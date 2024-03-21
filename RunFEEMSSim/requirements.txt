@@ -1,9 +1,0 @@
-nbdev~=2.3.2
-jupyter~=1.0.0
-jupyter_client~=7.3.2
-tornado~=6.1.0
-pandas~=2.1.1
-numpy~=1.24.2
-black~=23.1.0
-wheel~=0.38.4
-matplotlib~=3.8.0
