@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package gymirResult;
+
+message GymirResult {
+  string name = 1;
+  double auxiliary_load_kw = 2;
+  repeated SimulationInstance result = 3;
+}
+
+message SimulationInstance {
+  double epoch_s = 1;
+  string task_type = 2;
+  string task_name = 3;
+  double latitude_deg = 4;
+  double longitude_deg = 5;
+  double heading_deg = 6;
+  double wave_height_significant_m = 7;
+  double wave_peak_period_s = 8;
+  double wave_dir_rel_north_deg = 9;
+  double wave_dir_rel_vessel_deg= 10;
+  double wind_speed_mps = 11;
+  double wind_dir_rel_north_deg = 12;
+  double wind_dir_rel_vessel_deg = 13;
+  string weather_source = 14;
+  double speed_over_ground_kn = 15;
+  double speed_through_water_kn = 16;
+  double current_speed_mps = 17;
+  double current_dir_rel_north_deg = 18;
+  double power_kw = 19;
+  double torque_k_nm = 20;
+  double thrust_k_n = 21;
+  double total_resistance_k_n = 22;
+}
+
+message PropulsionPowerInstance {
+  double epoch_s = 1;
+  double propulsion_power_kw = 2;
+  double auxiliary_power_kw = 3;
+}
+
+message OperationProfilePoint {
+  double epoch_s = 1;
+  double speed_kn = 2;
+  double draft_m = 3;
+}
+
+message TimeSeriesResult {
+  repeated PropulsionPowerInstance propulsion_power_timeseries = 1;
+  double auxiliary_power_kw = 2;
+  repeated OperationProfilePoint operation_profile = 3;
+}

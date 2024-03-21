@@ -1,0 +1,31 @@
+﻿Table starts at,6,,,,,,
+Header at,8,,,,,,
+unit at,9,,,,,,
+Values start at,10,,,,,,
+Data sources,,,,,,,
+Base,MEPC.308(73) 2018 Guidelines on the method of calculation of the attained Energy Efficiency Design Index (EEDI) for new ships,,,,,,
+1,2,3,4,5,,,
+fuel_class,pathway_name,LCV,CO2_WtT,Cf_CO2,Cf_CH4,Cf_N2O,C_slip
+,,MJ/g,gCO2eq/MJ,gCO2/gFuel,gCO2/gFuel,gCO2/gFuel,Percent
+Fossil,HFO,0.0402,0,3.114,0,0,0
+Fossil,LFO,0.0402,0,3.114,0,0,0
+Fossil,Diesel,0.0427,0,3.206,0,0,0
+Fossil,LNG,0.048,0,2.75,0,0,0
+Fossil,LPG (Butane),0.0457,0,3.03,0,0,0
+Fossil,LPG (Propane),0.0463,0,3,0,0,0
+Fossil,H2,0.12,0,0,0,0,0
+Fossil,NH3,0.0186,0,0,0,0,0
+Fossil,Methanol,0.0199,0,1.375,0,0,0
+BIO,Ethanol,0.027,0,1.913,0,0,0
+BIO,Diesel,0.044,0,2.834,0,0,0
+BIO,HVO,,0,3.115,0,0,0
+BIO,LNG,0.05,0,2.75,0,0,0
+BIO,Other,,0,3.115,0,0,0
+BIO,H2,0.12,0,0,0,0,0
+RFNBO,Diesel,0.0427,0,3.206,0,0,0
+RFNBO,Methanol,0.0199,0,1.375,0,0,0
+RFNBO,LNG,0.0491,0,2.75,0,0,0
+RFNBO,H2,0.12,0,0,0,0,0
+RFNBO,NH3,0.0186,0,0,0,0,0
+RFNBO,LPG (Butane),0.0457,0,3.03,0,0,0
+RFNBO,LPG (Propane),0.0463,0,3,0,0,0

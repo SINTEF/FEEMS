@@ -1,0 +1,14 @@
+{
+  "duration_s": 900.0,
+  "fuel_consumption_total_kg": 46.512713907447804,
+  "hydrogen_consumption_total_kg": 0,
+  "energy_consumption_electric_total_mj": 0.0,
+  "energy_consumption_mechanical_total_mj": 0,
+  "energy_stored_total_mj": 0.0,
+  "running_hours_main_engines_hr": null,
+  "running_hours_genset_total_hr": 0.3888888888888889,
+  "running_hours_fuel_cell_total_hr": 0,
+  "running_hours_pti_pto_total_hr": 0,
+  "co2_emission_total_kg": 149.07324807337022,
+  "nox_emission_total_kg": 2.9697088695986515
+}

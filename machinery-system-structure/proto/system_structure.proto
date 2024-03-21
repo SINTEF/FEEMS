@@ -1,0 +1,311 @@
+syntax = "proto3";
+
+package machinerySystemStructure;
+
+message Point {
+  double x = 1;
+  double y = 2;
+}
+
+message Curve1D {
+  repeated Point points = 1;
+}
+
+message BSFCCurve {
+  string x_label = 1;  // Name and/or unit of the x variables
+  string y_label = 2;  // Name and/or unit of the y variables
+  Curve1D curve = 3;
+}
+
+message EfficiencyCurve {
+  string x_label = 1;  // Name and/or unit of the x variables
+  string y_label = 2;  // Name and/or unit of the y variables
+  Curve1D curve = 3;
+}
+
+message BSFC {
+  BSFCCurve curve = 1;
+  optional double value = 2;
+}
+
+message Efficiency {
+  optional EfficiencyCurve curve = 1;
+  optional double value = 2;
+}
+
+
+message PropulsionPowerTimeSeries {
+  string x_label = 1;
+  string y_label = 2;
+  uint32 propulsor_id = 3;
+  Curve1D curve = 4;
+}
+
+message AuxiliaryLoadTimeSeries {
+  string x_label = 1;
+  string y_label = 2;
+  uint32 switchboard_id = 3;
+  Curve1D curve =4;
+}
+
+message AuxiliaryLoad {
+  uint32 switchboard_id = 1;
+  double load_kw = 2;
+}
+
+enum EmissionType {
+  NONE = 0;
+  SOX = 1;
+  NOX = 2;
+  CO = 3;
+  PM = 4;
+  HC = 5;
+  CH4 = 6;
+  N2O = 7;
+}
+
+message EmissionCurve {
+  string x_label = 1;
+  string y_label = 2;
+  Curve1D curve = 3;
+  EmissionType emission_type = 4;
+}
+
+message Gear {
+  string name = 1;
+  double gear_ratio = 2;
+  double rated_power_kw = 3;
+  double rated_speed_rpm = 4;
+  Efficiency efficiency = 5;
+  uint32 order_from_switchboard_or_shaftline = 6;
+  double unit_price_usd = 7;
+}
+
+// Should follow the same order as in feems.type_for_feems.TypeFuel
+enum FuelType {
+  DIESEL = 0;
+  HFO = 1;
+  NATURAL_GAS = 2;
+  HYDROGEN = 3;
+  AMMONIA = 4;
+  LPG_PROPANE = 5;
+  LPG_BUTANE = 6;
+  ETHANOL = 7;
+  METHANOL = 8;
+  LFO = 9;
+}
+
+enum FuelOrigin {
+  NONE1 = 0;
+  FOSSIL = 1;
+  BIO = 2;
+  RENEWABLE_NON_BIO = 3;
+}
+
+enum FuelSpecifiedBy {
+  NONE2 = 0;
+  FUEL_EU_MARITIME = 1;
+  IMO = 2;
+  USER = 3;
+}
+
+message Fuel {
+  FuelType fuel_type = 1;
+  FuelOrigin fuel_origin = 2;
+}
+
+message Engine {
+  string name = 1;
+  double rated_power_kw = 2;
+  double rated_speed_rpm = 3;
+  BSFC bsfc = 4;
+  Fuel main_fuel = 5;
+  uint32 order_from_switchboard_or_shaftline = 6;
+  BSFC pilot_bsfc = 7;
+  Fuel pilot_fuel = 8;
+  enum NOxCalculationMethod {
+    TIER_2 = 0;
+    TIER_1 = 1;
+    TIER_3 = 2;
+    CURVE = 3;
+  }
+  enum EngineCycleType {
+    NONE = 0;
+    DIESEL = 1;
+    OTTO = 2;
+    LEAN_BURN_SPARK_IGNITION = 3;
+  }
+  NOxCalculationMethod nox_calculation_method = 9;
+  repeated EmissionCurve emission_curves = 10;
+  EngineCycleType engine_cycle_type = 11;
+  double unit_price_usd = 12;
+}
+
+message ElectricMachine {
+  string name = 1;
+  double rated_power_kw = 2;
+  double rated_speed_rpm = 3;
+  Efficiency efficiency = 4;
+  uint32 order_from_switchboard_or_shaftline = 5;
+  double unit_price_usd = 6;
+}
+
+message Battery {
+  string name = 1;
+  double energy_capacity_kwh = 2;
+  double rated_charging_rate_c = 3;
+  double rated_discharging_rate_c = 4;
+  double efficiency_charging = 5;
+  double efficiency_discharging = 6;
+  double initial_state_of_charge = 7;
+  uint32 order_from_switchboard_or_shaftline = 8;
+  double unit_price_usd = 9;
+}
+
+message ElectricComponent {
+  string name = 1;
+  double rated_power_kw = 2;
+  Efficiency efficiency = 3;
+  uint32 order_from_switchboard_or_shaftline = 4;
+  double unit_price_usd = 5;
+}
+
+message FuelCell {
+  string name = 1;
+  double rated_power_kw = 2;
+  Efficiency efficiency = 3;
+  uint32 order_from_switchboard_or_shaftline = 5;
+  Fuel fuel = 6;
+  double unit_price_usd = 7;
+  uint32 number_modules = 8;
+}
+
+message Propeller {
+  string name = 1;
+  Efficiency efficiency = 2;
+  uint32 propulsor_id = 3;
+  uint32 order_from_switchboard_or_shaftline = 5;
+}
+
+message BusBreaker {
+  int32 switchboard_to = 1;
+}
+
+message SuperCapacitor {
+  string name = 1;
+  double energy_capacity_wh = 2;
+  double rated_power_kw = 3;
+  double efficiency_charging = 4;
+  double efficiency_discharging = 5;
+  double initial_state_of_charge = 6;
+  uint32 order_from_switchboard_or_shaftline = 7;
+  double unit_price_usd = 8;
+}
+
+message MechanicalComponent {
+  string name = 1;
+  double rated_power_kw = 2;
+  Efficiency efficiency = 3;
+  uint32 order_from_switchboard_or_shaftline = 4;
+  double unit_price_usd = 5;
+}
+
+message Subsystem {
+  Gear gear = 1;
+  Engine engine = 2;
+  ElectricMachine electric_machine= 3;
+  ElectricComponent transformer = 4;
+  ElectricComponent converter1 = 5;
+  ElectricComponent converter2 = 6;
+  Battery battery = 7;
+  FuelCell fuel_cell = 8;
+  Propeller propeller = 9;
+  BusBreaker bus_breaker = 10;
+  SuperCapacitor supercapacitor = 11;
+  ElectricComponent other_load = 12;
+  enum PowerType {  // Make sure that this enum has the same order as in feems.type_for_feems.TypePower
+    NONE1 = 0; // NONE1 is used instead of NONE to avoid conflict with the NONE in the ComponentType enum
+    POWER_SOURCE = 1;
+    POWER_CONSUMER = 2;
+    PTI_PTO = 3;
+    ENERGY_STORAGE = 4;
+    SHORE_CONNECTION = 5;
+  }
+  enum ComponentType { // Make sure that this enum has the same order as in feems.type_for_feems.TypeComponent
+    NONE = 0;
+    MAIN_ENGINE = 1;
+    AUXILIARY_ENGINE = 2;
+    GENERATOR = 3;
+    PROPULSION_DRIVE = 4;
+    OTHER_LOAD = 5;
+    PTI_PTO_SYSTEM = 6;
+    BATTERY_SYSTEM = 7;
+    FUEL_CELL_SYSTEM = 8;
+    RECTIFIER = 9;
+    MAIN_ENGINE_WITH_GEARBOX = 10;
+    ELECTRIC_MOTOR = 11;
+    GENSET = 12;
+    TRANSFORMER = 13;
+    INVERTER = 14;
+    CIRCUIT_BREAKER = 15;
+    ACTIVE_FRONT_END = 16;
+    POWER_CONVERTER = 17;
+    SYNCHRONOUS_MACHINE = 18;
+    INDUCTION_MACHINE = 19;
+    GEARBOX = 20;
+    FUEL_CELL = 21;
+    PROPELLER_LOAD = 22;
+    OTHER_MECHANICAL_LOAD = 23;
+    BATTERY = 24;
+    SUPERCAPACITOR = 25;
+    SUPERCAPACITOR_SYSTEM = 26;
+    SHORE_POWER = 27;
+  }
+  PowerType power_type = 13;
+  ComponentType component_type = 14;
+  string name = 15;
+  double rated_power_kw = 16;
+  double rated_speed_rpm = 17;
+  double ramp_up_rate_limit_percent_per_second = 18;
+  double ramp_down_rate_limit_percent_per_second = 19;
+  uint32 base_load_order = 20; // The order of the power source in the base load calculation. 1 is the primary base load, 2 is the secondary base load, etc.
+}
+
+message Switchboard {
+  uint32 switchboard_id = 1;
+  repeated Subsystem subsystems = 2;
+}
+
+message ShaftLine {
+  uint32 shaft_line_id = 1;
+  repeated Subsystem subsystems = 2;
+}
+
+message MechanicalSystem {
+  repeated ShaftLine shaft_lines = 1;
+}
+
+message ElectricSystem {
+  repeated Switchboard switchboards = 1;
+}
+
+message FuelStorage {
+  FuelType fuel_type = 1;
+  double capacity_kg = 2;
+}
+
+message MachinerySystem {
+  string name = 1;
+  enum PropulsionType {
+    MECHANICAL = 0;
+    ELECTRIC = 1;
+    HYBRID = 2;
+  }
+  PropulsionType propulsion_type = 2;
+  repeated FuelStorage fuel_storage = 3;
+  double maximum_allowed_genset_load_percentage = 4;
+  MechanicalSystem mechanical_system = 5;
+  ElectricSystem electric_system = 6;
+  double maximum_allowed_fuel_cell_load_percentage = 7;
+  double average_base_load_percentage = 8;
+}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package feemsResult;
+
+import "system_structure.proto";
+
+
+message FuelScalar {
+    machinerySystemStructure.FuelType fuel_type = 1;
+    machinerySystemStructure.FuelOrigin fuel_origin = 2;
+    machinerySystemStructure.FuelSpecifiedBy fuel_specified_by = 3;
+    double mass_or_mass_fraction = 4;
+    double lhv_mj_per_g = 5;
+    double ghg_emission_factor_well_to_tank_gco2eq_per_mj = 6;
+    double ghg_emission_factor_tank_to_wake = 7;
+}
+
+message FuelArray {
+    machinerySystemStructure.FuelType fuel_type = 1;
+    machinerySystemStructure.FuelOrigin fuel_origin = 2;
+    machinerySystemStructure.FuelSpecifiedBy fuel_specified_by = 3;
+    repeated double mass_or_mass_fraction = 4;
+    double lhv_mj_per_g = 5;
+    double ghg_emission_factor_well_to_tank_gco2eq_per_mj = 6;
+    double ghg_emission_factor_tank_to_wake = 7;
+}
+
+message FuelConsumptionScalar {
+    repeated FuelScalar fuels = 1;
+}
+
+message FuelConsumptionRateArray {
+    repeated FuelArray fuels = 1;
+}
+
+message TimeSeriesResultForComponent {
+    repeated double time = 1;
+    repeated double power_output_kw = 2;
+    FuelConsumptionRateArray fuel_consumption_kg_per_s = 3;
+}
+
+message ResultPerComponent {
+    string component_name = 1;
+    FuelConsumptionScalar multi_fuel_consumption_kg = 2;
+    double electric_energy_consumption_mj = 3;
+    double mechanical_energy_consumption_mj = 4;
+    double energy_stored_mj= 5;
+    double running_hours_h = 6;
+    double co2_emissions_kg = 7;
+    double nox_emissions_kg = 8;
+    string component_type = 9;
+    double rated_capacity = 10;
+    string rated_capacity_unit = 11;
+    uint32 switchboard_id = 12;
+    uint32 shaftline_id = 13;
+    TimeSeriesResultForComponent result_time_series = 14;
+}
+
+message FeemsResult {
+    double duration_s = 1;
+    FuelConsumptionScalar multi_fuel_consumption_total_kg = 2;
+    double energy_consumption_electric_total_mj = 3;
+    double energy_consumption_mechanical_total_mj = 4;
+    double energy_stored_total_mj = 5;
+    double running_hours_main_engines_hr = 6;
+    double running_hours_genset_total_hr = 7;
+    double running_hours_fuel_cell_total_hr = 8;
+    double running_hours_pti_pto_total_hr = 9;
+    double co2_emission_total_kg = 10;
+    double nox_emission_total_kg = 11;
+    repeated ResultPerComponent detailed_result = 12;
+    double energy_input_mechanical_total_mj = 13;
+    double energy_input_electric_total_mj = 14;
+    double energy_consumption_propulsion_total_mj = 15;
+    double energy_consumption_auxiliary_total_mj = 16;
+}
+
+message FeemsResultForMachinerySystem {
+    FeemsResult electric_system = 1;
+    FeemsResult mechanical_system = 2;
+}

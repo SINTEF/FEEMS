@@ -1,0 +1,7 @@
+include settings.ini
+include LICENSE
+include CONTRIBUTING.md
+include README.md
+include dependencies
+include proto
+recursive-exclude * __pycache__

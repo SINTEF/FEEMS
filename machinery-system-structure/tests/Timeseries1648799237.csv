@@ -1,0 +1,442 @@
+1604188800,task,sailingtaskwithspeedchange
+1604188800,latitude,65.9177
+1604188800,longitude,13.105099999999998
+1604188800,heading,0.0
+1604188800,weather source,remote weather_wam800
+1604188800,wave height significant,0.2183055281639099
+1604188800,wave peak period (tp),2.0086119174957275
+1604188800,wave direction in degrees relative to geographic north,132.63381958007812
+1604188800,wind speed in meter per sec,5.820233345031738
+1604188800,wind direction in degrees relative to geographic north,284.8569641113281
+1604188800,wave direction in degrees relative to vessel heading,132.63381958007812
+1604188800,wind direction in degrees relative to vessel heading,284.8569641113281
+1604188800,sea current direction in degrees relative to geographic north,0.0
+1604188800,sea current speed in meter pr sec,0.0
+1604188800,assignment,sailing_mosjoen_rotterdam(sailing)
+1604188800,speed,15.0
+1604188800,power,0.0
+1604189706,task,sailingtaskwithspeedchange
+1604189706,latitude,65.94398908591388
+1604189706,longitude,12.965058340508804
+1604189706,heading,-65.22003792766533
+1604189706,weather source,remote weather_wam800
+1604189706,wave height significant,0.5654219388961792
+1604189706,wave peak period (tp),2.647538900375366
+1604189706,wave direction in degrees relative to geographic north,98.8360595703125
+1604189706,wind speed in meter per sec,14.152313232421875
+1604189706,wind direction in degrees relative to geographic north,278.6241760253906
+1604189706,wave direction in degrees relative to vessel heading,164.05609749797782
+1604189706,wind direction in degrees relative to vessel heading,343.84421395305594
+1604189706,sea current direction in degrees relative to geographic north,0.0
+1604189706,sea current speed in meter pr sec,0.0
+1604189706,assignment,sailing_mosjoen_rotterdam(sailing)
+1604189706,speed,15.0
+1604189706,power,0.0
+1604190517,task,sailingtaskwithspeedchange
+1604190517,latitude,65.9810068889561
+1604190517,longitude,12.860980584770873
+1604190517,heading,-48.82581811917973
+1604190517,weather source,remote weather_wam800
+1604190517,wave height significant,0.6421118378639221
+1604190517,wave peak period (tp),3.125613212585449
+1604190517,wave direction in degrees relative to geographic north,121.88983154296875
+1604190517,wind speed in meter per sec,13.640847206115723
+1604190517,wind direction in degrees relative to geographic north,305.4472351074219
+1604190517,wave direction in degrees relative to vessel heading,170.71564966214848
+1604190517,wind direction in degrees relative to vessel heading,354.27305322660163
+1604190517,sea current direction in degrees relative to geographic north,0.0
+1604190517,sea current speed in meter pr sec,0.0
+1604190517,assignment,sailing_mosjoen_rotterdam(sailing)
+1604190517,speed,15.0
+1604190517,power,0.0
+1604191186,task,sailingtaskwithspeedchange
+1604191186,latitude,65.96499305300499
+1604191186,longitude,12.753953706942221
+1604191186,heading,-110.12832330334405
+1604191186,weather source,remote weather_wam800
+1604191186,wave height significant,0.3410550355911255
+1604191186,wave peak period (tp),2.3184194564819336
+1604191186,wave direction in degrees relative to geographic north,104.8050537109375
+1604191186,wind speed in meter per sec,10.641560554504395
+1604191186,wind direction in degrees relative to geographic north,298.5522766113281
+1604191186,wave direction in degrees relative to vessel heading,214.93337701428155
+1604191186,wind direction in degrees relative to vessel heading,48.68059991467214
+1604191186,sea current direction in degrees relative to geographic north,0.0
+1604191186,sea current speed in meter pr sec,0.0
+1604191186,assignment,sailing_mosjoen_rotterdam(sailing)
+1604191186,speed,15.0
+1604191186,power,0.0
+1604192400,task,sailingtaskwithspeedchange
+1604192400,latitude,65.90710116529142
+1604192400,longitude,12.60384498835462
+1604192400,heading,-133.33669019661886
+1604192400,weather source,remote weather_wam800
+1604192400,wave height significant,0.2209988236427307
+1604192400,wave peak period (tp),2.3221964836120605
+1604192400,wave direction in degrees relative to geographic north,163.26300048828125
+1604192400,wind speed in meter per sec,4.227132320404053
+1604192400,wind direction in degrees relative to geographic north,306.3592529296875
+1604192400,wave direction in degrees relative to vessel heading,296.5996906849001
+1604192400,wind direction in degrees relative to vessel heading,79.69594312630636
+1604192400,sea current direction in degrees relative to geographic north,0.0
+1604192400,sea current speed in meter pr sec,0.0
+1604192400,assignment,sailing_mosjoen_rotterdam(sailing)
+1604192400,speed,15.0
+1604192400,power,0.0
+1604192423,task,sailingtaskwithspeedchange
+1604192423,latitude,65.90600295523144
+1604192423,longitude,12.601007634674227
+1604192423,heading,-133.4737531309435
+1604192423,weather source,remote weather_wam800
+1604192423,wave height significant,0.22912248969078064
+1604192423,wave peak period (tp),2.4058475494384766
+1604192423,wave direction in degrees relative to geographic north,162.33157348632812
+1604192423,wind speed in meter per sec,4.365622520446777
+1604192423,wind direction in degrees relative to geographic north,306.01507568359375
+1604192423,wave direction in degrees relative to vessel heading,295.8053266172716
+1604192423,wind direction in degrees relative to vessel heading,79.48882881453721
+1604192423,sea current direction in degrees relative to geographic north,0.0
+1604192423,sea current speed in meter pr sec,0.0
+1604192423,assignment,sailing_mosjoen_rotterdam(sailing)
+1604192423,speed,15.0
+1604192423,power,0.0
+1604193529,task,sailingtaskwithspeedchange
+1604193529,latitude,65.83600157254318
+1604193529,longitude,12.524001724709004
+1604193529,heading,-155.75153715873785
+1604193529,weather source,remote weather_wam800
+1604193529,wave height significant,0.3684995770454407
+1604193529,wave peak period (tp),2.9408090114593506
+1604193529,wave direction in degrees relative to geographic north,174.51553344726562
+1604193529,wind speed in meter per sec,7.4958086013793945
+1604193529,wind direction in degrees relative to geographic north,329.2124328613281
+1604193529,wave direction in degrees relative to vessel heading,330.2670706060035
+1604193529,wind direction in degrees relative to vessel heading,124.96397002006597
+1604193529,sea current direction in degrees relative to geographic north,0.0
+1604193529,sea current speed in meter pr sec,0.0
+1604193529,assignment,sailing_mosjoen_rotterdam(sailing)
+1604193529,speed,15.0
+1604193529,power,0.0
+1604194874,task,sailingtaskwithspeedchange
+1604194874,latitude,65.78038971273043
+1604194874,longitude,12.341069226717616
+1604194874,heading,-126.48618573170994
+1604194874,weather source,remote weather_wam800
+1604194874,wave height significant,0.568785548210144
+1604194874,wave peak period (tp),4.305638790130615
+1604194874,wave direction in degrees relative to geographic north,205.4559783935547
+1604194874,wind speed in meter per sec,7.179786205291748
+1604194874,wind direction in degrees relative to geographic north,334.7338562011719
+1604194874,wave direction in degrees relative to vessel heading,331.94216412526464
+1604194874,wind direction in degrees relative to vessel heading,101.22004193288183
+1604194874,sea current direction in degrees relative to geographic north,0.0
+1604194874,sea current speed in meter pr sec,0.0
+1604194874,assignment,sailing_mosjoen_rotterdam(sailing)
+1604194874,speed,15.0
+1604194874,power,0.0
+1604196000,task,sailingtaskwithspeedchange
+1604196000,latitude,65.70545356737648
+1604196000,longitude,12.287149422137635
+1604196000,heading,-163.50715579194338
+1604196000,weather source,remote weather_wam800
+1604196000,wave height significant,0.9916881322860718
+1604196000,wave peak period (tp),3.923922061920166
+1604196000,wave direction in degrees relative to geographic north,189.7821502685547
+1604196000,wind speed in meter per sec,13.11324691772461
+1604196000,wind direction in degrees relative to geographic north,348.2752380371094
+1604196000,wave direction in degrees relative to vessel heading,353.28930606049806
+1604196000,wind direction in degrees relative to vessel heading,151.78239382905275
+1604196000,sea current direction in degrees relative to geographic north,0.0
+1604196000,sea current speed in meter pr sec,0.0
+1604196000,assignment,sailing_mosjoen_rotterdam(sailing)
+1604196000,speed,15.0
+1604196000,power,0.0
+1604197749,task,sailingtaskwithspeedchange
+1604197749,latitude,65.58901885359728
+1604197749,longitude,12.204013398823498
+1604197749,heading,-163.55631509798957
+1604197749,weather source,remote weather_wam800
+1604197749,wave height significant,1.085551381111145
+1604197749,wave peak period (tp),12.284492492675781
+1604197749,wave direction in degrees relative to geographic north,217.18252563476562
+1604197749,wind speed in meter per sec,12.736698150634766
+1604197749,wind direction in degrees relative to geographic north,330.674560546875
+1604197749,wave direction in degrees relative to vessel heading,20.738840732755193
+1604197749,wind direction in degrees relative to vessel heading,134.23087564486457
+1604197749,sea current direction in degrees relative to geographic north,0.0
+1604197749,sea current speed in meter pr sec,0.0
+1604197749,assignment,sailing_mosjoen_rotterdam(sailing)
+1604197749,speed,15.0
+1604197749,power,0.0
+1604199600,task,sailingtaskwithspeedchange
+1604199600,latitude,65.50779836872366
+1604199600,longitude,11.963586101204264
+1604199600,heading,-129.1095415229322
+1604199600,weather source,remote weather_wam800
+1604199600,wave height significant,1.7652848958969116
+1604199600,wave peak period (tp),14.864236831665039
+1604199600,wave direction in degrees relative to geographic north,226.7213897705078
+1604199600,wind speed in meter per sec,13.274995803833008
+1604199600,wind direction in degrees relative to geographic north,332.4287414550781
+1604199600,wave direction in degrees relative to vessel heading,355.83093129344
+1604199600,wind direction in degrees relative to vessel heading,101.53828297801033
+1604199600,sea current direction in degrees relative to geographic north,0.0
+1604199600,sea current speed in meter pr sec,0.0
+1604199600,assignment,sailing_mosjoen_rotterdam(sailing)
+1604199600,speed,15.0
+1604199600,power,0.0
+1604199914,task,sailingtaskwithspeedchange
+1604199914,latitude,65.49398265570295
+1604199914,longitude,11.922949031059236
+1604199914,heading,-129.32840532264524
+1604199914,weather source,remote weather_wam800
+1604199914,wave height significant,1.7833387851715088
+1604199914,wave peak period (tp),14.864236831665039
+1604199914,wave direction in degrees relative to geographic north,219.7960205078125
+1604199914,wind speed in meter per sec,13.837101936340332
+1604199914,wind direction in degrees relative to geographic north,330.6998596191406
+1604199914,wave direction in degrees relative to vessel heading,349.12442583045777
+1604199914,wind direction in degrees relative to vessel heading,100.02826494178589
+1604199914,sea current direction in degrees relative to geographic north,0.0
+1604199914,sea current speed in meter pr sec,0.0
+1604199914,assignment,sailing_mosjoen_rotterdam(sailing)
+1604199914,speed,15.0
+1604199914,power,0.0
+1604203037,task,sailingtaskwithspeedchange
+1604203037,latitude,65.28002429220516
+1604203037,longitude,11.840009339302998
+1604203037,heading,-170.79109851876296
+1604203037,weather source,remote weather_wam800
+1604203037,wave height significant,1.3425443172454834
+1604203037,wave peak period (tp),14.854530334472656
+1604203037,wave direction in degrees relative to geographic north,208.41525268554688
+1604203037,wind speed in meter per sec,11.585634231567383
+1604203037,wind direction in degrees relative to geographic north,330.5367736816406
+1604203037,wave direction in degrees relative to vessel heading,19.20635120430984
+1604203037,wind direction in degrees relative to vessel heading,141.3278722004036
+1604203037,sea current direction in degrees relative to geographic north,0.0
+1604203037,sea current speed in meter pr sec,0.0
+1604203037,assignment,sailing_mosjoen_rotterdam(sailing)
+1604203037,speed,15.0
+1604203037,power,0.0
+1604203200,task,sailingtaskwithspeedchange
+1604203200,latitude,65.2687367827885
+1604203200,longitude,11.838237359089353
+1604203200,heading,-176.24237449022505
+1604203200,weather source,remote weather_wam800
+1604203200,wave height significant,1.4657821655273438
+1604203200,wave peak period (tp),13.512940406799316
+1604203200,wave direction in degrees relative to geographic north,205.18359375
+1604203200,wind speed in meter per sec,13.373538970947266
+1604203200,wind direction in degrees relative to geographic north,339.33282470703125
+1604203200,wave direction in degrees relative to vessel heading,21.425968240225075
+1604203200,wind direction in degrees relative to vessel heading,155.57519919725632
+1604203200,sea current direction in degrees relative to geographic north,0.0
+1604203200,sea current speed in meter pr sec,0.0
+1604203200,assignment,sailing_mosjoen_rotterdam(sailing)
+1604203200,speed,15.0
+1604203200,power,0.0
+1604204886,task,sailingtaskwithspeedchange
+1604204886,latitude,65.1519825558404
+1604204886,longitude,11.819997286784531
+1604204886,heading,-176.24398401749744
+1604204886,weather source,remote weather_wam800
+1604204886,wave height significant,1.0866183042526245
+1604204886,wave peak period (tp),14.864236831665039
+1604204886,wave direction in degrees relative to geographic north,231.82382202148438
+1604204886,wind speed in meter per sec,13.297026634216309
+1604204886,wind direction in degrees relative to geographic north,339.98541259765625
+1604204886,wave direction in degrees relative to vessel heading,48.067806038981814
+1604204886,wind direction in degrees relative to vessel heading,156.22939661515375
+1604204886,sea current direction in degrees relative to geographic north,0.0
+1604204886,sea current speed in meter pr sec,0.0
+1604204886,assignment,sailing_mosjoen_rotterdam(sailing)
+1604204886,speed,15.0
+1604204886,power,0.0
+1604205991,task,sailingtaskwithspeedchange
+1604205991,latitude,65.07800532295366
+1604205991,longitude,11.772003443390757
+1604205991,heading,-164.70860366248255
+1604205991,weather source,remote weather_wam800
+1604205991,wave height significant,0.41843631863594055
+1604205991,wave peak period (tp),2.430420398712158
+1604205991,wave direction in degrees relative to geographic north,183.70155334472656
+1604205991,wind speed in meter per sec,12.319045066833496
+1604205991,wind direction in degrees relative to geographic north,338.69305419921875
+1604205991,wave direction in degrees relative to vessel heading,348.41015700720914
+1604205991,wind direction in degrees relative to vessel heading,143.40165786170132
+1604205991,sea current direction in degrees relative to geographic north,0.0
+1604205991,sea current speed in meter pr sec,0.0
+1604205991,assignment,sailing_mosjoen_rotterdam(sailing)
+1604205991,speed,15.0
+1604205991,power,0.0
+1604206800,task,sailingtaskwithspeedchange
+1604206800,latitude,65.04551963915743
+1604206800,longitude,11.663404990131633
+1604206800,heading,-125.30477994911364
+1604206800,weather source,remote weather_wam800
+1604206800,wave height significant,0.5285452604293823
+1604206800,wave peak period (tp),14.864237785339355
+1604206800,wave direction in degrees relative to geographic north,167.16339111328125
+1604206800,wind speed in meter per sec,10.17496395111084
+1604206800,wind direction in degrees relative to geographic north,335.6573486328125
+1604206800,wave direction in degrees relative to vessel heading,292.4681710623949
+1604206800,wind direction in degrees relative to vessel heading,100.96212858192615
+1604206800,sea current direction in degrees relative to geographic north,0.0
+1604206800,sea current speed in meter pr sec,0.0
+1604206800,assignment,sailing_mosjoen_rotterdam(sailing)
+1604206800,speed,15.0
+1604206800,power,0.0
+1604207782,task,sailingtaskwithspeedchange
+1604207782,latitude,65.0059815747751
+1604207782,longitude,11.531938914962092
+1604207782,heading,-125.40325299862951
+1604207782,weather source,remote weather_wam800
+1604207782,wave height significant,0.6025618314743042
+1604207782,wave peak period (tp),13.512940406799316
+1604207782,wave direction in degrees relative to geographic north,190.9228515625
+1604207782,wind speed in meter per sec,11.866759300231934
+1604207782,wind direction in degrees relative to geographic north,336.20806884765625
+1604207782,wave direction in degrees relative to vessel heading,316.3261045611295
+1604207782,wind direction in degrees relative to vessel heading,101.61132184628576
+1604207782,sea current direction in degrees relative to geographic north,0.0
+1604207782,sea current speed in meter pr sec,0.0
+1604207782,assignment,sailing_mosjoen_rotterdam(sailing)
+1604207782,speed,15.0
+1604207782,power,0.0
+1604208824,task,sailingtaskwithspeedchange
+1604208824,latitude,64.96500807306059
+1604208824,longitude,11.391027676550678
+1604208824,heading,-124.45086946507155
+1604208824,weather source,remote weather_wam800
+1604208824,wave height significant,0.5090584754943848
+1604208824,wave peak period (tp),2.673462390899658
+1604208824,wave direction in degrees relative to geographic north,195.25860595703125
+1604208824,wind speed in meter per sec,10.641841888427734
+1604208824,wind direction in degrees relative to geographic north,339.5870056152344
+1604208824,wave direction in degrees relative to vessel heading,319.7094754221028
+1604208824,wind direction in degrees relative to vessel heading,104.03787508030592
+1604208824,sea current direction in degrees relative to geographic north,0.0
+1604208824,sea current speed in meter pr sec,0.0
+1604208824,assignment,sailing_mosjoen_rotterdam(sailing)
+1604208824,speed,15.0
+1604208824,power,0.0
+1604209673,task,sailingtaskwithspeedchange
+1604209673,latitude,64.90898168220494
+1604209673,longitude,11.347985958472387
+1604209673,heading,-161.9536614634771
+1604209673,weather source,remote weather_wam800
+1604209673,wave height significant,0.2734917104244232
+1604209673,wave peak period (tp),1.8260105848312378
+1604209673,wave direction in degrees relative to geographic north,174.63516235351562
+1604209673,wind speed in meter per sec,10.212474822998047
+1604209673,wind direction in degrees relative to geographic north,341.6849365234375
+1604209673,wave direction in degrees relative to vessel heading,336.5888238169927
+1604209673,wind direction in degrees relative to vessel heading,143.6385979869146
+1604209673,sea current direction in degrees relative to geographic north,0.0
+1604209673,sea current speed in meter pr sec,0.0
+1604209673,assignment,sailing_mosjoen_rotterdam(sailing)
+1604209673,speed,15.0
+1604209673,power,0.0
+1604210400,task,sailingtaskwithspeedchange
+1604210400,latitude,64.8663919961889
+1604210400,longitude,11.284255412958112
+1604210400,heading,-147.5532836732007
+1604210400,weather source,remote weather_wam800
+1604210400,wave height significant,0.3633185625076294
+1604210400,wave peak period (tp),1.8260105848312378
+1604210400,wave direction in degrees relative to geographic north,192.0460968017578
+1604210400,wind speed in meter per sec,8.035566329956055
+1604210400,wind direction in degrees relative to geographic north,344.24395751953125
+1604210400,wave direction in degrees relative to vessel heading,339.5993804749585
+1604210400,wind direction in degrees relative to vessel heading,131.79724119273192
+1604210400,sea current direction in degrees relative to geographic north,0.0
+1604210400,sea current speed in meter pr sec,0.0
+1604210400,assignment,sailing_mosjoen_rotterdam(sailing)
+1604210400,speed,15.0
+1604210400,power,0.0
+1604211652,task,sailingtaskwithspeedchange
+1604211652,latitude,64.79298273634353
+1604211652,longitude,11.174974384315643
+1604211652,heading,-147.61099026064363
+1604211652,weather source,remote weather_wam800
+1604211652,wave height significant,1.2737219333648682
+1604211652,wave peak period (tp),12.284492492675781
+1604211652,wave direction in degrees relative to geographic north,234.6975555419922
+1604211652,wind speed in meter per sec,11.271003723144531
+1604211652,wind direction in degrees relative to geographic north,344.09344482421875
+1604211652,wave direction in degrees relative to vessel heading,22.30854580263582
+1604211652,wind direction in degrees relative to vessel heading,131.70443508486238
+1604211652,sea current direction in degrees relative to geographic north,0.0
+1604211652,sea current speed in meter pr sec,0.0
+1604211652,assignment,sailing_mosjoen_rotterdam(sailing)
+1604211652,speed,15.0
+1604211652,power,0.0
+1604212887,task,sailingtaskwithspeedchange
+1604212887,latitude,64.72299036981285
+1604212887,longitude,11.058984092573088
+1604212887,heading,-144.69889935536287
+1604212887,weather source,remote weather_wam800
+1604212887,wave height significant,1.9874669313430786
+1604212887,wave peak period (tp),13.512940406799316
+1604212887,wave direction in degrees relative to geographic north,242.4027862548828
+1604212887,wind speed in meter per sec,12.35629653930664
+1604212887,wind direction in degrees relative to geographic north,345.2295227050781
+1604212887,wave direction in degrees relative to vessel heading,27.10168561024568
+1604212887,wind direction in degrees relative to vessel heading,129.928422060441
+1604212887,sea current direction in degrees relative to geographic north,0.0
+1604212887,sea current speed in meter pr sec,0.0
+1604212887,assignment,sailing_mosjoen_rotterdam(sailing)
+1604212887,speed,15.0
+1604212887,power,0.0
+1604214000,task,sailingtaskwithspeedchange
+1604214000,latitude,64.65799852861934
+1604214000,longitude,10.9613543560931
+1604214000,heading,-147.2474622327896
+1604214000,weather source,remote weather_wam800
+1604214000,wave height significant,1.9222803115844727
+1604214000,wave peak period (tp),13.512940406799316
+1604214000,wave direction in degrees relative to geographic north,253.89605712890625
+1604214000,wind speed in meter per sec,10.696914672851562
+1604214000,wind direction in degrees relative to geographic north,329.5866394042969
+1604214000,wave direction in degrees relative to vessel heading,41.14351936169584
+1604214000,wind direction in degrees relative to vessel heading,116.83410163708646
+1604214000,sea current direction in degrees relative to geographic north,0.0
+1604214000,sea current speed in meter pr sec,0.0
+1604214000,assignment,sailing_mosjoen_rotterdam(sailing)
+1604214000,speed,15.0
+1604214000,power,0.0
+1604214565,task,sailingtaskwithspeedchange
+1604214565,latitude,64.62498172547295
+1604214565,longitude,10.911972707661183
+1604214565,heading,-147.33572066880436
+1604214565,weather source,remote weather_wam800
+1604214565,wave height significant,1.2445582151412964
+1604214565,wave peak period (tp),13.512940406799316
+1604214565,wave direction in degrees relative to geographic north,258.9476013183594
+1604214565,wind speed in meter per sec,9.793121337890625
+1604214565,wind direction in degrees relative to geographic north,335.588623046875
+1604214565,wave direction in degrees relative to vessel heading,46.28332198716373
+1604214565,wind direction in degrees relative to vessel heading,122.92434371567936
+1604214565,sea current direction in degrees relative to geographic north,0.0
+1604214565,sea current speed in meter pr sec,0.0
+1604214565,assignment,sailing_mosjoen_rotterdam(sailing)
+1604214565,speed,15.0
+1604214565,power,0.0
+1604215950,task,sailingtaskwithspeedchange
+1604215950,latitude,64.59499938138765
+1604215950,longitude,10.698995632908813
+1604215950,heading,-108.07994844143826
+1604215950,weather source,remote weather_wam800
+1604215950,wave height significant,2.2321343421936035
+1604215950,wave peak period (tp),13.512941360473633
+1604215950,wave direction in degrees relative to geographic north,249.26536560058594
+1604215950,wind speed in meter per sec,9.837118148803711
+1604215950,wind direction in degrees relative to geographic north,336.2023010253906
+1604215950,wave direction in degrees relative to vessel heading,357.3453140420242
+1604215950,wind direction in degrees relative to vessel heading,84.28224946682889
+1604215950,sea current direction in degrees relative to geographic north,0.0
+1604215950,sea current speed in meter pr sec,0.0
+1604215950,assignment,sailing_mosjoen_rotterdam(sailing)
+1604215950,speed,15.0
+1604215950,power,0.0

@@ -1,0 +1,7 @@
+,fuel consumption [kg],hydrogen consumption [kg],electric energy consumption [MJ],mechanical energy consumption [MJ],energy_stored [MJ],running hours [h],CO2 emission [kg],NOx emission [kg],component type,rated capacity,rated capacity unit,switchboard id
+Genset 1,0.0,0,0,0,0,0.0,0.0,0.0,GENSET,1000.0,kW,1
+Genset 2,0.0,0,0,0,0,0.0,0.0,0.0,GENSET,1000.0,kW,1
+Battery System 1,0,0,0.0,0,0.0,0,0,0,BATTERY_SYSTEM,1000.0,kWh,1
+Genset 3,19.30144029810331,0,0,0,0,0.1388888888888889,61.86111615542111,1.2669647258816672,GENSET,1000.0,kW,2
+Genset 4,27.211273609344495,0,0,0,0,0.25,87.21213191794911,1.7027441437169843,GENSET,1000.0,kW,2
+Battery System 2,0,0,0.0,0,0.0,0,0,0,BATTERY_SYSTEM,1000.0,kWh,2

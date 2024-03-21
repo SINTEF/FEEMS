@@ -1,0 +1,14 @@
+protobuf~=4.21.12
+mypy-protobuf~=3.3.0
+types-protobuf~=3.20.3
+typing_extensions~=4.3.0
+dependencies/feems-0.10.5-py3-none-any.whl
+nbdev~=2.3.2
+jupyter~=1.0.0
+jupyter_client~=7.3.2
+tornado~=6.1.0
+jupyterlab~=3.4.7
+plotly~=5.13.1
+RunFeemsSim
+deepdiff
+matplotlib~=3.8.2

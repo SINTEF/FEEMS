@@ -1,0 +1,450 @@
+[
+  {
+    "system": "Generator",
+    "components": ["DR"],
+    "grid": "DC",
+    "nominal_efficiency": 0.995,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.984
+      },
+      {
+        "x": 16,
+        "y": 0.992
+      },
+      {
+        "x": 36,
+        "y": 0.994
+      },
+      {
+        "x": 64,
+        "y": 0.995
+      },
+      {
+        "x": 100,
+        "y": 0.995
+      }
+    ]
+  },
+  {
+    "system": "Generator",
+    "components": [],
+    "grid": "AC",
+    "nominal_efficiency": 1.0,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 1.0
+      },
+      {
+        "x": 16,
+        "y": 1.0
+      },
+      {
+        "x": 36,
+        "y": 1.0
+      },
+      {
+        "x": 64,
+        "y": 1.0
+      },
+      {
+        "x": 100,
+        "y": 1.0
+      }
+    ]
+  },
+  {
+    "system": "Shaft Generator",
+    "components": ["INU","AFE"],
+    "grid": "AC",
+    "nominal_efficiency": 0.964,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.858
+      },
+      {
+        "x": 16,
+        "y": 0.941
+      },
+      {
+        "x": 36,
+        "y": 0.958
+      },
+      {
+        "x": 64,
+        "y": 0.964
+      },
+      {
+        "x": 100,
+        "y": 0.965
+      }
+    ]
+  },
+  {
+    "system": "Shaft Generator",
+    "components": ["INU"],
+    "grid": "DC",
+    "nominal_efficiency": 0.984,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.925
+      },
+      {
+        "x": 16,
+        "y": 0.977
+      },
+      {
+        "x": 36,
+        "y": 0.985
+      },
+      {
+        "x": 64,
+        "y": 0.986
+      },
+      {
+        "x": 100,
+        "y": 0.986
+      }
+    ]
+  },
+  {
+    "system": "Shore Connection",
+    "components": ["DR","AFE","Trafo"],
+    "grid": "AC",
+    "nominal_efficiency": 0.96,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.858
+      },
+      {
+        "x": 16,
+        "y": 0.938
+      },
+      {
+        "x": 36,
+        "y": 0.956
+      },
+      {
+        "x": 64,
+        "y": 0.960
+      },
+      {
+        "x": 100,
+        "y": 0.960
+      }
+    ]
+  },
+  {
+    "system": "Shore Connection",
+    "components": ["AFE", "Trafo"],
+    "grid": "DC",
+    "nominal_efficiency": 0.98,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.927
+      },
+      {
+        "x": 16,
+        "y": 0.963
+      },
+      {
+        "x": 36,
+        "y": 0.972
+      },
+      {
+        "x": 64,
+        "y": 0.977
+      },
+      {
+        "x": 100,
+        "y": 0.979
+      }
+    ]
+  },
+  {
+    "system": "AC Distribution Transformer",
+    "components": ["Trafo"],
+    "grid": "AC",
+    "nominal_efficiency": 0.965,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.941
+      },
+      {
+        "x": 16,
+        "y": 0.983
+      },
+      {
+        "x": 36,
+        "y": 0.989
+      },
+      {
+        "x": 64,
+        "y": 0.986
+      },
+      {
+        "x": 100,
+        "y": 0.986
+      }
+    ]
+  },
+  {
+    "system": "AC Distribution Transformation",
+    "components": ["AFE","Trafo"],
+    "grid": "DC",
+    "nominal_efficiency": 0.965,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.872
+      },
+      {
+        "x": 16,
+        "y": 0.946
+      },
+      {
+        "x": 36,
+        "y": 0.962
+      },
+      {
+        "x": 64,
+        "y": 0.965
+      },
+      {
+        "x": 100,
+        "y": 0.965
+      }
+    ]
+  },
+  {
+    "system": "Bow Thruster",
+    "components": ["INU","AFE"],
+    "grid": "AC",
+    "nominal_efficiency": 0.964,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.858
+      },
+      {
+        "x": 16,
+        "y": 0.941
+      },
+      {
+        "x": 36,
+        "y": 0.958
+      },
+      {
+        "x": 64,
+        "y": 0.964
+      },
+      {
+        "x": 100,
+        "y": 0.965
+      }
+    ]
+  },
+  {
+    "system": "Bow Thruster",
+    "components": ["INU"],
+    "grid": "DC",
+    "nominal_efficiency": 0.984,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.925
+      },
+      {
+        "x": 16,
+        "y": 0.977
+      },
+      {
+        "x": 36,
+        "y": 0.985
+      },
+      {
+        "x": 64,
+        "y": 0.986
+      },
+      {
+        "x": 100,
+        "y": 0.986
+      }
+    ]
+  },
+  {
+    "system": "Pump, Fan VFD",
+    "components": ["INU","AFE"],
+    "grid": "AC",
+    "nominal_efficiency": 0.964,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.858
+      },
+      {
+        "x": 16,
+        "y": 0.941
+      },
+      {
+        "x": 36,
+        "y": 0.958
+      },
+      {
+        "x": 64,
+        "y": 0.964
+      },
+      {
+        "x": 100,
+        "y": 0.965
+      }
+    ]
+  },
+  {
+    "system": "Pump, Fan VFD",
+    "components": ["INU"],
+    "grid": "DC",
+    "nominal_efficiency": 0.984,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.925
+      },
+      {
+        "x": 16,
+        "y": 0.977
+      },
+      {
+        "x": 36,
+        "y": 0.985
+      },
+      {
+        "x": 64,
+        "y": 0.986
+      },
+      {
+        "x": 100,
+        "y": 0.986
+      }
+    ]
+  },
+  {
+    "system": "Energy Storage System",
+    "components": ["AFE","Trafo"],
+    "grid": "AC",
+    "nominal_efficiency": 0.965,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.872
+      },
+      {
+        "x": 16,
+        "y": 0.946
+      },
+      {
+        "x": 36,
+        "y": 0.962
+      },
+      {
+        "x": 64,
+        "y": 0.965
+      },
+      {
+        "x": 100,
+        "y": 0.965
+      }
+    ]
+  },
+  {
+    "system": "Energy Storage System",
+    "components": ["DDC"],
+    "grid": "DC",
+    "nominal_efficiency": 0.982,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.93
+      },
+      {
+        "x": 16,
+        "y": 0.966
+      },
+      {
+        "x": 36,
+        "y": 0.975
+      },
+      {
+        "x": 64,
+        "y": 0.98
+      },
+      {
+        "x": 100,
+        "y": 0.982
+      }
+    ]
+  },
+  {
+    "system": "Fuel cell system",
+    "components": ["AFE","Trafo"],
+    "grid": "AC",
+    "nominal_efficiency": 0.965,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.872
+      },
+      {
+        "x": 16,
+        "y": 0.946
+      },
+      {
+        "x": 36,
+        "y": 0.962
+      },
+      {
+        "x": 64,
+        "y": 0.965
+      },
+      {
+        "x": 100,
+        "y": 0.965
+      }
+    ]
+  },
+  {
+    "system": "Fuel cell system",
+    "components": ["DDC"],
+    "grid": "DC",
+    "nominal_efficiency": 0.982,
+    "efficiency_curve": [
+      {
+        "x": 4,
+        "y": 0.93
+      },
+      {
+        "x": 16,
+        "y": 0.966
+      },
+      {
+        "x": 36,
+        "y": 0.975
+      },
+      {
+        "x": 64,
+        "y": 0.98
+      },
+      {
+        "x": 100,
+        "y": 0.982
+      }
+    ]
+  }
+]

@@ -1,0 +1,72 @@
+# Python package
+# Create and test a Python package on multiple Python versions.
+# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+
+variables:
+  isMaster: $[eq(variables['Build.SourceBranch'], 'refs/heads/master')]
+
+jobs:
+- job: testing
+  pool:
+    vmImage: ubuntu-latest
+  strategy:
+    matrix:
+      Python39:
+        python.version: '3.9'
+      Python310:
+        python.version: '3.10'
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+    displayName: 'Use Python $(python.version)'
+
+  - task: PipAuthenticate@1
+    displayName: 'Pip Authenticate'
+    inputs:
+      artifactFeeds: 'SintefOceanEnergySystem'
+      onlyAddExtraIndex: true
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Install dependencies'
+
+  - script: |
+      nbdev_test
+    displayName: 'NBDEV Test'
+
+- job: publishing
+  dependsOn: testing
+  condition: eq(variables.isMaster, true)
+  pool:
+    vmImage: ubuntu-latest
+
+  steps:
+  - task: PipAuthenticate@1
+    displayName: 'Pip Authenticate'
+    inputs:
+      artifactFeeds: 'SintefOceanEnergySystem'
+      onlyAddExtraIndex: true
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Install dependencies'
+
+  - script: |
+      pip install wheel
+      pip install twine
+
+  - script: |
+      python setup.py bdist_wheel
+
+  - task: TwineAuthenticate@1
+    displayName: Twine Authentication
+    inputs:
+      artifactFeed: SintefOceanEnergySystem
+      pythonUploadServiceConnection: MES_package_library
+
+  - script: |
+      python -m twine upload -r SintefOceanEnergySystem --config-file $(PYPIRC_PATH) dist/*.whl
