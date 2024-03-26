@@ -8,7 +8,7 @@ include = ["feems/py.typed"]
 license = "Proprietary"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
+python = ">=3.10,<3.13"
 pandas = "^2.1.1"
 scipy = "^1.11.2"
 
@@ -30,4 +30,3 @@ target-version = ['py37']
 [build-system]
 requires = ["poetry>=1.4.0", "setuptools>=40.8.0"]
 build-backend = "poetry.core.masonry.api"
-
