@@ -40,6 +40,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python3 -m pip install --upgrade pip setuptools
           pip install -r requirements_dev.txt
 
       - name: Test with pytest if the project is feems else test with nbdev
