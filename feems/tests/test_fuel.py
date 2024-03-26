@@ -13,7 +13,7 @@ from feems.fuel import (
     _GWP100_N2O,
     _GWP100_CH4,
 )
-from pytest_subtests import subtests
+from pytest_subtests import SubTests
 
 
 def test_fuel_class():
@@ -131,7 +131,7 @@ def create_random_fuel_by_mass_fraction(
     return FuelByMassFraction(fuels=fuel_list)
 
 
-def test_fuel_by_mass_fraction_class(subtests):
+def test_fuel_by_mass_fraction_class(subtests: SubTests):
     with subtests.test(msg="Test fuel with no component"):
         assert FuelByMassFraction(fuels=[]).get_kg_co2_per_kg_fuel() == 0
 

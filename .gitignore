@@ -1,0 +1,11 @@
+__pycache__/
+Data
+PythonScript
+venv
+.idea/
+build
+dist
+/docs/_build/
+/feems.egg-info/
+.DS_Store
+*.egg-info/

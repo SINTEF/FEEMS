@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, unique, auto
 from functools import reduce
 from typing import NewType, NamedTuple, Union, List, Optional, TypeVar, DefaultDict
@@ -45,7 +45,7 @@ class FEEMSResult:
     running_hours_pti_pto_total_hr: float = 0.0
     total_emission_kg: Optional[DefaultDict[EmissionType, float]] = None
     detail_result: Optional[pd.DataFrame] = None
-    multi_fuel_consumption_total_kg: FuelConsumption = FuelConsumption()
+    multi_fuel_consumption_total_kg: FuelConsumption = field(default_factory=FuelConsumption)
     co2_emission_total_kg: float = 0.0
     energy_input_mechanical_total_mj: float = (
         0.0  # Energy input for generator / PTO (electric side) or PTI (mechanical side)

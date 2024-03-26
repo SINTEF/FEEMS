@@ -1,0 +1,18 @@
+mypy
+pytest
+wheel
+black[jupyter]
+pytest-subtests
+mypy-protobuf
+types-protobuf
+typing_extensions
+jupyter
+jupyterlab
+nbdev
+deepdiff
+plotly
+poetry
+-e ./feems
+-e ./machinery-system-structure
+-e ./RunFeemsSim
+-r requirements.txt

@@ -1,2 +1,0 @@
-poetry install
-poetry build
