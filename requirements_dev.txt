@@ -15,5 +15,5 @@ poetry
 build
 -e ./feems
 -e ./machinery-system-structure
--e ./RunFeemsSim
+-e ./RunFEEMSSim
 -r requirements.txt
