@@ -754,9 +754,9 @@ class TestElectricPowerSystem(TestCase):
             _,
             switchboard,
         ) in self.power_system_for_diesel_electric_system.switchboards.items():
-            sum_power_output_power_sources_switchboards[
-                switchboard.id
-            ] = switchboard.get_sum_power_output_by_power_type(TypePower.POWER_SOURCE)
+            sum_power_output_power_sources_switchboards[switchboard.id] = (
+                switchboard.get_sum_power_output_by_power_type(TypePower.POWER_SOURCE)
+            )
 
         for i, switchboard2bus in enumerate(
             self.power_system_for_diesel_electric_system.switchboard2bus

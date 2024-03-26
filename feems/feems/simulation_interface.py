@@ -130,7 +130,9 @@ class EnergySource:
 
 
 class ElectricPowerPlantStatus(NamedTuple):
-    bus_tie_breaker_status: np.ndarray  # First index is time index, second is bus_tie_breaker_index
+    bus_tie_breaker_status: (
+        np.ndarray
+    )  # First index is time index, second is bus_tie_breaker_index
     genset_connection_status: Dict[SwbId, np.ndarray]
     # Dictionary where key is teh swbid, the value is a matrix where the first index is time,
     # and second is genset_index

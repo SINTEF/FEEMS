@@ -536,7 +536,10 @@ class BatterySystem(Battery):
         self, power_input: Union[float, np.ndarray], strict_power_balance: bool = False
     ) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
         if self.converter is not None:
-            (battery_power_input, _,) = self.converter.get_power_output_from_bidirectional_input(
+            (
+                battery_power_input,
+                _,
+            ) = self.converter.get_power_output_from_bidirectional_input(
                 power_input=power_input, strict_power_balance=strict_power_balance
             )
         else:
@@ -810,7 +813,10 @@ class SuperCapacitorSystem(SuperCapacitor):
         self, power_output: Union[float, np.ndarray], strict_power_balance: bool = False
     ) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
         load = self.get_load(power_output)
-        (supercap_power_input, _,) = self.supercapacitor.get_power_input_from_bidirectional_output(
+        (
+            supercap_power_input,
+            _,
+        ) = self.supercapacitor.get_power_input_from_bidirectional_output(
             power_output=power_output, strict_power_balance=strict_power_balance
         )
         if self.converter is None:
@@ -825,7 +831,10 @@ class SuperCapacitorSystem(SuperCapacitor):
         self, power_input: Union[float, np.ndarray], strict_power_balance: bool = False
     ) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
         if self.converter is not None:
-            (supercap_power_input, _,) = self.converter.get_power_output_from_bidirectional_input(
+            (
+                supercap_power_input,
+                _,
+            ) = self.converter.get_power_output_from_bidirectional_input(
                 power_input=power_input, strict_power_balance=strict_power_balance
             )
         else:

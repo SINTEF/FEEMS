@@ -422,7 +422,7 @@ class TestComponent(TestCase):
         os.unlink(filename)
 
     def test_serial_system(self):
-        
+
         load_perc = 0.50  # np.random.rand() * 100
         efficiency = 1
         for component in self.components:

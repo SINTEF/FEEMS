@@ -95,9 +95,9 @@ class TestSwitchboard(TestCase):
             np.random.rand(self.no_points_to_test, self.switchboard.no_power_sources)
         ).astype(bool)
         index_all_power_source_off = np.bitwise_not(status_new_power_source).all(axis=1)
-        status_new_power_source[
-            index_all_power_source_off, 0
-        ] = True  # Make sure at least one power source is on
+        status_new_power_source[index_all_power_source_off, 0] = (
+            True  # Make sure at least one power source is on
+        )
         self.switchboard.set_status_components_by_power_type(
             type_=TypePower.POWER_SOURCE, status=status_new_power_source
         )
