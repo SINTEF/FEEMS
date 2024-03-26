@@ -13,6 +13,7 @@ History:
 Creator: Kevin K. Yum
 CopyRight: SINTEF Ocean
 """
+
 import re
 from dataclasses import dataclass
 from functools import reduce
@@ -47,7 +48,8 @@ def convert_camel_case_list_to_snake_case_list(camel_case_list: List[str]) -> Li
     :return: list of strings in snake case
     """
     return [
-        convert_camel_case_to_snake_case(camel_case_string) for camel_case_string in camel_case_list
+        convert_camel_case_to_snake_case(camel_case_string)
+        for camel_case_string in camel_case_list
     ]
 
 
@@ -56,6 +58,7 @@ class DiffSubsystems:
     """
     Class to store the differences between two subsystems.
     """
+
     diff_attributes: DeepDiff
     components_removed: List[str]
     components_added: List[str]
@@ -80,6 +83,7 @@ class DiffSwitchboardShaftLines:
     """
     Class to store the differences between two switchboards.
     """
+
     subsystems_removed: List[str]
     subsystems_added: List[str]
     subsystems_modified: Dict[str, DiffSubsystems]
@@ -133,7 +137,7 @@ def compare_proto_components(comp1: ProtoComponent, comp2: ProtoComponent) -> De
         t2=comp2_dict,
         ignore_order=True,
         report_repetition=True,
-        ignore_string_case=True
+        ignore_string_case=True,
     )
 
 
@@ -148,24 +152,37 @@ def compare_proto_subsystems(
     :return: dict of differences
     """
     non_component_attribute_keys = [
-        "powerType", "componentType", "name", "ratedPowerKw", "ratedSpeedRpm"
+        "powerType",
+        "componentType",
+        "name",
+        "ratedPowerKw",
+        "ratedSpeedRpm",
     ]
     subsystem1_dict = MessageToDict(subsystem1)
     subsystem2_dict = MessageToDict(subsystem2)
     subsystem1_dict_non_components = reduce(
-        lambda acc, key: {**acc, **{key: subsystem1_dict.pop(key)}} if key in subsystem1_dict else acc,
+        lambda acc, key: (
+            {**acc, **{key: subsystem1_dict.pop(key)}}
+            if key in subsystem1_dict
+            else acc
+        ),
         non_component_attribute_keys,
-        {}
+        {},
     )
     subsystem2_dict_non_components = reduce(
-        lambda acc, key: {**acc, **{key: subsystem2_dict.pop(key)}} if key in subsystem2_dict else acc,
+        lambda acc, key: (
+            {**acc, **{key: subsystem2_dict.pop(key)}}
+            if key in subsystem2_dict
+            else acc
+        ),
         non_component_attribute_keys,
-        {}
+        {},
     )
     diff_non_components = DeepDiff(
-        subsystem1_dict_non_components, subsystem2_dict_non_components,
+        subsystem1_dict_non_components,
+        subsystem2_dict_non_components,
         ignore_order=True,
-        report_repetition=True
+        report_repetition=True,
     )
     components_list_subsystem1 = convert_camel_case_list_to_snake_case_list(
         list(subsystem1_dict.keys())
@@ -173,20 +190,25 @@ def compare_proto_subsystems(
     components_list_subsystem2 = convert_camel_case_list_to_snake_case_list(
         list(subsystem2_dict.keys())
     )
-    components_removed = list(set(components_list_subsystem1) - set(components_list_subsystem2))
-    components_added = list(set(components_list_subsystem2) - set(components_list_subsystem1))
-    components_common = list(set(components_list_subsystem1) & set(components_list_subsystem2))
+    components_removed = list(
+        set(components_list_subsystem1) - set(components_list_subsystem2)
+    )
+    components_added = list(
+        set(components_list_subsystem2) - set(components_list_subsystem1)
+    )
+    components_common = list(
+        set(components_list_subsystem1) & set(components_list_subsystem2)
+    )
     diff_components = {}
     for component_name in components_common:
         diff_components[component_name] = compare_proto_components(
-            getattr(subsystem1, component_name),
-            getattr(subsystem2, component_name)
+            getattr(subsystem1, component_name), getattr(subsystem2, component_name)
         )
     return DiffSubsystems(
         diff_attributes=diff_non_components,
         components_removed=components_removed,
         components_added=components_added,
-        components_modified=diff_components
+        components_modified=diff_components,
     )
 
 
@@ -203,19 +225,23 @@ def compare_proto_switchboards_shaft_lines(
     diff = DiffSwitchboardShaftLines(
         subsystems_removed=[],
         subsystems_added=[subsystem.name for subsystem in switchboard2.subsystems],
-        subsystems_modified={}
+        subsystems_modified={},
     )
     for subsystem_ref in switchboard1.subsystems:
         try:
-            subsystem_to_compare = next(filter(
-                lambda subsystem: subsystem_ref.name == subsystem.name,
-                switchboard2.subsystems
-            ))
+            subsystem_to_compare = next(
+                filter(
+                    lambda subsystem: subsystem_ref.name == subsystem.name,
+                    switchboard2.subsystems,
+                )
+            )
         except StopIteration:
             diff.subsystems_removed.append(subsystem_ref.name)
         else:
             diff.subsystems_added.remove(subsystem_ref.name)
-            diff_subsystem = compare_proto_subsystems(subsystem_ref, subsystem_to_compare)
+            diff_subsystem = compare_proto_subsystems(
+                subsystem_ref, subsystem_to_compare
+            )
             diff.subsystems_modified[subsystem_ref.name] = diff_subsystem
     return diff
 
@@ -232,21 +258,30 @@ def compare_proto_electric_systems(
     """
     diff = DiffElectricPowerSystem(
         switchboards_removed=[],
-        switchboards_added=[switchboard.switchboard_id for switchboard in eps2.switchboards],
-        switchboards_modified={}
+        switchboards_added=[
+            switchboard.switchboard_id for switchboard in eps2.switchboards
+        ],
+        switchboards_modified={},
     )
     for switchboard_ref in eps1.switchboards:
         try:
-            switchboard_to_compare = next(filter(
-                lambda switchboard: switchboard_ref.switchboard_id == switchboard.switchboard_id,
-                eps2.switchboards
-            ))
+            switchboard_to_compare = next(
+                filter(
+                    lambda switchboard: switchboard_ref.switchboard_id
+                    == switchboard.switchboard_id,
+                    eps2.switchboards,
+                )
+            )
         except StopIteration:
             diff.switchboards_removed.append(switchboard_ref.switchboard_id)
         else:
             diff.switchboards_added.remove(switchboard_ref.switchboard_id)
-            diff_switchboard = compare_proto_switchboards_shaft_lines(switchboard_ref, switchboard_to_compare)
-            diff.switchboards_modified[switchboard_ref.switchboard_id] = diff_switchboard
+            diff_switchboard = compare_proto_switchboards_shaft_lines(
+                switchboard_ref, switchboard_to_compare
+            )
+            diff.switchboards_modified[switchboard_ref.switchboard_id] = (
+                diff_switchboard
+            )
     return diff
 
 
@@ -262,20 +297,27 @@ def compare_proto_mechanical_system(
     """
     diff = DiffMechanicalSystem(
         shaft_lines_removed=[],
-        shaft_lines_added=[shaft_line.shaft_line_id for shaft_line in shaft_lines2.shaft_lines],
-        shaft_lines_modified={}
+        shaft_lines_added=[
+            shaft_line.shaft_line_id for shaft_line in shaft_lines2.shaft_lines
+        ],
+        shaft_lines_modified={},
     )
     for shaft_line_ref in shaft_lines1.shaft_lines:
         try:
-            shaft_line_to_compare = next(filter(
-                lambda shaft_line: shaft_line_ref.shaft_line_id == shaft_line.shaft_line_id,
-                shaft_lines2.shaft_lines
-            ))
+            shaft_line_to_compare = next(
+                filter(
+                    lambda shaft_line: shaft_line_ref.shaft_line_id
+                    == shaft_line.shaft_line_id,
+                    shaft_lines2.shaft_lines,
+                )
+            )
         except StopIteration:
             diff.shaft_lines_removed.append(shaft_line_ref.shaft_line_id)
         else:
             diff.shaft_lines_added.remove(shaft_line_ref.shaft_line_id)
-            diff_shaft_line = compare_proto_switchboards_shaft_lines(shaft_line_ref, shaft_line_to_compare)
+            diff_shaft_line = compare_proto_switchboards_shaft_lines(
+                shaft_line_ref, shaft_line_to_compare
+            )
             diff.shaft_lines_modified[shaft_line_ref.shaft_line_id] = diff_shaft_line
     return diff
 
@@ -292,12 +334,16 @@ def compare_proto_machinery_system(
     """
     machinery_system1_dict = MessageToDict(machinery1)
     machinery_system2_dict = MessageToDict(machinery2)
-    machinery_system1_dict.pop('electricSystem', None)
-    machinery_system2_dict.pop('electricSystem', None)
-    machinery_system1_dict.pop('mechanicalSystem', None)
-    machinery_system2_dict.pop('mechanicalSystem', None)
+    machinery_system1_dict.pop("electricSystem", None)
+    machinery_system2_dict.pop("electricSystem", None)
+    machinery_system1_dict.pop("mechanicalSystem", None)
+    machinery_system2_dict.pop("mechanicalSystem", None)
     return DiffMachinerySystem(
         diff_attributes=DeepDiff(machinery_system1_dict, machinery_system2_dict),
-        diff_electric_system=compare_proto_electric_systems(machinery1.electric_system, machinery2.electric_system),
-        diff_mechanical_system=compare_proto_mechanical_system(machinery1.mechanical_system, machinery2.mechanical_system),
+        diff_electric_system=compare_proto_electric_systems(
+            machinery1.electric_system, machinery2.electric_system
+        ),
+        diff_mechanical_system=compare_proto_mechanical_system(
+            machinery1.mechanical_system, machinery2.mechanical_system
+        ),
     )

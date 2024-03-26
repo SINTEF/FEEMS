@@ -23,7 +23,9 @@ def retrieve_machinery_system_from_file(
     return system
 
 
-def retrieve_gymir_result_from_file(file: Union[str, io.BytesIO]) -> proto_gymir.GymirResult:
+def retrieve_gymir_result_from_file(
+    file: Union[str, io.BytesIO]
+) -> proto_gymir.GymirResult:
     if isinstance(file, str):
         file = open(file, "rb")
     system = proto_gymir.GymirResult()

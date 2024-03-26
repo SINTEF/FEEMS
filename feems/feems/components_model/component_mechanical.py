@@ -357,8 +357,8 @@ class MainEngineForMechanicalPropulsion(Component):
         """
         if power is None:
             power = self.power_output
+        self.engine.power_output = power
         return self.engine.get_engine_run_point_from_power_out_kw(
-            power_kw=power,
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
@@ -435,8 +435,8 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
             power = self.power_output
         load_ratio = self.get_load(power)
         eff_gearbox = self.gearbox.get_efficiency_from_load_percentage(load_ratio)
+        self.engine.power_output = power / eff_gearbox
         return self.engine.get_engine_run_point_from_power_out_kw(
-            power_kw=power / eff_gearbox,
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,

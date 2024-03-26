@@ -30,7 +30,12 @@ from .component_mechanical import (
     Engine,
     EngineDualFuel,
 )
-from .utility import integrate_data, IntegrationMethod, integrate_multi_fuel_consumption
+from .utility import (
+    integrate_data,
+    IntegrationMethod,
+    integrate_multi_fuel_consumption,
+    IntegrationError,
+)
 from .. import get_logger
 from ..exceptions import InputError
 from ..fuel import (
@@ -119,7 +124,11 @@ def get_fuel_emission_energy_balance_for_component(
         energy_consumption_mechanical_total_mj=0,
         energy_stored_total_mj=0,
     )
-    running_hours = np.dot((component.power_output != 0), time_interval_s).sum() / 3600
+    running_hours = (
+        (np.atleast_1d(component.power_output)[0] != 0) * np.atleast_1d(time_interval_s)[0] / 3600
+    )
+    if len(np.atleast_1d(component.power_output)) > 1:
+        running_hours = np.dot((component.power_output != 0), time_interval_s).sum() / 3600
     # Calculate fuel consumption for engines
     if component.type in [
         TypeComponent.MAIN_ENGINE,
@@ -209,31 +218,43 @@ def get_fuel_emission_energy_balance_for_component(
         power_input = component.power_input.copy()
         power_input[power_input < 0] = 0  # PTI mode
         if isSystemMechanical:
-            res.energy_input_mechanical_total_mj = integrate_data(
-                data_to_integrate=power_input,
-                time_interval_s=time_interval_s,
-                integration_method=integration_method,
-            ) / 1000
+            res.energy_input_mechanical_total_mj = (
+                integrate_data(
+                    data_to_integrate=power_input,
+                    time_interval_s=time_interval_s,
+                    integration_method=integration_method,
+                )
+                / 1000
+            )
         else:
-            res.energy_consumption_mechanical_total_mj = integrate_data(
-                data_to_integrate=power_input,
-                time_interval_s=time_interval_s,
-                integration_method=integration_method,
-            ) / 1000
+            res.energy_consumption_mechanical_total_mj = (
+                integrate_data(
+                    data_to_integrate=power_input,
+                    time_interval_s=time_interval_s,
+                    integration_method=integration_method,
+                )
+                / 1000
+            )
         power_input = component.power_input.copy()
         power_input[power_input > 0] = 0  # PTO mode
         if isSystemMechanical:
-            res.energy_consumption_mechanical_total_mj = integrate_data(
-                data_to_integrate=power_input,
-                time_interval_s=time_interval_s,
-                integration_method=integration_method,
-            ) / 1000
+            res.energy_consumption_mechanical_total_mj = (
+                integrate_data(
+                    data_to_integrate=power_input,
+                    time_interval_s=time_interval_s,
+                    integration_method=integration_method,
+                )
+                / 1000
+            )
         else:
-            res.energy_input_mechanical_total_mj = integrate_data(
-                data_to_integrate=-power_input,
-                time_interval_s=time_interval_s,
-                integration_method=integration_method,
-            ) / 1000
+            res.energy_input_mechanical_total_mj = (
+                integrate_data(
+                    data_to_integrate=-power_input,
+                    time_interval_s=time_interval_s,
+                    integration_method=integration_method,
+                )
+                / 1000
+            )
         res.running_hours_pti_pto_total_hr += running_hours
 
     #: Calculate electric energy stored for energy storage system
@@ -243,11 +264,11 @@ def get_fuel_emission_energy_balance_for_component(
             component,
         )
         res.energy_stored_total_mj = (
-                component.get_energy_stored_kj(
+            component.get_energy_stored_kj(
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
             )
-                / 1000
+            / 1000
         )
 
     #: Calculate electric energy input for shore power
@@ -255,7 +276,7 @@ def get_fuel_emission_energy_balance_for_component(
         component = cast(Union[ShorePowerConnection, ShorePowerConnectionSystem], component)
         res.energy_input_electric_total_mj = (
             integrate_data(
-                data_to_integrate=component.power_output,
+                data_to_integrate=component.power_input,
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
             )
@@ -263,15 +284,20 @@ def get_fuel_emission_energy_balance_for_component(
         )
     elif component.type in [
         TypeComponent.OTHER_LOAD,
-        TypeComponent.OTHER_MECHANICAL_LOAD
+        TypeComponent.OTHER_MECHANICAL_LOAD,
     ]:
-        res.energy_consumption_auxiliary_total_mj = (
-            integrate_data(
-                data_to_integrate=component.power_output,
-                time_interval_s=time_interval_s,
-                integration_method=integration_method,
-            ) / 1000
-        )
+        component.set_power_output_from_input(component.power_input)
+        try:
+            res.energy_consumption_auxiliary_total_mj = (
+                integrate_data(
+                    data_to_integrate=component.power_output,
+                    time_interval_s=time_interval_s,
+                    integration_method=integration_method,
+                )
+                / 1000
+            )
+        except IntegrationError as e:
+            logger.warning("Integration occurred for other load: " + e.__str__())
     elif component.type in [
         TypeComponent.PROPELLER_LOAD,
         TypeComponent.PROPULSION_DRIVE,
@@ -281,14 +307,13 @@ def get_fuel_emission_energy_balance_for_component(
                 data_to_integrate=component.power_output,
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
-            ) / 1000
+            )
+            / 1000
         )
     else:
         raise TypeError(
             f"Component type {component.type} not supported for energy balance calculation"
         )
-
-
 
     return res
 
@@ -739,7 +764,10 @@ class Switchboard(Node):
         Returns:
             FEEMSResult
         """
-        if fuel_specified_by not in [FuelSpecifiedBy.IMO, FuelSpecifiedBy.FUEL_EU_MARITIME]:
+        if fuel_specified_by not in [
+            FuelSpecifiedBy.IMO,
+            FuelSpecifiedBy.FUEL_EU_MARITIME,
+        ]:
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
@@ -771,6 +799,24 @@ class Switchboard(Node):
             )
 
             res = res.sum_with_freeze_duration(res_comp)
+
+            if (
+                component
+                not in self.component_by_power_type[TypePower.POWER_SOURCE.value]
+                + self.component_by_power_type[TypePower.PTI_PTO.value]
+                + self.component_by_power_type[TypePower.ENERGY_STORAGE.value]
+            ):
+                continue
+
+            if component.type == TypeComponent.GENSET:
+                res_comp.energy_consumption_mechanical_total_mj = (
+                    integrate_data(
+                        data_to_integrate=component.aux_engine.power_output,
+                        time_interval_s=time_interval_s,
+                        integration_method=integration_method,
+                    )
+                    / 1000
+                )
 
             #: Add the calculation to the result_dataframe
             data_to_add = [
@@ -819,7 +865,10 @@ class Switchboard(Node):
         Returns:
             FEEMSResult
         """
-        if fuel_specified_by not in [FuelSpecifiedBy.IMO, FuelSpecifiedBy.FUEL_EU_MARITIME]:
+        if fuel_specified_by not in [
+            FuelSpecifiedBy.IMO,
+            FuelSpecifiedBy.FUEL_EU_MARITIME,
+        ]:
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
@@ -837,14 +886,6 @@ class Switchboard(Node):
         # Get the fuel consumption / running hours for each power source, pti/pto,
         # energy_storage component
         for component in self.components:
-            if (
-                component
-                not in self.component_by_power_type[TypePower.POWER_SOURCE.value]
-                + self.component_by_power_type[TypePower.PTI_PTO.value]
-                + self.component_by_power_type[TypePower.ENERGY_STORAGE.value]
-            ):
-                continue
-
             #: Calculate running hours
             res_component = get_fuel_emission_energy_balance_for_component(
                 component=component,
@@ -1182,13 +1223,17 @@ class ShaftLine(Node):
             total running hours for engines[hours], CO2 emissions [kg], NOx emissions [kg] and
             the detail numbers for each engine and PTI/PTO
         """
-        if fuel_specified_by not in [FuelSpecifiedBy.IMO, FuelSpecifiedBy.FUEL_EU_MARITIME]:
+        if fuel_specified_by not in [
+            FuelSpecifiedBy.IMO,
+            FuelSpecifiedBy.FUEL_EU_MARITIME,
+        ]:
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
         #: Get the main engine instances and collect the names
         main_engines = self.component_by_power_type[TypePower.POWER_SOURCE]
         pti_ptos = self.component_by_power_type[TypePower.PTI_PTO]
+        loads = self.component_by_power_type[TypePower.POWER_CONSUMER]
 
         #: Create a dataframe template for the result
         column_names = [
@@ -1205,18 +1250,7 @@ class ShaftLine(Node):
         res = FEEMSResult(detail_result=pd.DataFrame(columns=column_names))
 
         #: Get the fuel consumption rate and on time for each engine / integrate them
-        for component in [*main_engines, *pti_ptos]:
-
-            if not (
-                isinstance(component, MainEngineForMechanicalPropulsion)
-                or isinstance(component, MainEngineWithGearBoxForMechanicalPropulsion)
-                or isinstance(component, PTIPTO)
-            ):
-                raise TypeError(
-                    "Main engine or PTI/PTO component is not of "
-                    "main engine type or PTI/PTO type"
-                )
-
+        for component in [*main_engines, *pti_ptos, *loads]:
             # Calculate fuel consumption
             res_comp = get_fuel_emission_energy_balance_for_component(
                 component=component,
@@ -1225,6 +1259,26 @@ class ShaftLine(Node):
                 fuel_specified_by=fuel_specified_by,
             )
             res = res.sum_with_freeze_duration(res_comp)
+            if not (
+                isinstance(component, MainEngineForMechanicalPropulsion)
+                or isinstance(component, MainEngineWithGearBoxForMechanicalPropulsion)
+                or isinstance(component, PTIPTO)
+            ):
+                continue
+
+            # Calculate shaft energy output for main engine, genset
+            if component.type in [
+                TypeComponent.MAIN_ENGINE,
+                TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
+            ]:
+                res_comp.energy_consumption_mechanical_total_mj = (
+                    integrate_data(
+                        data_to_integrate=component.engine.power_output,
+                        time_interval_s=time_step,
+                        integration_method=integration_method,
+                    )
+                    / 1000
+                )
 
             # Add the calculation to the result_dataframe
             data_to_add = [

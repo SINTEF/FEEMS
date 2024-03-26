@@ -139,6 +139,8 @@ message Engine {
   repeated EmissionCurve emission_curves = 10;
   EngineCycleType engine_cycle_type = 11;
   double unit_price_usd = 12;
+  double start_delay_s = 13;
+  double turn_off_power_kw = 14;
 }
 
 message ElectricMachine {
@@ -160,6 +162,9 @@ message Battery {
   double initial_state_of_charge = 7;
   uint32 order_from_switchboard_or_shaftline = 8;
   double unit_price_usd = 9;
+  double self_discharge_percent_per_day = 10;
+  double state_of_energy_minimum = 11;
+  double state_of_energy_maximum = 12;
 }
 
 message ElectricComponent {
@@ -178,6 +183,8 @@ message FuelCell {
   Fuel fuel = 6;
   double unit_price_usd = 7;
   uint32 number_modules = 8;
+  double power_minimum_specific= 9;
+  double start_delay_s = 10;
 }
 
 message Propeller {

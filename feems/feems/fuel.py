@@ -494,6 +494,14 @@ class FuelConsumption:
                 sum_fuel.fuels.append(each_fuel.copy)
         return sum_fuel
 
+    def __mul__(self, other: Union[float, np.ndarray]):
+        res = FuelConsumption()
+        for fuel in self.fuels:
+            fuel_to_add = fuel.copy
+            fuel_to_add.mass_or_mass_fraction *= other
+            res.fuels.append(fuel_to_add)
+        return res
+
     @property
     def total_fuel_consumption(self) -> Union[float, np.ndarray]:
         """Returns the total fuel consumption in kg or kg/s depending on the context."""

@@ -430,6 +430,7 @@ class FuelCellSystem(ElectricComponent):
         fuel_cell_module: FuelCell,
         converter: ElectricComponent,
         switchboard_id: SwbId,
+        number_modules: int = 1,
     ):
         super(FuelCellSystem, self).__init__(
             name=name,
@@ -441,6 +442,7 @@ class FuelCellSystem(ElectricComponent):
         )
         self.converter = converter
         self.fuel_cell = fuel_cell_module
+        self.number_modules = number_modules
 
     def get_fuel_cell_run_point(
         self,
@@ -473,12 +475,18 @@ class FuelCellSystem(ElectricComponent):
         if power_out_kw is None:
             power_out_kw = self.power_output
         power_out_fuel_cell_kw, load_ratio = self.set_power_input_from_output(power_out_kw)
-        return self.fuel_cell.get_fuel_cell_run_point(
-            power_out_kw=power_out_fuel_cell_kw,
+        result_per_module = self.fuel_cell.get_fuel_cell_run_point(
+            power_out_kw=power_out_fuel_cell_kw / self.number_modules,
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+        )
+        return FuelCellRunPoint(
+            load_ratio=result_per_module.load_ratio,
+            fuel_flow_rate_kg_per_s=result_per_module.fuel_flow_rate_kg_per_s
+            * self.number_modules,
+            efficiency=result_per_module.efficiency,
         )
 
 
