@@ -18,6 +18,7 @@ from feems.components_model.component_electric import (
     FuelCellSystem,
 )
 from feems.components_model.component_mechanical import (
+    COGAS,
     Engine,
     MainEngineWithGearBoxForMechanicalPropulsion,
     EngineDualFuel,
@@ -657,3 +658,48 @@ class TestComponent(TestCase):
             fuel_cell_system_run_point.efficiency,
             fuel_cell_module_run_point.efficiency,
         )
+
+        """Test cogeneration system"""
+        #: Create an engine component
+        engine = create_engine_component("auxiliary engine 1", 1000, 1000)
+        #: Create a generator component
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator 1",
+            rated_power=engine.rated_power * 0.9,
+            rated_speed=engine.rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        rectifier = ElectricComponent(
+            type_=TypeComponent.RECTIFIER,
+            name="rectifier 1",
+            rated_power=generator.rated_power,
+            eff_curve=np.array([99]),
+        )
+        coges_ac = Genset("coges 1", engine, generator)
+        coges_dc = Genset("coges 1", engine, generator, rectifier)
+        power_electric = np.random.rand(5) * coges_ac.rated_power
+        load_at_coges = generator.get_load(power_electric)
+        power_dc_at_generator = power_electric / rectifier.get_efficiency_from_load_percentage(
+            load_at_coges
+        )
+        power_shaft_ac, load_perc = generator.get_shaft_power_load_from_electric_power(
+            power_electric
+        )
+        power_shaft_dc, load_perc = generator.get_shaft_power_load_from_electric_power(
+            power_dc_at_generator
+        )
+        res_engine_ac = engine.get_engine_run_point_from_power_out_kw(power_shaft_ac)
+        res_engine_dc = engine.get_engine_run_point_from_power_out_kw(power_shaft_dc)
+        res_coges_ac = coges_ac.get_fuel_cons_load_bsfc_from_power_out_generator_kw(power_electric)
+        res_coges_dc = coges_dc.get_fuel_cons_load_bsfc_from_power_out_generator_kw(power_electric)
+        np.testing.assert_allclose(
+            res_engine_ac.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            res_coges_ac.engine.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+        )
+        np.testing.assert_allclose(
+            res_engine_dc.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            res_coges_dc.engine

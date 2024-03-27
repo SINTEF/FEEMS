@@ -1,4 +1,5 @@
 from typing import Union, List, Tuple, Optional, TypeVar
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -19,6 +20,7 @@ from ..types_for_feems import (
     Numeric,
     NumericT,
 )
+from ..fuel import FuelConsumption
 
 # Define logger
 logger = get_logger(__name__)
@@ -26,6 +28,12 @@ logger = get_logger(__name__)
 
 T = TypeVar("T", float, np.ndarray)
 
+
+@dataclass
+class ComponentRunPoint:
+    load_ratio: np.ndarray
+    efficiency: np.ndarray
+    fuel_flow_rate_kg_per_s: FuelConsumption
 
 class Component:
     """

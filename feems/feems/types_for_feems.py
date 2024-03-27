@@ -168,6 +168,8 @@ class TypeComponent(Enum):
     SUPERCAPACITOR = 25
     SUPERCAPACITOR_SYSTEM = 26
     SHORE_POWER = 27
+    COGES = 28
+    COGAS = 29
 
 
 @unique

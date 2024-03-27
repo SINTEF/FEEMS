@@ -4,7 +4,7 @@ from typing import Union, NamedTuple, List, Dict, TypeVar, Callable, Optional
 import numpy as np
 import pandas as pd
 
-from .component_base import Component, BasicComponent
+from .component_base import Component, BasicComponent, ComponentRunPoint
 from .. import get_logger
 from ..constant import (
     nox_tier_slow_speed_max_rpm,
@@ -442,6 +442,87 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
         )
+
+class COGAS(BasicComponent):
+    """Combined gas and steam component class for basic information and efficiency interpolation"""
+
+    def __init__(
+        self,
+        name: str = "",
+        rated_power: Power_kW = Power_kW(0),
+        eff_curve: np.ndarray = np.array([1]),
+        rated_speed: Speed_rpm = Speed_rpm(0),
+        gas_turbine_power_curve: np.ndarray = None,
+        steam_turbine_power_curve: np.ndarray = None,
+        fuel_type: TypeFuel = TypeFuel.DIESEL,
+        fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+    ):
+        """Constructor for COGES component"""
+        # Validate the inputs for curves. The length of the curves should be the same and the x values should be the same.
+        if gas_turbine_power_curve is not None and steam_turbine_power_curve is not None:
+            if gas_turbine_power_curve.shape != steam_turbine_power_curve.shape:
+                raise ValueError("The length of the gas turbine power curve and steam turbine power curve should be the same.")
+            if np.all(gas_turbine_power_curve[:, 0] == steam_turbine_power_curve[:, 0]):
+                raise ValueError("The x values of the gas turbine power curve and steam turbine power curve should be the same.")
+        
+        super().__init__(
+            type_=TypeComponent.COGAS, 
+            power_type=TypePower.POWER_SOURCE, 
+            name=name, 
+            rated_power=rated_power, 
+            eff_curve=eff_curve, 
+            rated_speed=rated_speed
+        )
+        self.gas_turbine_power_curve = gas_turbine_power_curve
+        self.steam_turbine_power_curve = steam_turbine_power_curve
+        self.total_power_curve = self.gas_turbine_power_curve.copy()
+        self.total_power_curve[:, 1] += self.steam_turbine_power_curve[:, 1]
+        self.power_ratio_gas_turbine_points = gas_turbine_power_curve.copy()
+        self.power_ratio_gas_turbine_points[:, 1] /= self.total_power_curve[:, 1]
+        self.power_ratio_gas_turbine_interpolator = get_efficiency_curve_from_points(
+            self.power_ratio_gas_turbine_points
+        )
+        self.fuel_type = fuel_type
+        self.fuel_origin = fuel_origin
+
+        @property
+        def power_output_gas_turbine(self):
+            """Power output of the gas turbine in kW"""
+            return self.power_ratio_gas_turbine_interpolator(self.power_output / self.rated_power)
+        
+        @property
+        def power_output_steam_turbine(self):
+            """Power output of the steam turbine in kW"""
+            return self.power_output - self.power_output_gas_turbine
+        
+        def get_gas_turbine_run_point_from_power_output_kw(
+            self,
+            power_kw: np.ndarray = None,
+            fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+            lhv_mj_per_g: Optional[float] = None,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
+            ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ) -> ComponentRunPoint:
+            if power_kw is None:
+                power_kw = self.power_output
+            load_ratio = self.get_load(power_kw)
+            eff = self.get_efficiency_from_load_percentage(load_ratio)
+            fuel = Fuel(
+                origin=self.fuel_origin,
+                fuel_type=self.fuel_type,
+                fuel_specified_by=fuel_specified_by,
+                lhv_mj_per_g=lhv_mj_per_g,
+                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj
+            )
+            fuel_power_kw = power_kw / eff
+            fuel_consumption_kg_per_s = fuel_power_kw / fuel.lhv_mj_per_g / 1000
+            fuel.consumption = fuel_consumption_kg_per_s
+            return ComponentRunPoint(
+                load_ratio=load_ratio,
+                fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel]),
+                efficiency=eff,
+            )
 
 
 MechanicalComponent = Union[

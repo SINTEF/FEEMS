@@ -6,8 +6,9 @@ import pandas as pd
 
 from .. import get_logger
 
-from .component_base import SerialSystem, Component, BasicComponent
+from .component_base import SerialSystem, Component, BasicComponent, ComponentRunPoint
 from .component_mechanical import (
+    COGAS,
     Engine,
     MainEngineForMechanicalPropulsion,
     MechanicalPropulsionComponent,
@@ -17,7 +18,6 @@ from .component_mechanical import (
 from .utility import integrate_data, IntegrationMethod, integrate_data_accumulative
 from ..constant import hhv_hydrogen_mj_per_kg, lhv_hydrogen_mj_per_kg
 from ..fuel import (
-    FuelByMassFraction,
     FuelConsumption,
     TypeFuel,
     FuelSpecifiedBy,
@@ -340,13 +340,6 @@ class SerialSystemElectric(SerialSystem):
         self.switchboard_id = switchboard_id
 
 
-@dataclass
-class FuelCellRunPoint:
-    load_ratio: np.ndarray
-    fuel_flow_rate_kg_per_s: FuelConsumption
-    efficiency: np.ndarray
-
-
 class FuelCell(BasicComponent):
     def __init__(
         self,
@@ -373,7 +366,7 @@ class FuelCell(BasicComponent):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
-    ) -> FuelCellRunPoint:
+    ) -> ComponentRunPoint:
         """
         Get the fuel cell run point
 
@@ -392,7 +385,7 @@ class FuelCell(BasicComponent):
                 fuel_specified_by is FuelSpecifiedBy.USER.
 
         Returns:
-            FuelCellRunPoint: fuel cell run point
+            ComponentRunPoint: fuel cell run point
         """
         if power_out_kw is None:
             power_out_kw = self.power_output
@@ -407,7 +400,7 @@ class FuelCell(BasicComponent):
         )
         fuel.mass_or_mass_fraction = power_in_kw / fuel.lhv_mj_per_g / 1e6
         efficiency = self.get_efficiency_from_load_percentage(load_ratio)
-        return FuelCellRunPoint(
+        return ComponentRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(
                 fuels=[
@@ -451,7 +444,7 @@ class FuelCellSystem(ElectricComponent):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
-    ) -> FuelCellRunPoint:
+    ) -> ComponentRunPoint:
         """
         Get the fuel cell run point
 
@@ -470,7 +463,7 @@ class FuelCellSystem(ElectricComponent):
                 fuel_specified_by is FuelSpecifiedBy.USER.
 
         Returns:
-            FuelCellRunPoint: fuel cell run point
+            ComponentRunPoint: fuel cell run point
         """
         if power_out_kw is None:
             power_out_kw = self.power_output
@@ -482,7 +475,7 @@ class FuelCellSystem(ElectricComponent):
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
         )
-        return FuelCellRunPoint(
+        return ComponentRunPoint(
             load_ratio=result_per_module.load_ratio,
             fuel_flow_rate_kg_per_s=result_per_module.fuel_flow_rate_kg_per_s
             * self.number_modules,
@@ -555,6 +548,11 @@ class BatterySystem(Battery):
 class GensetRunPoint(NamedTuple):
     genset_load_ratio: np.ndarray
     engine: EngineRunPoint
+
+
+class COGESRunPoint(NamedTuple):
+    coges_load_ratio: np.ndarray
+    cogas: ComponentRunPoint
 
 
 class Genset(Component):
@@ -892,11 +890,59 @@ class ShorePowerConnectionSystem(ShorePowerConnection):
         self.converter = converter
 
 
+class COGES(Component):
+    """
+    Class for serial configuration for a COGES system.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        cogas: COGAS,
+        generator: ElectricMachine,
+    ):
+        super().__init__(
+            name=name,
+            type_=TypeComponent.COGES,
+            power_type=TypePower.POWER_SOURCE,
+            rated_power=generator.rated_power,
+            rated_speed=generator.rated_speed,
+        )
+        self.fuel_type = cogas.fuel_type
+        self.cogas = cogas
+        self.generator = generator
+        self.switchboard_id = generator.switchboard_id
+        self.status = np.ones(0).astype(bool)
+        self.load_sharing_mode = np.zeros(1)
+
+    def get_system_run_point_from_power_output_kw(self, power_output_kw: np.ndarray = None) -> ComponentRunPoint:
+        """
+        Get the run point of the COGES system based on the power output of the system
+
+        Args:
+            power_output_kw (np.ndarray): power output of the COGES system in kW or None. If None,
+                it will take the value of power output of the COGES system.
+
+        Returns:
+            ComponentRunPoint: run point of the COGES system
+        """
+        if power_output_kw is None:
+            power_output_kw = self.power_output
+        
+        self.cogas.power_output, load_generator = self.generator.set_power_input_from_output(power_output_kw)
+        cogas_run_point = self.cogas.get_gas_turbine_run_point_from_power_output_kw()
+        return COGESRunPoint(
+            coges_load_ratio=load_generator,
+            cogas=cogas_run_point,
+        )
+        
+
 MechanicalComponent = Union[
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
     PTIPTO,
     MechanicalPropulsionComponent,
+    COGAS
 ]
 
 PowerSystemComponent = Union[
