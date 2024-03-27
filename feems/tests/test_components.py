@@ -15,6 +15,7 @@ from feems.components_model.component_electric import (
     Genset,
     SerialSystemElectric,
     FuelCell,
+    FuelCellSystem,
 )
 from feems.components_model.component_mechanical import (
     Engine,
@@ -43,6 +44,53 @@ CONVERTER_EFF = np.array([[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]).
 
 
 class TestComponent(TestCase):
+
+    def setUp(self):
+        """Create a serial system for testing for a pti/pto system with 5 components."""
+        gearbox = BasicComponent(
+            type_=TypeComponent.GEARBOX,
+            name="gearbox",
+            power_type=TypePower.POWER_TRANSMISSION,
+            rated_power=3000,
+            rated_speed=150,
+            eff_curve=np.array([98.0]),
+        )
+        synch_mach = ElectricMachine(
+            type_=TypeComponent.SYNCHRONOUS_MACHINE,
+            name="synchronous machine",
+            rated_power=3000,
+            rated_speed=150,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        rectifier = ElectricComponent(
+            type_=TypeComponent.RECTIFIER,
+            name="rectifier",
+            rated_power=3000,
+            eff_curve=np.array([99.5]),
+        )
+        inverter = ElectricComponent(
+            type_=TypeComponent.INVERTER,
+            name="inverter",
+            rated_power=3000,
+            eff_curve=CONVERTER_EFF,
+        )
+        transformer = ElectricComponent(
+            type_=TypeComponent.TRANSFORMER,
+            name="transformer",
+            rated_power=3000,
+            eff_curve=np.array([99]),
+        )
+
+        self.components = [gearbox, synch_mach, rectifier, inverter, transformer]
+        self.pti_pto = SerialSystem(
+            TypeComponent.PTI_PTO_SYSTEM,
+            TypePower.PTI_PTO,
+            "PTIPTO 1",
+            self.components,
+            rated_power=transformer.rated_power,
+            rated_speed=synch_mach.rated_speed,
+        )
+
     def test_component(self):
         name = "component"
         component = create_components(name, 1, 1000, 1000)
@@ -374,74 +422,28 @@ class TestComponent(TestCase):
         os.unlink(filename)
 
     def test_serial_system(self):
-        gearbox = BasicComponent(
-            type_=TypeComponent.GEARBOX,
-            name="gearbox",
-            power_type=TypePower.POWER_TRANSMISSION,
-            rated_power=3000,
-            rated_speed=150,
-            eff_curve=np.array([98.0]),
-        )
-        synch_mach = ElectricMachine(
-            type_=TypeComponent.SYNCHRONOUS_MACHINE,
-            name="synchronous machine",
-            rated_power=3000,
-            rated_speed=150,
-            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
-        )
-        rectifier = ElectricComponent(
-            type_=TypeComponent.RECTIFIER,
-            name="rectifier",
-            rated_power=3000,
-            eff_curve=np.array([99.5]),
-        )
-        inverter = ElectricComponent(
-            type_=TypeComponent.INVERTER,
-            name="inverter",
-            rated_power=3000,
-            eff_curve=CONVERTER_EFF,
-        )
-        transformer = ElectricComponent(
-            type_=TypeComponent.TRANSFORMER,
-            name="transformer",
-            rated_power=3000,
-            eff_curve=np.array([99]),
-        )
 
-        components = [gearbox, synch_mach, rectifier, inverter, transformer]
-        pti_pto = SerialSystem(
-            TypeComponent.PTI_PTO_SYSTEM,
-            TypePower.PTI_PTO,
-            "PTIPTO 1",
-            components,
-            rated_power=transformer.rated_power,
-            rated_speed=synch_mach.rated_speed,
-        )
         load_perc = 0.50  # np.random.rand() * 100
         efficiency = 1
-        for component in components:
+        for component in self.components:
             efficiency *= component.get_efficiency_from_load_percentage(load_perc)
         self.assertAlmostEqual(
-            pti_pto.get_efficiency_from_load_percentage(load_perc),
+            self.pti_pto.get_efficiency_from_load_percentage(load_perc),
             efficiency,
             places=-1,
         )
-        return pti_pto
 
     def test_pti_pto(self):
-
-        #: Get a generic pti_pto instance from SerialSystem testing
-        pti_pto_serial = self.test_serial_system()
 
         #: Create a PTIPTO instance
         switchboard_id = 1
         shaft_line_id = 1
         pti_pto = PTIPTO(
-            pti_pto_serial.name,
-            pti_pto_serial.components,
+            self.pti_pto.name,
+            self.pti_pto.components,
             switchboard_id,
-            pti_pto_serial.rated_power,
-            pti_pto_serial.rated_speed,
+            self.pti_pto.rated_power,
+            self.pti_pto.rated_speed,
             shaft_line_id,
         )
         self.assertEqual(shaft_line_id, pti_pto.shaft_line_id)
@@ -450,18 +452,17 @@ class TestComponent(TestCase):
         switchboard_no = 0
         power_type = TypePower.PTI_PTO
         # noinspection PyShadowingNames
-        PTIPTO = self.test_serial_system()
-        PTIPTO_electric = SerialSystemElectric(
-            PTIPTO.type,
-            PTIPTO.name,
+        pti_pto_electric = SerialSystemElectric(
+            self.pti_pto.type,
+            self.pti_pto.name,
             power_type,
-            PTIPTO.components,
+            self.pti_pto.components,
             switchboard_no,
-            PTIPTO.rated_power,
-            PTIPTO.rated_speed,
+            self.pti_pto.rated_power,
+            self.pti_pto.rated_speed,
         )
-        self.assertEqual(PTIPTO_electric.switchboard_id, switchboard_no)
-        self.assertEqual(PTIPTO_electric.power_type, power_type)
+        self.assertEqual(pti_pto_electric.switchboard_id, switchboard_no)
+        self.assertEqual(pti_pto_electric.power_type, power_type)
 
     # noinspection DuplicatedCode
     def test_main_engine_with_gear_box(self):
@@ -618,4 +619,41 @@ class TestComponent(TestCase):
         assert np.allclose(
             fuel_cell_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
             natural_gas_consumption_kg_per_s,
+        )
+
+        number_modules = 2
+        converter = ElectricComponent(
+            type_=TypeComponent.POWER_CONVERTER,
+            name="converter",
+            rated_power=fuel_cell.rated_power * number_modules * 1.05,
+            eff_curve=create_random_monotonic_eff_curve(),
+        )
+        fuel_cell_system = FuelCellSystem(
+            name="fuel cell system 1",
+            fuel_cell_module=fuel_cell,
+            converter=converter,
+            switchboard_id=1,
+            number_modules=2,
+        )
+        power = np.random.rand(5) * fuel_cell_system.rated_power
+        power_after_converter, _ = converter.get_power_input_from_bidirectional_output(power)
+        fuel_cell_system_run_point = fuel_cell_system.get_fuel_cell_run_point(power)
+        fuel_cell_module_run_point = fuel_cell_system.fuel_cell.get_fuel_cell_run_point(
+            power_out_kw=power_after_converter / number_modules,
+        )
+        assert np.allclose(
+            fuel_cell_system_run_point.load_ratio,
+            fuel_cell_module_run_point.load_ratio,
+        )
+        for fuel_con_system, fuel_con_module in zip(
+            fuel_cell_system_run_point.fuel_flow_rate_kg_per_s.fuels,
+            fuel_cell_module_run_point.fuel_flow_rate_kg_per_s.fuels,
+        ):
+            assert np.allclose(
+                fuel_con_system.mass_or_mass_fraction,
+                fuel_con_module.mass_or_mass_fraction * number_modules,
+            )
+        assert np.allclose(
+            fuel_cell_system_run_point.efficiency,
+            fuel_cell_module_run_point.efficiency,
         )

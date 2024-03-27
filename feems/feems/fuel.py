@@ -1,4 +1,5 @@
 """This module provides classes for fuel consumption and emissions."""
+
 from functools import cache
 import os
 import warnings
@@ -241,12 +242,14 @@ class Fuel:
             origin=self.origin,
             fuel_specified_by=self.fuel_specified_by,
             lhv_mj_per_g=self.lhv_mj_per_g if fuel_specified_by_user else None,
-            ghg_emission_factor_well_to_tank_gco2eq_per_mj=self.ghg_emission_factor_well_to_tank_gco2eq_per_mj
-            if fuel_specified_by_user
-            else None,
-            ghg_emission_factor_tank_to_wake=self.ghg_emission_factor_tank_to_wake
-            if fuel_specified_by_user
-            else None,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=(
+                self.ghg_emission_factor_well_to_tank_gco2eq_per_mj
+                if fuel_specified_by_user
+                else None
+            ),
+            ghg_emission_factor_tank_to_wake=(
+                self.ghg_emission_factor_tank_to_wake if fuel_specified_by_user else None
+            ),
             mass_or_mass_fraction=self.mass_or_mass_fraction,
         )
 
@@ -326,9 +329,9 @@ def get_prescribed_factors(
     ghg_emission_factor_well_to_tank_gco2eq_per_mj = fuel_data["CO2_WtT"].values[0]
     ghg_emission_factor_tank_to_wake = [
         GhgEmissionFactorTankToWake(
-            fuel_consumer_class=each_data["fuel_consumer_unit_class"]
-            if organization == "eu"
-            else None,
+            fuel_consumer_class=(
+                each_data["fuel_consumer_unit_class"] if organization == "eu" else None
+            ),
             co2_factor_gco2_per_gfuel=each_data["Cf_CO2"],
             ch4_factor_gch4_per_gfuel=each_data["Cf_CH4"],
             n2o_factor_gn2o_per_gfuel=each_data["Cf_N2O"],
@@ -493,6 +496,14 @@ class FuelConsumption:
             if index not in index_fuel_added:
                 sum_fuel.fuels.append(each_fuel.copy)
         return sum_fuel
+
+    def __mul__(self, other: Union[float, np.ndarray]):
+        res = FuelConsumption()
+        for fuel in self.fuels:
+            fuel_to_add = fuel.copy
+            fuel_to_add.mass_or_mass_fraction *= other
+            res.fuels.append(fuel_to_add)
+        return res
 
     @property
     def total_fuel_consumption(self) -> Union[float, np.ndarray]:

@@ -3,7 +3,7 @@ from typing import Union, NamedTuple, cast
 from unittest import TestCase
 
 import numpy as np
-from scipy.integrate import simps
+from scipy.integrate import simpson
 
 from feems.components_model import (
     ElectricComponent,
@@ -95,9 +95,9 @@ class TestSwitchboard(TestCase):
             np.random.rand(self.no_points_to_test, self.switchboard.no_power_sources)
         ).astype(bool)
         index_all_power_source_off = np.bitwise_not(status_new_power_source).all(axis=1)
-        status_new_power_source[
-            index_all_power_source_off, 0
-        ] = True  # Make sure at least one power source is on
+        status_new_power_source[index_all_power_source_off, 0] = (
+            True  # Make sure at least one power source is on
+        )
         self.switchboard.set_status_components_by_power_type(
             type_=TypePower.POWER_SOURCE, status=status_new_power_source
         )
@@ -431,7 +431,7 @@ class TestShaftLine(TestCase):
                 main_engine.rated_power * total_load_percentage_ref * main_engine.status
             ).fuel_flow_rate_kg_per_s.total_fuel_consumption
             fuel_consumption_rate_ref += fuel_consumption_rate_temp
-        fuel_consumption_ref = simps(fuel_consumption_rate_ref) * time_step
+        fuel_consumption_ref = simpson(fuel_consumption_rate_ref) * time_step
 
         #: Set the PTI/PTO power 0
         pti_pto.power_input = pti_pto.set_power_output_from_input(np.zeros(number_test_points))
@@ -497,7 +497,7 @@ class TestShaftLine(TestCase):
             engine.power_output = total_load_percentage_ref * engine.rated_power * engine.status
             res_engine = engine.get_engine_run_point_from_power_out_kw()
             fuel_consumption_ref += (
-                simps(res_engine.fuel_flow_rate_kg_per_s.total_fuel_consumption) * time_step
+                simpson(res_engine.fuel_flow_rate_kg_per_s.total_fuel_consumption) * time_step
             )
             total_running_hours_ref += engine.status.sum() * time_step / 3600
 

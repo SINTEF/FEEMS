@@ -124,7 +124,7 @@ class TestMechanicalPropulsionSystemSimulation(TestMechanicalPropulsionSystemSet
 
                 # Check if the BSFC is in the sane range
                 total_energy_kj = (
-                    integrate.simps(total_power_kw, dx=time_interval_s)
+                    integrate.simpson(total_power_kw, dx=time_interval_s)
                     if len(total_power_kw) > 1
                     else total_power_kw * time_interval_s
                 )
