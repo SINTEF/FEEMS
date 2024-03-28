@@ -1,6 +1,7 @@
 import random
 from typing import List, Union, NamedTuple
 
+from feems.fuel import FuelOrigin, TypeFuel
 import numpy as np
 import pandas as pd
 from scipy.interpolate import PchipInterpolator
@@ -18,7 +19,7 @@ from feems.components_model.component_electric import (
     Battery,
     PTIPTO,
 )
-from feems.components_model.component_mechanical import Engine
+from feems.components_model.component_mechanical import COGAS, Engine
 from feems.components_model.node import Switchboard
 from feems.exceptions import ConfigurationError
 from feems.types_for_feems import (
@@ -748,3 +749,35 @@ def create_electric_components_for_switchboard(
             electric_components.append(component)
 
     return electric_components
+
+def create_cogas_system(
+    rated_power_kw: float = 1000,
+    rated_speed_rpm: float = 1000,
+    eff_curve: np.ndarray = None,
+    gas_turbine_power_curve: np.ndarray = None,
+    steam_turbine_power_curve: np.ndarray = None,
+    fuel_type: TypeFuel = TypeFuel.NATURAL_GAS,
+    fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+
+) -> COGAS:
+    # Create a cogas system
+    if eff_curve is None:
+        eff_curve = create_random_monotonic_eff_curve()
+    if gas_turbine_power_curve is None:
+        gas_turbine_power_curve = create_random_monotonic_eff_curve()
+        gas_turbine_power_curve[:, 1] *= gas_turbine_power_curve[:, 0] * rated_power_kw
+    if steam_turbine_power_curve is None:
+        steam_turbine_power_curve = create_random_monotonic_eff_curve()
+        steam_turbine_power_curve[:, 1] = (
+            steam_turbine_power_curve[:, 0] * rated_power_kw - gas_turbine_power_curve[:, 1]
+        )
+    return COGAS(
+        name="COGAS",
+        rated_power=rated_power_kw,
+        rated_speed=rated_speed_rpm,
+        eff_curve=eff_curve,
+        gas_turbine_power_curve=gas_turbine_power_curve,
+        steam_turbine_power_curve=steam_turbine_power_curve,
+        fuel_type=fuel_type,
+        fuel_origin=fuel_origin,
+    )

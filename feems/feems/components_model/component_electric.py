@@ -915,7 +915,7 @@ class COGES(Component):
         self.status = np.ones(0).astype(bool)
         self.load_sharing_mode = np.zeros(1)
 
-    def get_system_run_point_from_power_output_kw(self, power_output_kw: np.ndarray = None) -> ComponentRunPoint:
+    def get_system_run_point_from_power_output_kw(self, power_output_kw: np.ndarray = None) -> COGESRunPoint:
         """
         Get the run point of the COGES system based on the power output of the system
 

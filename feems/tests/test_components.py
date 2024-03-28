@@ -9,6 +9,7 @@ from scipy.interpolate import PchipInterpolator
 
 from feems.components_model.component_base import BasicComponent, SerialSystem
 from feems.components_model.component_electric import (
+    COGES,
     ElectricMachine,
     ElectricComponent,
     PTIPTO,
@@ -32,6 +33,7 @@ from feems.fuel import FuelByMassFraction, TypeFuel, Fuel, FuelSpecifiedBy, Fuel
 from feems.types_for_feems import Speed_rpm, NOxCalculationMethod, SwbId
 from feems.types_for_feems import TypeNode, TypeComponent, TypePower, Power_kW
 from tests.utility import (
+    create_cogas_system,
     create_components,
     create_random_monotonic_eff_curve,
     create_basic_components,
@@ -659,47 +661,51 @@ class TestComponent(TestCase):
             fuel_cell_module_run_point.efficiency,
         )
 
-        """Test cogeneration system"""
+    def test_cogas(self):
+        """Test combined gas and steam system - mechanical output"""
+        cogas = create_cogas_system()
+        power_output_kw = np.random.rand(5) * cogas.rated_power
+        eff_cogas = cogas.get_efficiency_from_load_percentage(
+            cogas.get_load(power_output_kw)
+        )
+        fuel = Fuel(
+            fuel_type=cogas.fuel_type,
+            origin=cogas.fuel_origin,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+        fuel_consumption_kg_per_s_ref = power_output_kw / eff_cogas / (fuel.lhv_mj_per_g * 1000) / 1000
+        gas_turbine_run_point = cogas.get_gas_turbine_run_point_from_power_output_kw(power_output_kw)
+        assert np.allclose(eff_cogas, gas_turbine_run_point.efficiency)
+        assert np.allclose(fuel_consumption_kg_per_s_ref, gas_turbine_run_point.fuel_flow_rate_kg_per_s.fuels[0].consumption)
+        
+    def test_coges(self):
         #: Create an engine component
-        engine = create_engine_component("auxiliary engine 1", 1000, 1000)
+        cogas = create_cogas_system()
         #: Create a generator component
         generator = ElectricMachine(
             type_=TypeComponent.GENERATOR,
             name="generator 1",
-            rated_power=engine.rated_power * 0.9,
-            rated_speed=engine.rated_speed,
+            rated_power=cogas.rated_power * 0.9,
+            rated_speed=cogas.rated_speed,
             power_type=TypePower.POWER_SOURCE,
             switchboard_id=SwbId(0),
             number_poles=4,
             eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
         )
-        rectifier = ElectricComponent(
-            type_=TypeComponent.RECTIFIER,
-            name="rectifier 1",
-            rated_power=generator.rated_power,
-            eff_curve=np.array([99]),
+        coges = COGES(
+            name="coges 1",
+            cogas=cogas,
+            generator=generator,
         )
-        coges_ac = Genset("coges 1", engine, generator)
-        coges_dc = Genset("coges 1", engine, generator, rectifier)
-        power_electric = np.random.rand(5) * coges_ac.rated_power
-        load_at_coges = generator.get_load(power_electric)
-        power_dc_at_generator = power_electric / rectifier.get_efficiency_from_load_percentage(
-            load_at_coges
-        )
-        power_shaft_ac, load_perc = generator.get_shaft_power_load_from_electric_power(
+        power_electric = np.random.rand(5) * coges.rated_power
+        power_shaft, load_at_generator = generator.get_shaft_power_load_from_electric_power(
             power_electric
         )
-        power_shaft_dc, load_perc = generator.get_shaft_power_load_from_electric_power(
-            power_dc_at_generator
-        )
-        res_engine_ac = engine.get_engine_run_point_from_power_out_kw(power_shaft_ac)
-        res_engine_dc = engine.get_engine_run_point_from_power_out_kw(power_shaft_dc)
-        res_coges_ac = coges_ac.get_fuel_cons_load_bsfc_from_power_out_generator_kw(power_electric)
-        res_coges_dc = coges_dc.get_fuel_cons_load_bsfc_from_power_out_generator_kw(power_electric)
+        res_cogas = cogas.get_gas_turbine_run_point_from_power_output_kw(power_shaft)
+        res_coges = coges.get_system_run_point_from_power_output_kw(power_electric)
+        np.testing.assert_allclose(load_at_generator, res_coges.coges_load_ratio)
         np.testing.assert_allclose(
-            res_engine_ac.fuel_flow_rate_kg_per_s.total_fuel_consumption,
-            res_coges_ac.engine.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            res_coges.cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            res_cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
         )
-        np.testing.assert_allclose(
-            res_engine_dc.fuel_flow_rate_kg_per_s.total_fuel_consumption,
-            res_coges_dc.engine
+    
