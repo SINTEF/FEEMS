@@ -30,7 +30,7 @@ from feems.components_model.utility import (
     get_efficiency_curve_from_dataframe,
 )
 from feems.fuel import FuelByMassFraction, TypeFuel, Fuel, FuelSpecifiedBy, FuelOrigin
-from feems.types_for_feems import Speed_rpm, NOxCalculationMethod, SwbId
+from feems.types_for_feems import EmissionType, Speed_rpm, NOxCalculationMethod, SwbId
 from feems.types_for_feems import TypeNode, TypeComponent, TypePower, Power_kW
 from tests.utility import (
     create_cogas_system,
@@ -42,6 +42,7 @@ from tests.utility import (
     ELECTRIC_MACHINE_EFF_CURVE,
     create_electric_components_for_switchboard,
 )
+from feems.constant import nox_factor_imo_medium_speed_g_hWh
 
 CONVERTER_EFF = np.array([[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]).transpose()
 
@@ -675,8 +676,13 @@ class TestComponent(TestCase):
         )
         fuel_consumption_kg_per_s_ref = power_output_kw / eff_cogas / (fuel.lhv_mj_per_g * 1000) / 1000
         gas_turbine_run_point = cogas.get_gas_turbine_run_point_from_power_output_kw(power_output_kw)
-        assert np.allclose(eff_cogas, gas_turbine_run_point.efficiency)
-        assert np.allclose(fuel_consumption_kg_per_s_ref, gas_turbine_run_point.fuel_flow_rate_kg_per_s.fuels[0].consumption)
+        np.testing.assert_allclose(eff_cogas, gas_turbine_run_point.efficiency)
+        np.testing.assert_allclose(fuel_consumption_kg_per_s_ref, gas_turbine_run_point.fuel_flow_rate_kg_per_s.fuels[0].consumption)
+        
+        # Test if the default NOx emission curve is IMO Tier 3
+        factor, exponent = nox_factor_imo_medium_speed_g_hWh[NOxCalculationMethod.TIER_3.value]
+        nox_g_per_kwh = factor * np.power(cogas.rated_speed, exponent)
+        np.testing.assert_equal(cogas._emissions_per_kwh_interp[EmissionType.NOX](np.random.rand()), nox_g_per_kwh)
         
     def test_coges(self):
         #: Create an engine component

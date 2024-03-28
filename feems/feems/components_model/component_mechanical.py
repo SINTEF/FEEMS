@@ -456,6 +456,8 @@ class COGAS(BasicComponent):
         steam_turbine_power_curve: np.ndarray = None,
         fuel_type: TypeFuel = TypeFuel.DIESEL,
         fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+        emissions_curves: List[EmissionCurve] = None,
+        NOx_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_3,
     ):
         """Constructor for COGES component"""
         # Validate the inputs for curves. The length of the curves should be the same and the x values should be the same.
@@ -484,6 +486,50 @@ class COGAS(BasicComponent):
         )
         self.fuel_type = fuel_type
         self.fuel_origin = fuel_origin
+        self._setup_emissions(emissions_curves)
+        self._setup_nox(NOx_calculation_method, rated_speed)
+        
+
+    def _setup_emissions(self, emissions_curves: List[EmissionCurve] = None) -> None:
+        self.emission_curves = emissions_curves
+        self._emissions_per_kwh_interp: Dict[EmissionType, Callable[[T], T]] = {}
+        if emissions_curves is not None:
+            e: EmissionCurve
+            for e in emissions_curves:
+                if len(e.points_per_kwh) > 0:
+                    self._emissions_per_kwh_interp[e.emission] = get_emission_curve_from_points(
+                        e.points_per_kwh
+                    )
+    
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        raise NotImplementedError("Fuel consumer type for COGAS is not defined in FuelEU Maritime regulation yet.")
+        
+    def emissions_g_per_kwh(self, emission_type: EmissionType, load_ratio: T) -> Optional[T]:
+        if emission_type in self._emissions_per_kwh_interp:
+            return self._emissions_per_kwh_interp[emission_type](load_ratio)
+        else:
+            return None
+
+    def _setup_nox(
+        self, nox_calculation_method: NOxCalculationMethod, rated_speed: Speed_rpm
+    ) -> None:
+        self.nox_calculation_method = nox_calculation_method
+        if nox_calculation_method == NOxCalculationMethod.CURVE:
+            assert EmissionType.NOX in self._emissions_per_kwh_interp
+            return
+
+        if rated_speed > nox_tier_slow_speed_max_rpm:
+            tier_class = nox_calculation_method.value
+            factor = nox_factor_imo_medium_speed_g_hWh[tier_class][0]
+            exponent = nox_factor_imo_medium_speed_g_hWh[tier_class][1]
+            nox_g_per_kwh = factor * np.power(self.rated_speed, exponent)
+            curve = lambda x: nox_g_per_kwh
+        else:
+            tier_class = nox_calculation_method.value
+            nox_factor_g_kwh = nox_factor_imo_slow_speed_g_kWh[tier_class]
+            curve = lambda x: nox_factor_g_kwh
+        self._emissions_per_kwh_interp[EmissionType.NOX] = curve
 
     @property
     def power_output_gas_turbine(self):
