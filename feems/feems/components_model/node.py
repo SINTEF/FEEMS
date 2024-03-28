@@ -327,10 +327,10 @@ def get_fuel_emission_energy_balance_for_component(
             np.isscalar(coges_run_point.coges_load_ratio)
             or coges_run_point.coges_load_ratio.size == 1
         ):
-            res.load_ratio_genset = genset_run_point.coges_load_ratio
+            res.load_ratio_genset = coges_run_point.coges_load_ratio
 
         set_emission(
-            engine_out=coges_run_point.coges, 
+            engine_out=coges_run_point.cogas, 
             integration_method=integration_method, 
             result=res, 
             time_interval_s=time_interval_s

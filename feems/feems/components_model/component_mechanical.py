@@ -550,6 +550,9 @@ class COGAS(BasicComponent):
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
     ) -> ComponentRunPoint:
+        # GHG factors for FuelEU Maritime is not available for COGAS yet. It should raise an error if the user tries to use it.
+        if fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
+            raise ValueError("GHG factors for FuelEU Maritime is not available for COGAS yet.")
         if power_kw is None:
             power_kw = self.power_output
         load_ratio = self.get_load(power_kw)
@@ -564,11 +567,16 @@ class COGAS(BasicComponent):
         )
         fuel_power_kw = power_kw / eff
         fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000)  / 1000
-        fuel.consumption = fuel_consumption_kg_per_s
+        fuel.mass_or_mass_fraction = fuel_consumption_kg_per_s
+        emissionn_per_s = {}
+        power_kwh_per_s = power_kw / 3600
+        for e in self._emissions_per_kwh_interp:
+            emissionn_per_s[e] = self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio) * power_kwh_per_s
         return ComponentRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel]),
             efficiency=eff,
+            emissions_g_per_s=emissionn_per_s
         )
 
 

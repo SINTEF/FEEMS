@@ -915,7 +915,14 @@ class COGES(Component):
         self.status = np.ones(0).astype(bool)
         self.load_sharing_mode = np.zeros(1)
 
-    def get_system_run_point_from_power_output_kw(self, power_output_kw: np.ndarray = None) -> COGESRunPoint:
+    def get_system_run_point_from_power_output_kw(
+        self, 
+        power_output_kw: np.ndarray = None,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        lhv_mj_per_g: Optional[float] = None,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
+        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,        
+    ) -> COGESRunPoint:
         """
         Get the run point of the COGES system based on the power output of the system
 
@@ -930,7 +937,12 @@ class COGES(Component):
             power_output_kw = self.power_output
         
         self.cogas.power_output, load_generator = self.generator.set_power_input_from_output(power_output_kw)
-        cogas_run_point = self.cogas.get_gas_turbine_run_point_from_power_output_kw()
+        cogas_run_point = self.cogas.get_gas_turbine_run_point_from_power_output_kw(
+            fuel_specified_by=fuel_specified_by,
+            lhv_mj_per_g=lhv_mj_per_g,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+            ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+        )
         return COGESRunPoint(
             coges_load_ratio=load_generator,
             cogas=cogas_run_point,

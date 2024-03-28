@@ -1,8 +1,12 @@
 import copy
+import pprint
 import random
 from typing import List, Dict
 from unittest import TestCase
 
+from feems.components_model.component_electric import COGES, ElectricMachine, SerialSystemElectric
+from feems.components_model.component_mechanical import COGAS
+from feems.fuel import Fuel, FuelConsumption
 import numpy as np
 
 from feems.components_model import (
@@ -17,6 +21,7 @@ from feems.components_model import (
 from feems.components_model.utility import IntegrationMethod
 from feems.system_model import ElectricPowerSystem, BusId, MechanicalPropulsionSystem
 from feems.types_for_feems import (
+    SwbId,
     TypeComponent,
     TypePower,
     Power_kW,
@@ -28,8 +33,10 @@ from feems.types_for_feems import (
 
 # import os
 from tests.utility import (
+    ELECTRIC_MACHINE_EFF_CURVE,
     create_a_pti_pto,
     create_a_propulsion_drive,
+    create_cogas_system,
     create_genset_component,
 )
 
@@ -176,7 +183,7 @@ class TestElectricPowerSystem(TestCase):
         )
         energy_storage_for_diesel_electric = copy.deepcopy(energy_storage_for_hybrid)
         energy_storage_for_conventional = copy.deepcopy(energy_storage_for_hybrid)
-
+        
         # Thruster
         self.no_thruster = 2
         self.no_thruster_diesel_electric = self.no_switchboard_diesel_electric
@@ -894,6 +901,107 @@ class TestElectricPowerSystem(TestCase):
             result = electric_system.get_fuel_energy_consumption_running_time()
             self.assertLess(result.energy_stored_total_mj, 0)
 
+
+class TestCOGESSystem(TestCase):
+    def setUp(self) -> None:
+        # Create COGES systems
+        self.coges: List[COGES] = []
+        self.propulsion_drive: List[SerialSystemElectric] = []
+        self.other_load = ElectricComponent(
+            type_=TypeComponent.OTHER_LOAD,
+            name="other loads",
+            power_type=TypePower.POWER_CONSUMER,
+            rated_power=Power_kW(1000),
+            eff_curve=np.array([1]),
+            switchboard_id=1,
+        )
+        for i in range(1, 3):
+            cogas = create_cogas_system()
+            generator = ElectricMachine(
+                type_=TypeComponent.GENERATOR,
+                name=f"generator {i}",
+                rated_power=cogas.rated_power * 0.9,
+                rated_speed=cogas.rated_speed,
+                power_type=TypePower.POWER_SOURCE,
+                switchboard_id=SwbId(i),
+                number_poles=4,
+                eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+            )
+            self.coges.append(COGES(
+                name=f"COGES {i}",
+                cogas=cogas,
+                generator=generator,
+            ))
+            # Create a propulsion drive
+            self.propulsion_drive.append(create_a_propulsion_drive(
+                name=f"propulsion drive {i}",
+                rated_power=600,
+                rated_speed=750,
+                switchboard_id=i,
+            ))
+        self.system = ElectricPowerSystem(
+            name="COGES system",
+            power_plant_components=[
+                *self.coges, *self.propulsion_drive, self.other_load
+            ],
+            bus_tie_connections=[(1, 2)],
+        )
+    
+    def test_configuration(self):
+        # Test the configuration
+        self.assertEqual(self.system.no_power_sources, len(self.coges))
+        self.assertEqual(self.system.no_propulsion_units, len(self.propulsion_drive))
+        self.assertEqual(self.system.no_other_load, 1)
+        self.assertEqual(self.system.no_energy_storage, 0)
+        self.assertEqual(self.system.no_pti_pto, 0)
+        self.assertEqual(self.system.no_bus_tie_breakers, 1)
+        self.assertEqual(self.system.no_bus_configuration_change, 1)
+        self.assertEqual(self.system.no_switchboard, 2)
+        self.assertEqual(self.system.no_bus, [1])
+        
+    def test_get_fuel_consumption(self):
+        propulsion_loads = [propulsion_drive.rated_power * np.random.random(1) for propulsion_drive in self.propulsion_drive]
+        other_loads = np.array([400 * np.random.random()])
+        
+        # Set the power input for the propulsion drives and other loads
+        for propulsion_drive, load in zip(self.propulsion_drive, propulsion_loads):
+            propulsion_drive.set_power_input_from_output(load)
+        self.other_load.set_power_input_from_output(other_loads)
+        
+        # Set the bus tie status
+        self.system.bus_tie_breakers[0].status = np.ones(1).astype(bool)
+        
+        # Set the status and load sharing mode for the power sources
+        for coges in self.coges:
+            coges.status = np.ones(1).astype(bool)
+            coges.load_sharing_mode = np.zeros(1)
+            
+        # Set time interval
+        self.system.set_time_interval(time_interval_s=3600, integration_method=IntegrationMethod.sum_with_time)        
+        
+        # Do power balance
+        self.system.do_power_balance_calculation()
+        
+        # Calculate the fuel consumption manually
+        cogas_fuel_consumption = 0
+        for coges in self.coges:
+            cogas_power_output, _ = coges.generator.get_power_input_from_bidirectional_output(coges.power_output)
+            cogas_efficiency = coges.cogas.get_efficiency_from_load_percentage(
+                cogas_power_output / coges.cogas.rated_power
+            )
+            lhv_fuel_mj_per_g = Fuel(
+                fuel_type=coges.cogas.fuel_type,
+                origin=coges.cogas.fuel_origin,
+            ).lhv_mj_per_g
+            cogas_fuel_consumption_rate = cogas_power_output / cogas_efficiency / (lhv_fuel_mj_per_g * 1000) / 1000
+            cogas_fuel_consumption += cogas_fuel_consumption_rate * 3600
+        
+        # Get the fuel consumption
+        result = self.system.get_fuel_energy_consumption_running_time()
+        fuel_consumption_result = result.fuel_consumption_total_kg
+        # Compare the results
+        self.assertAlmostEqual(cogas_fuel_consumption[0], fuel_consumption_result, 5)
+        
 
 class TestMechanicalPropulsionSystemSetup(TestCase):
     def setUp(self) -> None:

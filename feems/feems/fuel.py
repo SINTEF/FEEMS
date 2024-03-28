@@ -162,7 +162,6 @@ class Fuel:
     lhv_mj_per_g: Optional[float] = None
     ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None
     ghg_emission_factor_tank_to_wake: Optional[List[GhgEmissionFactorTankToWake]] = None
-    consumption: float = 0.0
     mass_or_mass_fraction: Union[np.array, float] = 0.0
 
     def __init__(

@@ -14,6 +14,7 @@ from feems.components_model import (
 
 from . import get_logger
 from .components_model.component_electric import (
+    COGES,
     ElectricComponent,
     ElectricMachine,
     Genset,
@@ -101,7 +102,7 @@ class ElectricPowerSystem(MachinerySystem):
         #: Categorize the components
         for component in power_plant_components:
             if component.power_type == TypePower.POWER_SOURCE:
-                if isinstance(component, (ElectricMachine, Genset, FuelCellSystem)):
+                if isinstance(component, (ElectricMachine, Genset, FuelCellSystem, COGES)):
                     self.power_sources.append(component)
                     power_source2switchboard.append(component.switchboard_id)
                     component2switchboard.append(component.switchboard_id)

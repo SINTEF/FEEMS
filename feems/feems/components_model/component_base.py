@@ -1,5 +1,5 @@
-from typing import Union, List, Tuple, Optional, TypeVar
-from dataclasses import dataclass
+from typing import Union, List, Tuple, Optional, TypeVar, Dict
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ from .utility import (
 from .. import get_logger
 from ..exceptions import InputError
 from ..types_for_feems import (
+    EmissionType,
     TypeComponent,
     TypePower,
     Power_kW,
@@ -34,6 +35,8 @@ class ComponentRunPoint:
     load_ratio: np.ndarray
     efficiency: np.ndarray
     fuel_flow_rate_kg_per_s: FuelConsumption
+    emissions_g_per_s: Dict[EmissionType, np.ndarray] = field(default_factory=dict)
+
 
 class Component:
     """

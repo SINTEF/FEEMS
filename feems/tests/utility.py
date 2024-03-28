@@ -758,7 +758,6 @@ def create_cogas_system(
     steam_turbine_power_curve: np.ndarray = None,
     fuel_type: TypeFuel = TypeFuel.NATURAL_GAS,
     fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
-
 ) -> COGAS:
     # Create a cogas system
     if eff_curve is None:
