@@ -503,7 +503,8 @@ class COGAS(BasicComponent):
     
     @property
     def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
-        raise NotImplementedError("Fuel consumer type for COGAS is not defined in FuelEU Maritime regulation yet.")
+        Warning("Fuel consumer type for COGAS is not defined in FuelEU Maritime regulation yet.")
+        return None
         
     def emissions_g_per_kwh(self, emission_type: EmissionType, load_ratio: T) -> Optional[T]:
         if emission_type in self._emissions_per_kwh_interp:

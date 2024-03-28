@@ -8,6 +8,7 @@ import pandas as pd
 
 from .component_base import Component
 from .component_electric import (
+    COGES,
     ElectricComponent,
     FuelCellSystem,
     Genset,
@@ -310,6 +311,32 @@ def get_fuel_emission_energy_balance_for_component(
             )
             / 1000
         )
+    elif component.type == TypeComponent.COGES:
+        component = cast(COGES, component)
+        coges_run_point = component.get_system_run_point_from_power_output_kw(
+            fuel_specified_by=fuel_specified_by,
+        )
+        res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
+            fuel_consumption_kg_per_s=coges_run_point.cogas.fuel_flow_rate_kg_per_s,
+            time_interval_s=time_interval_s,
+            integration_method=integration_method,
+        )
+        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(component.cogas.fuel_consumer_type_fuel_eu_maritime)
+
+        if (
+            np.isscalar(coges_run_point.coges_load_ratio)
+            or coges_run_point.coges_load_ratio.size == 1
+        ):
+            res.load_ratio_genset = genset_run_point.coges_load_ratio
+
+        set_emission(
+            engine_out=coges_run_point.coges, 
+            integration_method=integration_method, 
+            result=res, 
+            time_interval_s=time_interval_s
+        )
+
+        res.running_hours_genset_total_hr = running_hours
     else:
         raise TypeError(
             f"Component type {component.type} not supported for energy balance calculation"
