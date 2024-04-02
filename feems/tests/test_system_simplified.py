@@ -71,7 +71,9 @@ class TestElectricPowerSystem(TestCase):
             switchboard_id=self.switchboard_id,
             eff_curve=np.array([efficiency_generator]),
         )
-        self.genset = Genset(name="genset", aux_engine=aux_engine_object, generator=self.generator)
+        self.genset = Genset(
+            name="genset", aux_engine=aux_engine_object, generator=self.generator
+        )
 
         # Battery
         self.rated_capacity_battery_kwh = 1200.0
@@ -157,8 +159,12 @@ class TestElectricPowerSystem(TestCase):
 
         dt = duration.sum()
         power_other = load_other[0]
-        gen_shaft_power, _ = self.generator.get_shaft_power_load_from_electric_power(power_other)
-        res_engine = self.genset.aux_engine.get_engine_run_point_from_power_out_kw(gen_shaft_power)
+        gen_shaft_power, _ = self.generator.get_shaft_power_load_from_electric_power(
+            power_other
+        )
+        res_engine = self.genset.aux_engine.get_engine_run_point_from_power_out_kw(
+            gen_shaft_power
+        )
         fc_kg = res_engine.fuel_flow_rate_kg_per_s.total_fuel_consumption * dt
         res = self.power_system.get_fuel_energy_consumption_running_time()
         self.assertAlmostEqual(fc_kg, res.fuel_consumption_total_kg)
@@ -203,7 +209,9 @@ class TestElectricPowerSystem(TestCase):
             time_interval_s=self.power_system.time_interval_s,
             integration_method=self.power_system.integration_method,
         )
-        self.assertEqual(res.fuel_consumption_total_kg, hyd_consumption.total_fuel_consumption)
+        self.assertEqual(
+            res.fuel_consumption_total_kg, hyd_consumption.total_fuel_consumption
+        )
 
         run_simulation(
             electric_power_system=self.power_system,
@@ -220,7 +228,9 @@ class TestElectricPowerSystem(TestCase):
             time_interval_s=self.power_system.time_interval_s,
             integration_method=self.power_system.integration_method,
         )
-        self.assertEqual(res.fuel_consumption_total_kg, fuel_cons.total_fuel_consumption)
+        self.assertEqual(
+            res.fuel_consumption_total_kg, fuel_cons.total_fuel_consumption
+        )
 
     def test_time_single_input_vs_multi_input(self) -> None:
         # Sets the load
@@ -255,6 +265,8 @@ class TestElectricPowerSystem(TestCase):
         self.battery.load_sharing_mode = equal_load_sharing_vector
 
     # noinspection PyUnusedLocal
-    def sim_one_step_part_two(self, load_other: Union[float, np.ndarray], n: int) -> None:
+    def sim_one_step_part_two(
+        self, load_other: Union[float, np.ndarray], n: int
+    ) -> None:
         self.power_system.set_bus_tie_status_all(np.array([]))
         self.power_system.do_power_balance_calculation()

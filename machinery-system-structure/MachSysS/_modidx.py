@@ -124,12 +124,20 @@ d = {
                 "converttofeems.html#convert_proto_battery_to_feems",
                 "MachSysS/convert_to_feems.py",
             ),
+            "MachSysS.convert_to_feems.convert_proto_cogas_to_feems": (
+                "converttofeems.html#convert_proto_cogas_to_feems",
+                "MachSysS/convert_to_feems.py",
+            ),
+            "MachSysS.convert_to_feems.convert_proto_coges_to_feems": (
+                "converttofeems.html#convert_proto_coges_to_feems",
+                "MachSysS/convert_to_feems.py",
+            ),
             "MachSysS.convert_to_feems.convert_proto_curve1d_to_np_array": (
                 "converttofeems.html#convert_proto_curve1d_to_np_array",
                 "MachSysS/convert_to_feems.py",
             ),
-            "MachSysS.convert_to_feems.convert_proto_efficiency_bsfc_to_np_array": (
-                "converttofeems.html#convert_proto_efficiency_bsfc_to_np_array",
+            "MachSysS.convert_to_feems.convert_proto_efficiency_bsfc_power_to_np_array": (
+                "converttofeems.html#convert_proto_efficiency_bsfc_power_to_np_array",
                 "MachSysS/convert_to_feems.py",
             ),
             "MachSysS.convert_to_feems.convert_proto_electric_component_to_feems": (

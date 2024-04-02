@@ -94,8 +94,8 @@ class Engine(Component):
             e: EmissionCurve
             for e in emissions_curves:
                 if len(e.points_per_kwh) > 0:
-                    self._emissions_per_kwh_interp[e.emission] = get_emission_curve_from_points(
-                        e.points_per_kwh
+                    self._emissions_per_kwh_interp[e.emission] = (
+                        get_emission_curve_from_points(e.points_per_kwh)
                     )
 
     def _setup_bsfc(self, bsfc_curve, file_name) -> None:
@@ -128,9 +128,13 @@ class Engine(Component):
         elif self.engine_cycle_type == EngineCycleType.LEAN_BURN_SPARK_IGNITION:
             return FuelConsumerClassFuelEUMaritime.LNG_LBSI
         else:
-            raise ValueError(f"Invalid engine cycle type {self.engine_cycle_type} for LNG engine")
+            raise ValueError(
+                f"Invalid engine cycle type {self.engine_cycle_type} for LNG engine"
+            )
 
-    def emissions_g_per_kwh(self, emission_type: EmissionType, load_ratio: T) -> Optional[T]:
+    def emissions_g_per_kwh(
+        self, emission_type: EmissionType, load_ratio: T
+    ) -> Optional[T]:
         if emission_type in self._emissions_per_kwh_interp:
             return self._emissions_per_kwh_interp[emission_type](load_ratio)
         else:
@@ -162,7 +166,9 @@ class Engine(Component):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -193,7 +199,8 @@ class Engine(Component):
         emissions_per_s = {}
         for e in self._emissions_per_kwh_interp:
             emissions_per_s[e] = (
-                self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio) * power_kwh_per_s
+                self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio)
+                * power_kwh_per_s
             )
         fuel_consumption_component = Fuel(
             fuel_type=self.fuel_type,
@@ -257,7 +264,9 @@ class EngineDualFuel(Engine):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -333,7 +342,9 @@ class MainEngineForMechanicalPropulsion(Component):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -409,7 +420,9 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -443,6 +456,7 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
         )
 
+
 class COGAS(BasicComponent):
     """Combined gas and steam component class for basic information and efficiency interpolation"""
 
@@ -461,19 +475,26 @@ class COGAS(BasicComponent):
     ):
         """Constructor for COGES component"""
         # Validate the inputs for curves. The length of the curves should be the same and the x values should be the same.
-        if gas_turbine_power_curve is not None and steam_turbine_power_curve is not None:
+        if (
+            gas_turbine_power_curve is not None
+            and steam_turbine_power_curve is not None
+        ):
             if gas_turbine_power_curve.shape != steam_turbine_power_curve.shape:
-                raise ValueError("The length of the gas turbine power curve and steam turbine power curve should be the same.")
+                raise ValueError(
+                    "The length of the gas turbine power curve and steam turbine power curve should be the same."
+                )
             if np.all(gas_turbine_power_curve[:, 0] != steam_turbine_power_curve[:, 0]):
-                raise ValueError("The x values of the gas turbine power curve and steam turbine power curve should be the same.")
-        
+                raise ValueError(
+                    "The x values of the gas turbine power curve and steam turbine power curve should be the same."
+                )
+
         super().__init__(
-            type_=TypeComponent.COGAS, 
-            power_type=TypePower.POWER_SOURCE, 
-            name=name, 
-            rated_power=rated_power, 
-            eff_curve=eff_curve, 
-            rated_speed=rated_speed
+            type_=TypeComponent.COGAS,
+            power_type=TypePower.POWER_SOURCE,
+            name=name,
+            rated_power=rated_power,
+            eff_curve=eff_curve,
+            rated_speed=rated_speed,
         )
         self.gas_turbine_power_curve = gas_turbine_power_curve
         self.steam_turbine_power_curve = steam_turbine_power_curve
@@ -488,7 +509,6 @@ class COGAS(BasicComponent):
         self.fuel_origin = fuel_origin
         self._setup_emissions(emissions_curves)
         self._setup_nox(NOx_calculation_method, rated_speed)
-        
 
     def _setup_emissions(self, emissions_curves: List[EmissionCurve] = None) -> None:
         self.emission_curves = emissions_curves
@@ -497,16 +517,20 @@ class COGAS(BasicComponent):
             e: EmissionCurve
             for e in emissions_curves:
                 if len(e.points_per_kwh) > 0:
-                    self._emissions_per_kwh_interp[e.emission] = get_emission_curve_from_points(
-                        e.points_per_kwh
+                    self._emissions_per_kwh_interp[e.emission] = (
+                        get_emission_curve_from_points(e.points_per_kwh)
                     )
-    
+
     @property
     def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
-        Warning("Fuel consumer type for COGAS is not defined in FuelEU Maritime regulation yet.")
+        Warning(
+            "Fuel consumer type for COGAS is not defined in FuelEU Maritime regulation yet."
+        )
         return None
-        
-    def emissions_g_per_kwh(self, emission_type: EmissionType, load_ratio: T) -> Optional[T]:
+
+    def emissions_g_per_kwh(
+        self, emission_type: EmissionType, load_ratio: T
+    ) -> Optional[T]:
         if emission_type in self._emissions_per_kwh_interp:
             return self._emissions_per_kwh_interp[emission_type](load_ratio)
         else:
@@ -535,24 +559,30 @@ class COGAS(BasicComponent):
     @property
     def power_output_gas_turbine(self):
         """Power output of the gas turbine in kW"""
-        return self.power_ratio_gas_turbine_interpolator(self.power_output / self.rated_power)
-    
+        return self.power_ratio_gas_turbine_interpolator(
+            self.power_output / self.rated_power
+        )
+
     @property
     def power_output_steam_turbine(self):
         """Power output of the steam turbine in kW"""
         return self.power_output - self.power_output_gas_turbine
-    
+
     def get_gas_turbine_run_point_from_power_output_kw(
         self,
         power_kw: np.ndarray = None,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
     ) -> ComponentRunPoint:
         # GHG factors for FuelEU Maritime is not available for COGAS yet. It should raise an error if the user tries to use it.
         if fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
-            raise ValueError("GHG factors for FuelEU Maritime is not available for COGAS yet.")
+            raise ValueError(
+                "GHG factors for FuelEU Maritime is not available for COGAS yet."
+            )
         if power_kw is None:
             power_kw = self.power_output
         load_ratio = self.get_load(power_kw)
@@ -563,20 +593,23 @@ class COGAS(BasicComponent):
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
         )
         fuel_power_kw = power_kw / eff
-        fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000)  / 1000
+        fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000) / 1000
         fuel.mass_or_mass_fraction = fuel_consumption_kg_per_s
         emissionn_per_s = {}
         power_kwh_per_s = power_kw / 3600
         for e in self._emissions_per_kwh_interp:
-            emissionn_per_s[e] = self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio) * power_kwh_per_s
+            emissionn_per_s[e] = (
+                self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio)
+                * power_kwh_per_s
+            )
         return ComponentRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel]),
             efficiency=eff,
-            emissions_g_per_s=emissionn_per_s
+            emissions_g_per_s=emissionn_per_s,
         )
 
 

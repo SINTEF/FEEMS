@@ -95,7 +95,9 @@ class BasicComponent(Component):
         rated_speed: Speed_rpm = Speed_rpm(0.0),
         file_name: str = None,
     ):
-        super(BasicComponent, self).__init__(name, type_, power_type, rated_power, rated_speed)
+        super(BasicComponent, self).__init__(
+            name, type_, power_type, rated_power, rated_speed
+        )
         if file_name is not None:
             df = pd.read_csv(file_name, index_col=0)
             self.rated_power = df["Rated Power"].values[0]
@@ -123,7 +125,9 @@ class BasicComponent(Component):
             raise InputError(err_msg)
 
         #: Make a mapping between the power in to out
-        power_out = np.arange(-self.rated_power, self.rated_power, self.rated_power * 0.01)
+        power_out = np.arange(
+            -self.rated_power, self.rated_power, self.rated_power * 0.01
+        )
         load = self.get_load(power_out)
         power_in = power_out / self.get_efficiency_from_load_percentage(load)
 
@@ -154,7 +158,9 @@ class BasicComponent(Component):
         power_output = self._power_out_interp(power_input)
         if strict_power_balance:
             if type(power_input) is not np.ndarray:
-                power_output = newton(self._power_balance, power_output, args=(power_input,))
+                power_output = newton(
+                    self._power_balance, power_output, args=(power_input,)
+                )
             else:
                 no_points_per_batch = 50
                 no_points = len(power_input)
@@ -207,7 +213,9 @@ class BasicComponent(Component):
             (
                 power_input[idx_forward_power],
                 load[idx_forward_power],
-            ) = self._get_power_input_and_load_from_output(power_output[idx_forward_power])
+            ) = self._get_power_input_and_load_from_output(
+                power_output[idx_forward_power]
+            )
             (
                 power_input[idx_reverse_power],
                 load[idx_reverse_power],
@@ -238,7 +246,9 @@ class BasicComponent(Component):
             (
                 power_output[idx_reverse_power],
                 load[idx_reverse_power],
-            ) = self._get_power_input_and_load_from_output(power_input[idx_reverse_power])
+            ) = self._get_power_input_and_load_from_output(
+                power_input[idx_reverse_power]
+            )
         return power_output, load
 
     def set_power_input_from_output(
@@ -257,7 +267,9 @@ class BasicComponent(Component):
         self.power_output = power_output
 
         #: Calculate the power input and %load considering the efficiency
-        self.power_input, load = self.get_power_input_from_bidirectional_output(power_output)
+        self.power_input, load = self.get_power_input_from_bidirectional_output(
+            power_output
+        )
 
         #: Return the result
         return self.power_input, load
@@ -278,7 +290,9 @@ class BasicComponent(Component):
         self.power_input = power_input
 
         #: Calculate the power output and %load considering the efficiency
-        self.power_output, load = self.get_power_output_from_bidirectional_input(power_input)
+        self.power_output, load = self.get_power_output_from_bidirectional_input(
+            power_input
+        )
 
         #: Return the result
         return self.power_output, load
@@ -322,10 +336,14 @@ class BasicComponent(Component):
         load = self.get_load(x)
         if not isinstance(power_input, np.ndarray):
             if power_input > 0:
-                power_output = power_input * self.get_efficiency_from_load_percentage(load)
+                power_output = power_input * self.get_efficiency_from_load_percentage(
+                    load
+                )
                 d_power_output = power_input * self._get_d_efficiency(x, 0.001 * x)
             else:
-                power_output = power_input / self.get_efficiency_from_load_percentage(load)
+                power_output = power_input / self.get_efficiency_from_load_percentage(
+                    load
+                )
                 d_power_output = (
                     -power_input
                     * self._get_d_efficiency(x, 0.001 * x)
@@ -341,19 +359,26 @@ class BasicComponent(Component):
             ] * self.get_efficiency_from_load_percentage(load[idx_forward_power])
             d_power_output[idx_forward_power] = power_input[
                 idx_forward_power
-            ] * self._get_d_efficiency(x[idx_forward_power], 0.001 * x[idx_forward_power])
+            ] * self._get_d_efficiency(
+                x[idx_forward_power], 0.001 * x[idx_forward_power]
+            )
             power_output[idx_reverse_power] = power_input[
                 idx_reverse_power
             ] / self.get_efficiency_from_load_percentage(load[idx_reverse_power])
             d_power_output[idx_reverse_power] = (
                 -power_input[idx_reverse_power]
-                * self._get_d_efficiency(x[idx_reverse_power], 0.001 * x[idx_reverse_power])
-                / (self.get_efficiency_from_load_percentage(load[idx_reverse_power])) ** 2
+                * self._get_d_efficiency(
+                    x[idx_reverse_power], 0.001 * x[idx_reverse_power]
+                )
+                / (self.get_efficiency_from_load_percentage(load[idx_reverse_power]))
+                ** 2
             )
         power_balance = x - power_output
         return (power_balance * (1 - d_power_output)).sum()
 
-    def _get_d_efficiency(self, power: np.ndarray, power_delta: np.ndarray) -> np.ndarray:
+    def _get_d_efficiency(
+        self, power: np.ndarray, power_delta: np.ndarray
+    ) -> np.ndarray:
         load = self.get_load(power)
         load_delta = self.get_load(power + power_delta)
         return (
