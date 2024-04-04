@@ -5,7 +5,7 @@ description = ""
 authors = ["Kevin Koosup Yum <kevinkoosup.yum@sintef.no>"]
 readme = "readme.md"
 include = ["feems/py.typed"]
-license = "Proprietary"
+license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
