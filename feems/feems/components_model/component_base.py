@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 T = TypeVar("T", float, np.ndarray)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ComponentRunPoint:
     load_ratio: np.ndarray
     efficiency: np.ndarray

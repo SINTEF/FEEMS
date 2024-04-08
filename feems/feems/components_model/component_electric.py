@@ -9,6 +9,7 @@ from .. import get_logger
 from .component_base import SerialSystem, Component, BasicComponent, ComponentRunPoint
 from .component_mechanical import (
     COGAS,
+    COGASRunPoint,
     Engine,
     MainEngineForMechanicalPropulsion,
     MechanicalPropulsionComponent,
@@ -572,7 +573,7 @@ class GensetRunPoint(NamedTuple):
 
 class COGESRunPoint(NamedTuple):
     coges_load_ratio: np.ndarray
-    cogas: ComponentRunPoint
+    cogas: COGASRunPoint
 
 
 class Genset(Component):

@@ -94,6 +94,8 @@ def convert_proto_efficiency_bsfc_power_to_np_array(
     efficiency_bsfc_power: Union[proto.Efficiency, proto.BSFC, proto.PowerCurve]
 ) -> np.ndarray:
     """Converts protobuf efficiency or bsfc to numpy array"""
+    if isinstance(efficiency_bsfc_power, proto.PowerCurve):
+        return convert_proto_curve1d_to_np_array(efficiency_bsfc_power.curve)
     if efficiency_bsfc_power.HasField("value"):
         if efficiency_bsfc_power.value > 0:
             return np.array([efficiency_bsfc_power.value])
@@ -308,7 +310,7 @@ def convert_proto_coges_to_feems(
     subsystem: proto.Subsystem, switchboard_id: int
 ) -> COGES:
     """Converts protobuf subsystem message to feems component"""
-    cogas = convert_proto_cogas_to_feems(proto_cogas == subsystem.cogas)
+    cogas = convert_proto_cogas_to_feems(proto_cogas=subsystem.cogas)
     generator = convert_proto_electric_machine_to_feems(
         proto_component=subsystem.electric_machine,
         component_type=TypeComponent.SYNCHRONOUS_MACHINE,

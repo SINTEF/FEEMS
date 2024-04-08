@@ -457,6 +457,12 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         )
 
 
+@dataclass(kw_only=True)
+class COGASRunPoint(ComponentRunPoint):
+    gas_turbine_power_kw: np.ndarray = None
+    steam_turbine_power_kw: np.ndarray = None
+
+
 class COGAS(BasicComponent):
     """Combined gas and steam component class for basic information and efficiency interpolation"""
 
@@ -471,7 +477,7 @@ class COGAS(BasicComponent):
         fuel_type: TypeFuel = TypeFuel.DIESEL,
         fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
         emissions_curves: List[EmissionCurve] = None,
-        NOx_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_3,
+        nox_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_3,
     ):
         """Constructor for COGES component"""
         # Validate the inputs for curves. The length of the curves should be the same and the x values should be the same.
@@ -487,6 +493,10 @@ class COGAS(BasicComponent):
                 raise ValueError(
                     "The x values of the gas turbine power curve and steam turbine power curve should be the same."
                 )
+            if gas_turbine_power_curve.shape[1] != 2:
+                raise ValueError(
+                    "The gas turbine power curve and steam turbine power curve should have two columns."
+                )
 
         super().__init__(
             type_=TypeComponent.COGAS,
@@ -498,17 +508,25 @@ class COGAS(BasicComponent):
         )
         self.gas_turbine_power_curve = gas_turbine_power_curve
         self.steam_turbine_power_curve = steam_turbine_power_curve
-        self.total_power_curve = self.gas_turbine_power_curve.copy()
-        self.total_power_curve[:, 1] += self.steam_turbine_power_curve[:, 1]
-        self.power_ratio_gas_turbine_points = gas_turbine_power_curve.copy()
-        self.power_ratio_gas_turbine_points[:, 1] /= self.total_power_curve[:, 1]
-        self.power_ratio_gas_turbine_interpolator = get_efficiency_curve_from_points(
-            self.power_ratio_gas_turbine_points
-        )
+        if (
+            self.gas_turbine_power_curve is not None
+            and self.steam_turbine_power_curve is not None
+        ):
+            self.total_power_curve = self.gas_turbine_power_curve.copy()
+            self.total_power_curve[:, 1] += self.steam_turbine_power_curve[:, 1]
+            self.power_ratio_gas_turbine_points = gas_turbine_power_curve.copy()
+            self.power_ratio_gas_turbine_points[:, 1] /= self.total_power_curve[:, 1]
+            self.power_ratio_gas_turbine_interpolator, _ = (
+                get_efficiency_curve_from_points(self.power_ratio_gas_turbine_points)
+            )
+        else:
+            self.total_power_curve = None
+            self.power_ratio_gas_turbine_points = None
+            self.power_ratio_gas_turbine_interpolator = None
         self.fuel_type = fuel_type
         self.fuel_origin = fuel_origin
         self._setup_emissions(emissions_curves)
-        self._setup_nox(NOx_calculation_method, rated_speed)
+        self._setup_nox(nox_calculation_method, rated_speed)
 
     def _setup_emissions(self, emissions_curves: List[EmissionCurve] = None) -> None:
         self.emission_curves = emissions_curves
@@ -559,6 +577,10 @@ class COGAS(BasicComponent):
     @property
     def power_output_gas_turbine(self):
         """Power output of the gas turbine in kW"""
+        if self.power_ratio_gas_turbine_interpolator is None:
+            raise ValueError(
+                "The power ratio gas turbine interpolator is not defined. Please provide the power curves for the gas and steam turbines."
+            )
         return self.power_ratio_gas_turbine_interpolator(
             self.power_output / self.rated_power
         )
@@ -577,7 +599,7 @@ class COGAS(BasicComponent):
         ghg_emission_factor_tank_to_wake: List[
             Optional[GhgEmissionFactorTankToWake]
         ] = None,
-    ) -> ComponentRunPoint:
+    ) -> COGASRunPoint:
         # GHG factors for FuelEU Maritime is not available for COGAS yet. It should raise an error if the user tries to use it.
         if fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
             raise ValueError(
@@ -605,12 +627,16 @@ class COGAS(BasicComponent):
                 self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio)
                 * power_kwh_per_s
             )
-        return ComponentRunPoint(
+        result = COGASRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel]),
             efficiency=eff,
             emissions_g_per_s=emissionn_per_s,
         )
+        if self.gas_turbine_power_curve is not None:
+            result.gas_turbine_power_kw = self.power_output_gas_turbine
+            result.steam_turbine_power_kw = self.power_output_steam_turbine
+        return result
 
 
 MechanicalComponent = Union[

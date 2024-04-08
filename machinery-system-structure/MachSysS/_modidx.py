@@ -218,6 +218,10 @@ d = {
                 "converttoprotobuf.html#convert_bsfc_curve_to_protobuf",
                 "MachSysS/convert_to_protobuf.py",
             ),
+            "MachSysS.convert_to_protobuf.convert_cogas_component_to_protobuf": (
+                "converttoprotobuf.html#convert_cogas_component_to_protobuf",
+                "MachSysS/convert_to_protobuf.py",
+            ),
             "MachSysS.convert_to_protobuf.convert_efficiency_curve_to_protobuf": (
                 "converttoprotobuf.html#convert_efficiency_curve_to_protobuf",
                 "MachSysS/convert_to_protobuf.py",
@@ -260,6 +264,10 @@ d = {
             ),
             "MachSysS.convert_to_protobuf.convert_nox_calculation_method_to_protobuf": (
                 "converttoprotobuf.html#convert_nox_calculation_method_to_protobuf",
+                "MachSysS/convert_to_protobuf.py",
+            ),
+            "MachSysS.convert_to_protobuf.convert_np_array_to_protobuf_power_curve": (
+                "converttoprotobuf.html#convert_np_array_to_protobuf_power_curve",
                 "MachSysS/convert_to_protobuf.py",
             ),
             "MachSysS.convert_to_protobuf.convert_serial_electric_system_to_protobuf": (
