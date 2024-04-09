@@ -3,6 +3,7 @@ name: Publish Python 🐍 distribution 📦 to PyPI for FEEMS
 on:
   push:
     branches: ["main"]
+    tags: ["v*"]
 
 jobs:
   build:
