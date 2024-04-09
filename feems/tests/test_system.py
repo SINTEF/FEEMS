@@ -1,7 +1,7 @@
 import copy
 import pprint
 import random
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from unittest import TestCase
 
 from feems.components_model.component_electric import (
@@ -366,7 +366,7 @@ class TestElectricPowerSystem(TestCase):
     @staticmethod
     def get_components_numbers_electric_system(
         system: ElectricPowerSystem,
-    ) -> (int, int, int, int, int):
+    ) -> Tuple[int, int, int, int, int]:
         no_power_sources = system.no_power_sources
         no_propulsion_drive = system.no_propulsion_units
         no_other_load = system.no_other_load
