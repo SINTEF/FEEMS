@@ -45,8 +45,10 @@ class TestUtilityForTest(unittest.TestCase):
         for _ in range(100):
             #: Set the random parameters for creating the switchboard component
             number_components = random.randint(4, 100)
-            number_components_list = get_list_random_distribution_numbers_for_total_number(
-                4, number_components
+            number_components_list = (
+                get_list_random_distribution_numbers_for_total_number(
+                    4, number_components
+                )
             )
             rated_power_avail = random.random() * 5000
             rated_speed_max = random.random() * 1000

@@ -6,8 +6,10 @@ import pandas as pd
 
 from .. import get_logger
 
-from .component_base import SerialSystem, Component, BasicComponent
+from .component_base import SerialSystem, Component, BasicComponent, ComponentRunPoint
 from .component_mechanical import (
+    COGAS,
+    COGASRunPoint,
     Engine,
     MainEngineForMechanicalPropulsion,
     MechanicalPropulsionComponent,
@@ -17,7 +19,6 @@ from .component_mechanical import (
 from .utility import integrate_data, IntegrationMethod, integrate_data_accumulative
 from ..constant import hhv_hydrogen_mj_per_kg, lhv_hydrogen_mj_per_kg
 from ..fuel import (
-    FuelByMassFraction,
     FuelConsumption,
     TypeFuel,
     FuelSpecifiedBy,
@@ -126,7 +127,8 @@ class ElectricMachine(ElectricComponent):
                 power_electric, strict_power_balance
             )
         elif (
-            self.power_type == TypePower.POWER_CONSUMER or self.power_type == TypePower.PTI_PTO_SYS
+            self.power_type == TypePower.POWER_CONSUMER
+            or self.power_type == TypePower.PTI_PTO_SYS
         ):
             power_shaft, load = self.get_power_output_from_bidirectional_input(
                 power_electric, strict_power_balance
@@ -134,7 +136,9 @@ class ElectricMachine(ElectricComponent):
         else:
             raise TypeError(
                 "The type of the component for {} is not properly assigned. "
-                "It should be either power source, power consumer or PTI/PTO.".format(self.name)
+                "It should be either power source, power consumer or PTI/PTO.".format(
+                    self.name
+                )
             )
         return power_shaft, load
 
@@ -158,14 +162,19 @@ class ElectricMachine(ElectricComponent):
             power_electric, load = self.get_power_output_from_bidirectional_input(
                 power_shaft, strict_power_balance
             )
-        elif self.power_type == TypePower.POWER_CONSUMER or self.power_type == TypePower.PTI_PTO:
+        elif (
+            self.power_type == TypePower.POWER_CONSUMER
+            or self.power_type == TypePower.PTI_PTO
+        ):
             power_electric, load = self.get_power_input_from_bidirectional_output(
                 power_shaft, strict_power_balance
             )
         else:
             raise TypeError(
                 "The type of the component for {} is not properly assigned. "
-                "It should be either power source, power consumer or PTI/PTO.".format(self.name),
+                "It should be either power source, power consumer or PTI/PTO.".format(
+                    self.name
+                ),
             )
         return power_electric, load
 
@@ -280,7 +289,9 @@ class Battery(ElectricComponent):
             idx_discharging = power_output < 0
             power_input = power_output.copy()
             power_input[idx_charging] = power_output[idx_charging] / self.eff_charging
-            power_input[idx_discharging] = power_output[idx_discharging] * self.eff_discharging
+            power_input[idx_discharging] = (
+                power_output[idx_discharging] * self.eff_discharging
+            )
             return power_input, load
 
     def get_power_output_from_bidirectional_input(
@@ -296,7 +307,9 @@ class Battery(ElectricComponent):
             idx_discharging = power_input < 0
             power_output = power_input.copy()
             power_output[idx_charging] = power_output[idx_charging] * self.eff_charging
-            power_output[idx_discharging] = power_output[idx_discharging] / self.eff_discharging
+            power_output[idx_discharging] = (
+                power_output[idx_discharging] / self.eff_discharging
+            )
         load = self.get_load(power_output)
         return power_output, load
 
@@ -340,13 +353,6 @@ class SerialSystemElectric(SerialSystem):
         self.switchboard_id = switchboard_id
 
 
-@dataclass
-class FuelCellRunPoint:
-    load_ratio: np.ndarray
-    fuel_flow_rate_kg_per_s: FuelConsumption
-    efficiency: np.ndarray
-
-
 class FuelCell(BasicComponent):
     def __init__(
         self,
@@ -372,8 +378,10 @@ class FuelCell(BasicComponent):
         fuel_specified_by=FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
-    ) -> FuelCellRunPoint:
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
+    ) -> ComponentRunPoint:
         """
         Get the fuel cell run point
 
@@ -392,11 +400,13 @@ class FuelCell(BasicComponent):
                 fuel_specified_by is FuelSpecifiedBy.USER.
 
         Returns:
-            FuelCellRunPoint: fuel cell run point
+            ComponentRunPoint: fuel cell run point
         """
         if power_out_kw is None:
             power_out_kw = self.power_output
-        power_in_kw, load_ratio = self.get_power_input_from_bidirectional_output(power_out_kw)
+        power_in_kw, load_ratio = self.get_power_input_from_bidirectional_output(
+            power_out_kw
+        )
         fuel = Fuel(
             fuel_type=self.fuel_type,
             origin=self.fuel_origin,
@@ -407,7 +417,7 @@ class FuelCell(BasicComponent):
         )
         fuel.mass_or_mass_fraction = power_in_kw / fuel.lhv_mj_per_g / 1e6
         efficiency = self.get_efficiency_from_load_percentage(load_ratio)
-        return FuelCellRunPoint(
+        return ComponentRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(
                 fuels=[
@@ -450,8 +460,10 @@ class FuelCellSystem(ElectricComponent):
         fuel_specified_by=FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
-    ) -> FuelCellRunPoint:
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
+    ) -> ComponentRunPoint:
         """
         Get the fuel cell run point
 
@@ -470,11 +482,13 @@ class FuelCellSystem(ElectricComponent):
                 fuel_specified_by is FuelSpecifiedBy.USER.
 
         Returns:
-            FuelCellRunPoint: fuel cell run point
+            ComponentRunPoint: fuel cell run point
         """
         if power_out_kw is None:
             power_out_kw = self.power_output
-        power_out_fuel_cell_kw, load_ratio = self.set_power_input_from_output(power_out_kw)
+        power_out_fuel_cell_kw, load_ratio = self.set_power_input_from_output(
+            power_out_kw
+        )
         result_per_module = self.fuel_cell.get_fuel_cell_run_point(
             power_out_kw=power_out_fuel_cell_kw / self.number_modules,
             fuel_specified_by=fuel_specified_by,
@@ -482,7 +496,7 @@ class FuelCellSystem(ElectricComponent):
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
         )
-        return FuelCellRunPoint(
+        return ComponentRunPoint(
             load_ratio=result_per_module.load_ratio,
             fuel_flow_rate_kg_per_s=result_per_module.fuel_flow_rate_kg_per_s
             * self.number_modules,
@@ -555,6 +569,11 @@ class BatterySystem(Battery):
 class GensetRunPoint(NamedTuple):
     genset_load_ratio: np.ndarray
     engine: EngineRunPoint
+
+
+class COGESRunPoint(NamedTuple):
+    coges_load_ratio: np.ndarray
+    cogas: COGASRunPoint
 
 
 class Genset(Component):
@@ -633,7 +652,9 @@ class Genset(Component):
         engine_run_point = self.aux_engine.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by
         )
-        return GensetRunPoint(genset_load_ratio=load_ratio_generator, engine=engine_run_point)
+        return GensetRunPoint(
+            genset_load_ratio=load_ratio_generator, engine=engine_run_point
+        )
 
 
 class PTIPTO(SerialSystemElectric):
@@ -756,7 +777,9 @@ class SuperCapacitor(ElectricComponent):
             idx_discharging = power_output < 0
             power_input = power_output.copy()
             power_input[idx_charging] = power_output[idx_charging] / self.eff_charging
-            power_input[idx_discharging] = power_output[idx_discharging] * self.eff_discharging
+            power_input[idx_discharging] = (
+                power_output[idx_discharging] * self.eff_discharging
+            )
             return power_input, load
 
     def get_power_output_from_bidirectional_input(
@@ -772,7 +795,9 @@ class SuperCapacitor(ElectricComponent):
             idx_discharging = power_input < 0
             power_output = power_input.copy()
             power_output[idx_charging] = power_output[idx_charging] * self.eff_charging
-            power_output[idx_discharging] = power_output[idx_discharging] / self.eff_discharging
+            power_output[idx_discharging] = (
+                power_output[idx_discharging] / self.eff_discharging
+            )
         load = self.get_load(power_output)
         return power_output, load
 
@@ -856,7 +881,9 @@ class ShorePowerConnection(ElectricComponent):
     :param switchboard_id: Switchboard ID
     """
 
-    def __init__(self, name: str, rated_power: Power_kW, switchboard_id: SwbId = SwbId(0)):
+    def __init__(
+        self, name: str, rated_power: Power_kW, switchboard_id: SwbId = SwbId(0)
+    ):
         super().__init__(
             TypeComponent.SHORE_POWER,
             name,
@@ -892,11 +919,75 @@ class ShorePowerConnectionSystem(ShorePowerConnection):
         self.converter = converter
 
 
+class COGES(Component):
+    """
+    Class for serial configuration for a COGES system.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        cogas: COGAS,
+        generator: ElectricMachine,
+    ):
+        super().__init__(
+            name=name,
+            type_=TypeComponent.COGES,
+            power_type=TypePower.POWER_SOURCE,
+            rated_power=generator.rated_power,
+            rated_speed=generator.rated_speed,
+        )
+        self.fuel_type = cogas.fuel_type
+        self.cogas = cogas
+        self.generator = generator
+        self.switchboard_id = generator.switchboard_id
+        self.status = np.ones(0).astype(bool)
+        self.load_sharing_mode = np.zeros(1)
+
+    def get_system_run_point_from_power_output_kw(
+        self,
+        power_output_kw: np.ndarray = None,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        lhv_mj_per_g: Optional[float] = None,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
+        ghg_emission_factor_tank_to_wake: List[
+            Optional[GhgEmissionFactorTankToWake]
+        ] = None,
+    ) -> COGESRunPoint:
+        """
+        Get the run point of the COGES system based on the power output of the system
+
+        Args:
+            power_output_kw (np.ndarray): power output of the COGES system in kW or None. If None,
+                it will take the value of power output of the COGES system.
+
+        Returns:
+            ComponentRunPoint: run point of the COGES system
+        """
+        if power_output_kw is None:
+            power_output_kw = self.power_output
+
+        self.cogas.power_output, load_generator = (
+            self.generator.set_power_input_from_output(power_output_kw)
+        )
+        cogas_run_point = self.cogas.get_gas_turbine_run_point_from_power_output_kw(
+            fuel_specified_by=fuel_specified_by,
+            lhv_mj_per_g=lhv_mj_per_g,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+            ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+        )
+        return COGESRunPoint(
+            coges_load_ratio=load_generator,
+            cogas=cogas_run_point,
+        )
+
+
 MechanicalComponent = Union[
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
     PTIPTO,
     MechanicalPropulsionComponent,
+    COGAS,
 ]
 
 PowerSystemComponent = Union[
@@ -915,4 +1006,6 @@ PowerSystemComponent = Union[
     ShorePowerConnectionSystem,
 ]
 
-EnergyStorageComponent = Union[Battery, BatterySystem, SuperCapacitor, SuperCapacitorSystem]
+EnergyStorageComponent = Union[
+    Battery, BatterySystem, SuperCapacitor, SuperCapacitorSystem
+]

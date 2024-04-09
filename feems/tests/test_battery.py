@@ -39,7 +39,9 @@ class TestBattery(TestCase):
         )
         terminal_power = 100
         internal_power = 90
-        self.check_power_input_output_conversion_scalar(battery, internal_power, terminal_power)
+        self.check_power_input_output_conversion_scalar(
+            battery, internal_power, terminal_power
+        )
 
     def test_charging_battery_system(self):
         eta = 0.9
@@ -72,7 +74,9 @@ class TestBattery(TestCase):
         )
         terminal_power = -90
         internal_power = -100
-        self.check_power_input_output_conversion_scalar(battery, internal_power, terminal_power)
+        self.check_power_input_output_conversion_scalar(
+            battery, internal_power, terminal_power
+        )
 
     def test_discharging_battery_system(self):
         eta = 0.9
@@ -92,7 +96,9 @@ class TestBattery(TestCase):
             battery_system, internal_power, terminal_power
         )
 
-    def check_power_input_output_conversion_scalar(self, battery, internal_power, terminal_power):
+    def check_power_input_output_conversion_scalar(
+        self, battery, internal_power, terminal_power
+    ):
         with self.subTest("Internal power from terminal power"):
             (
                 internal_power_calculated,

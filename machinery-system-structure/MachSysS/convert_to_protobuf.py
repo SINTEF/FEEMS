@@ -3,6 +3,7 @@
 # %% auto 0
 __all__ = [
     "convert_efficiency_curve_to_protobuf",
+    "convert_np_array_to_protobuf_power_curve",
     "convert_bsfc_curve_to_protobuf",
     "convert_electric_machine_to_protobuf",
     "convert_electric_component_to_protobuf",
@@ -12,6 +13,7 @@ __all__ = [
     "convert_nox_calculation_method_to_protobuf",
     "convert_emission_curves_to_protobuf",
     "convert_engine_component_to_protobuf",
+    "convert_cogas_component_to_protobuf",
     "convert_switchboard_to_protobuf",
     "convert_shaftline_to_protobuf",
     "convert_electric_system_to_protobuf",
@@ -32,9 +34,11 @@ from feems.components_model import (
 )
 from typing import cast, Union, List
 
+from feems.components_model.component_base import BasicComponent
 from feems.types_for_feems import TypeComponent, NOxCalculationMethod, EmissionCurve
-from feems.components_model.component_mechanical import EngineDualFuel
+from feems.components_model.component_mechanical import COGAS, EngineDualFuel
 from feems.components_model.component_electric import (
+    COGES,
     ElectricComponent,
     FuelCellSystem,
     ElectricMachine,
@@ -51,6 +55,7 @@ from feems.system_model import (
     MechanicalPropulsionSystemWithElectricPowerSystem,
     HybridPropulsionSystem,
 )
+import numpy as np
 
 import MachSysS.system_structure_pb2 as proto
 
@@ -72,6 +77,28 @@ def convert_efficiency_curve_to_protobuf(
         efficiency.curve.x_label = "power load"
         efficiency.curve.y_label = "efficiency"
     return efficiency
+
+
+def convert_np_array_to_protobuf_power_curve(power_curve: np.array) -> proto.PowerCurve:
+    """Convert power curve in the component to protobuf message"""
+    # Check if the array is in n x 2 dimension or a single value
+    if power_curve.shape[1] == 2:
+        curve = proto.Curve1D()
+        curve.points.extend(
+            [
+                proto.Point(x=each_point[0], y=each_point[1])
+                for each_point in power_curve
+            ]
+        )
+        return proto.PowerCurve(
+            x_label="load_ratio",
+            y_label="power_kw",
+            curve=curve,
+        )
+    else:
+        raise ValueError(
+            f"The power curve array should have 2 columns. The array has {power_curve.shape[1]} columns."
+        )
 
 
 def convert_bsfc_curve_to_protobuf(
@@ -267,6 +294,38 @@ def convert_engine_component_to_protobuf(
     return engine
 
 
+def convert_cogas_component_to_protobuf(
+    component: COGAS,
+    order_from_shaftline_or_switchboard: int = 1,
+) -> proto.Engine:
+    """Convert engine component of FEEMS to protobuf message"""
+    cogas = proto.COGAS(
+        name=component.name,
+        rated_power_kw=component.rated_power,
+        rated_speed_rpm=component.rated_speed,
+        efficiency=convert_efficiency_curve_to_protobuf(component),
+        fuel=proto.Fuel(
+            fuel_type=component.fuel_type.value,
+            fuel_origin=component.fuel_origin.value,
+        ),
+        nox_calculation_method=convert_nox_calculation_method_to_protobuf(
+            component.nox_calculation_method
+        ),
+        emission_curves=convert_emission_curves_to_protobuf(component.emission_curves),
+        order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
+    )
+    if component.gas_turbine_power_curve is not None:
+        cogas.gas_turbine_power_curve.CopyFrom(
+            convert_np_array_to_protobuf_power_curve(component.gas_turbine_power_curve)
+        )
+        cogas.steam_turbine_power_curve.CopyFrom(
+            convert_np_array_to_protobuf_power_curve(
+                component.steam_turbine_power_curve
+            )
+        )
+    return cogas
+
+
 def convert_switchboard_to_protobuf(
     switchboard_feems: Switchboard,
 ) -> proto.Switchboard:
@@ -305,6 +364,18 @@ def convert_switchboard_to_protobuf(
                     ),
                     number_modules=component.number_modules,
                     order_from_switchboard_or_shaftline=2,
+                )
+            )
+        elif component.type == TypeComponent.COGES:
+            component = cast(COGES, component)
+            subsystem.cogas.CopyFrom(
+                convert_cogas_component_to_protobuf(
+                    component=component.cogas, order_from_shaftline_or_switchboard=2
+                )
+            )
+            subsystem.electric_machine.CopyFrom(
+                convert_electric_machine_to_protobuf(
+                    component=component.generator, order_from_switchboard=1
                 )
             )
         elif component.type == TypeComponent.GENSET:
@@ -454,7 +525,7 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
     return shaftline_proto
 
 
-# %% ../01_ConvertToProtobuf.ipynb 5
+# %% ../01_ConvertToProtobuf.ipynb 6
 def convert_electric_system_to_protobuf(
     electric_system: ElectricPowerSystem,
 ) -> proto.ElectricSystem:

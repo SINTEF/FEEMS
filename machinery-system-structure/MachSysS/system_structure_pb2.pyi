@@ -149,6 +149,21 @@ class Efficiency(_message.Message):
         value: _Optional[float] = ...,
     ) -> None: ...
 
+class PowerCurve(_message.Message):
+    __slots__ = ("x_label", "y_label", "curve")
+    X_LABEL_FIELD_NUMBER: _ClassVar[int]
+    Y_LABEL_FIELD_NUMBER: _ClassVar[int]
+    CURVE_FIELD_NUMBER: _ClassVar[int]
+    x_label: str
+    y_label: str
+    curve: Curve1D
+    def __init__(
+        self,
+        x_label: _Optional[str] = ...,
+        y_label: _Optional[str] = ...,
+        curve: _Optional[_Union[Curve1D, _Mapping]] = ...,
+    ) -> None: ...
+
 class PropulsionPowerTimeSeries(_message.Message):
     __slots__ = ("x_label", "y_label", "propulsor_id", "curve")
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -344,6 +359,67 @@ class Engine(_message.Message):
         ] = ...,
         emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ...,
         engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ...,
+        unit_price_usd: _Optional[float] = ...,
+        start_delay_s: _Optional[float] = ...,
+        turn_off_power_kw: _Optional[float] = ...,
+    ) -> None: ...
+
+class COGAS(_message.Message):
+    __slots__ = (
+        "name",
+        "rated_power_kw",
+        "rated_speed_rpm",
+        "efficiency",
+        "gas_turbine_power_curve",
+        "steam_turbine_power_curve",
+        "fuel",
+        "order_from_switchboard_or_shaftline",
+        "nox_calculation_method",
+        "emission_curves",
+        "unit_price_usd",
+        "start_delay_s",
+        "turn_off_power_kw",
+    )
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]
+    EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
+    GAS_TURBINE_POWER_CURVE_FIELD_NUMBER: _ClassVar[int]
+    STEAM_TURBINE_POWER_CURVE_FIELD_NUMBER: _ClassVar[int]
+    FUEL_FIELD_NUMBER: _ClassVar[int]
+    ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
+    NOX_CALCULATION_METHOD_FIELD_NUMBER: _ClassVar[int]
+    EMISSION_CURVES_FIELD_NUMBER: _ClassVar[int]
+    UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
+    TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    rated_power_kw: float
+    rated_speed_rpm: float
+    efficiency: Efficiency
+    gas_turbine_power_curve: PowerCurve
+    steam_turbine_power_curve: PowerCurve
+    fuel: Fuel
+    order_from_switchboard_or_shaftline: int
+    nox_calculation_method: Engine.NOxCalculationMethod
+    emission_curves: _containers.RepeatedCompositeFieldContainer[EmissionCurve]
+    unit_price_usd: float
+    start_delay_s: float
+    turn_off_power_kw: float
+    def __init__(
+        self,
+        name: _Optional[str] = ...,
+        rated_power_kw: _Optional[float] = ...,
+        rated_speed_rpm: _Optional[float] = ...,
+        efficiency: _Optional[_Union[Efficiency, _Mapping]] = ...,
+        gas_turbine_power_curve: _Optional[_Union[PowerCurve, _Mapping]] = ...,
+        steam_turbine_power_curve: _Optional[_Union[PowerCurve, _Mapping]] = ...,
+        fuel: _Optional[_Union[Fuel, _Mapping]] = ...,
+        order_from_switchboard_or_shaftline: _Optional[int] = ...,
+        nox_calculation_method: _Optional[
+            _Union[Engine.NOxCalculationMethod, str]
+        ] = ...,
+        emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ...,
         unit_price_usd: _Optional[float] = ...,
         start_delay_s: _Optional[float] = ...,
         turn_off_power_kw: _Optional[float] = ...,
@@ -614,6 +690,7 @@ class Subsystem(_message.Message):
         "bus_breaker",
         "supercapacitor",
         "other_load",
+        "cogas",
         "power_type",
         "component_type",
         "name",
@@ -670,6 +747,8 @@ class Subsystem(_message.Message):
         SUPERCAPACITOR: _ClassVar[Subsystem.ComponentType]
         SUPERCAPACITOR_SYSTEM: _ClassVar[Subsystem.ComponentType]
         SHORE_POWER: _ClassVar[Subsystem.ComponentType]
+        COGAS: _ClassVar[Subsystem.ComponentType]
+        COGES: _ClassVar[Subsystem.ComponentType]
 
     NONE: Subsystem.ComponentType
     MAIN_ENGINE: Subsystem.ComponentType
@@ -699,6 +778,8 @@ class Subsystem(_message.Message):
     SUPERCAPACITOR: Subsystem.ComponentType
     SUPERCAPACITOR_SYSTEM: Subsystem.ComponentType
     SHORE_POWER: Subsystem.ComponentType
+    COGAS: Subsystem.ComponentType
+    COGES: Subsystem.ComponentType
     GEAR_FIELD_NUMBER: _ClassVar[int]
     ENGINE_FIELD_NUMBER: _ClassVar[int]
     ELECTRIC_MACHINE_FIELD_NUMBER: _ClassVar[int]
@@ -711,6 +792,7 @@ class Subsystem(_message.Message):
     BUS_BREAKER_FIELD_NUMBER: _ClassVar[int]
     SUPERCAPACITOR_FIELD_NUMBER: _ClassVar[int]
     OTHER_LOAD_FIELD_NUMBER: _ClassVar[int]
+    COGAS_FIELD_NUMBER: _ClassVar[int]
     POWER_TYPE_FIELD_NUMBER: _ClassVar[int]
     COMPONENT_TYPE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -731,6 +813,7 @@ class Subsystem(_message.Message):
     bus_breaker: BusBreaker
     supercapacitor: SuperCapacitor
     other_load: ElectricComponent
+    cogas: COGAS
     power_type: Subsystem.PowerType
     component_type: Subsystem.ComponentType
     name: str
@@ -753,6 +836,7 @@ class Subsystem(_message.Message):
         bus_breaker: _Optional[_Union[BusBreaker, _Mapping]] = ...,
         supercapacitor: _Optional[_Union[SuperCapacitor, _Mapping]] = ...,
         other_load: _Optional[_Union[ElectricComponent, _Mapping]] = ...,
+        cogas: _Optional[_Union[COGAS, _Mapping]] = ...,
         power_type: _Optional[_Union[Subsystem.PowerType, str]] = ...,
         component_type: _Optional[_Union[Subsystem.ComponentType, str]] = ...,
         name: _Optional[str] = ...,

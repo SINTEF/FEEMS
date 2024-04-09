@@ -124,12 +124,20 @@ d = {
                 "converttofeems.html#convert_proto_battery_to_feems",
                 "MachSysS/convert_to_feems.py",
             ),
+            "MachSysS.convert_to_feems.convert_proto_cogas_to_feems": (
+                "converttofeems.html#convert_proto_cogas_to_feems",
+                "MachSysS/convert_to_feems.py",
+            ),
+            "MachSysS.convert_to_feems.convert_proto_coges_to_feems": (
+                "converttofeems.html#convert_proto_coges_to_feems",
+                "MachSysS/convert_to_feems.py",
+            ),
             "MachSysS.convert_to_feems.convert_proto_curve1d_to_np_array": (
                 "converttofeems.html#convert_proto_curve1d_to_np_array",
                 "MachSysS/convert_to_feems.py",
             ),
-            "MachSysS.convert_to_feems.convert_proto_efficiency_bsfc_to_np_array": (
-                "converttofeems.html#convert_proto_efficiency_bsfc_to_np_array",
+            "MachSysS.convert_to_feems.convert_proto_efficiency_bsfc_power_to_np_array": (
+                "converttofeems.html#convert_proto_efficiency_bsfc_power_to_np_array",
                 "MachSysS/convert_to_feems.py",
             ),
             "MachSysS.convert_to_feems.convert_proto_electric_component_to_feems": (
@@ -210,6 +218,10 @@ d = {
                 "converttoprotobuf.html#convert_bsfc_curve_to_protobuf",
                 "MachSysS/convert_to_protobuf.py",
             ),
+            "MachSysS.convert_to_protobuf.convert_cogas_component_to_protobuf": (
+                "converttoprotobuf.html#convert_cogas_component_to_protobuf",
+                "MachSysS/convert_to_protobuf.py",
+            ),
             "MachSysS.convert_to_protobuf.convert_efficiency_curve_to_protobuf": (
                 "converttoprotobuf.html#convert_efficiency_curve_to_protobuf",
                 "MachSysS/convert_to_protobuf.py",
@@ -252,6 +264,10 @@ d = {
             ),
             "MachSysS.convert_to_protobuf.convert_nox_calculation_method_to_protobuf": (
                 "converttoprotobuf.html#convert_nox_calculation_method_to_protobuf",
+                "MachSysS/convert_to_protobuf.py",
+            ),
+            "MachSysS.convert_to_protobuf.convert_np_array_to_protobuf_power_curve": (
+                "converttoprotobuf.html#convert_np_array_to_protobuf_power_curve",
                 "MachSysS/convert_to_protobuf.py",
             ),
             "MachSysS.convert_to_protobuf.convert_serial_electric_system_to_protobuf": (
