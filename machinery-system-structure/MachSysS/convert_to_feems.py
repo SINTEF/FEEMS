@@ -4,14 +4,16 @@
 __all__ = [
     "convert_proto_point_to_list",
     "convert_proto_curve1d_to_np_array",
-    "convert_proto_efficiency_bsfc_to_np_array",
+    "convert_proto_efficiency_bsfc_power_to_np_array",
     "convert_proto_electric_component_to_feems",
     "convert_proto_electric_machine_to_feems",
     "convert_proto_fuel_cell_system_to_feems",
     "convert_emission_curve_to_feems",
     "convert_nox_calculation_method",
     "convert_proto_engine_to_feems",
+    "convert_proto_cogas_to_feems",
     "convert_proto_genset_to_feems",
+    "convert_proto_coges_to_feems",
     "convert_proto_battery_to_feems",
     "convert_proto_battery_system_to_feems",
     "convert_proto_supercapacitor_to_feems",
@@ -53,9 +55,10 @@ from feems.components_model.component_electric import (
     PTIPTO,
     SuperCapacitor,
     FuelCell,
+    COGES,
 )
 from feems.components_model.component_electric import SerialSystemElectric, Genset
-from feems.components_model.component_mechanical import EngineDualFuel
+from feems.components_model.component_mechanical import COGAS, EngineDualFuel
 from feems.fuel import FuelOrigin, TypeFuel
 from feems.system_model import (
     ElectricPowerSystem,
@@ -87,15 +90,17 @@ def convert_proto_curve1d_to_np_array(curve: proto.Curve1D) -> np.ndarray:
     return np.array(list(map(convert_proto_point_to_list, curve.points)))
 
 
-def convert_proto_efficiency_bsfc_to_np_array(
-    efficiency_bsfc: Union[proto.Efficiency, proto.BSFC]
+def convert_proto_efficiency_bsfc_power_to_np_array(
+    efficiency_bsfc_power: Union[proto.Efficiency, proto.BSFC, proto.PowerCurve]
 ) -> np.ndarray:
     """Converts protobuf efficiency or bsfc to numpy array"""
-    if efficiency_bsfc.HasField("value"):
-        if efficiency_bsfc.value > 0:
-            return np.array([efficiency_bsfc.value])
-    if efficiency_bsfc.HasField("curve"):
-        return convert_proto_curve1d_to_np_array(efficiency_bsfc.curve.curve)
+    if isinstance(efficiency_bsfc_power, proto.PowerCurve):
+        return convert_proto_curve1d_to_np_array(efficiency_bsfc_power.curve)
+    if efficiency_bsfc_power.HasField("value"):
+        if efficiency_bsfc_power.value > 0:
+            return np.array([efficiency_bsfc_power.value])
+    if efficiency_bsfc_power.HasField("curve"):
+        return convert_proto_curve1d_to_np_array(efficiency_bsfc_power.curve.curve)
     else:
         raise TypeError("The efficiency value or curve is not properly set.")
 
@@ -110,7 +115,9 @@ def convert_proto_electric_component_to_feems(
         type_=component_type,
         name=proto_component.name,
         rated_power=proto_component.rated_power_kw,
-        eff_curve=convert_proto_efficiency_bsfc_to_np_array(proto_component.efficiency),
+        eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+            proto_component.efficiency
+        ),
         power_type=power_type,
         switchboard_id=switchboard_id,
     )
@@ -128,7 +135,9 @@ def convert_proto_electric_machine_to_feems(
         rated_power=proto_component.rated_power_kw,
         rated_speed=proto_component.rated_speed_rpm,
         power_type=power_type,
-        eff_curve=convert_proto_efficiency_bsfc_to_np_array(proto_component.efficiency),
+        eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+            proto_component.efficiency
+        ),
         switchboard_id=switchboard_id,
     )
 
@@ -143,7 +152,9 @@ def convert_proto_fuel_cell_system_to_feems(
     fuel_cell = FuelCell(
         name=subsystem.fuel_cell.name,
         rated_power=subsystem.fuel_cell.rated_power_kw,
-        eff_curve=convert_proto_efficiency_bsfc_to_np_array(subsystem.fuel_cell.efficiency),
+        eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+            subsystem.fuel_cell.efficiency
+        ),
         fuel_type=TypeFuel(subsystem.fuel_cell.fuel.fuel_type),
         fuel_origin=FuelOrigin(subsystem.fuel_cell.fuel.fuel_origin),
     )
@@ -176,17 +187,25 @@ def convert_emission_curve_to_feems(
     )
 
 
-def convert_nox_calculation_method(proto_engine: proto.Engine) -> NOxCalculationMethod:
+def convert_nox_calculation_method(
+    proto_comp: Union[proto.Engine, proto.COGAS]
+) -> NOxCalculationMethod:
     """Converts protobuf nox calculation type to feems nox calculation method"""
-    nox_calculation_method = NOxCalculationMethod.TIER_2
-    if proto_engine.nox_calculation_method is not None:
-        name = proto.Engine.NOxCalculationMethod.Name(proto_engine.nox_calculation_method)
+    if isinstance(proto_comp, proto.Engine):
+        nox_calculation_method = NOxCalculationMethod.TIER_2
+    elif isinstance(proto_comp, proto.COGAS):
+        nox_calculation_method = NOxCalculationMethod.TIER_3
+    else:
+        raise TypeError("The component should be either an engine or COGAS")
+    if proto_comp.nox_calculation_method is not None:
+        name = proto.Engine.NOxCalculationMethod.Name(proto_comp.nox_calculation_method)
         nox_calculation_method = NOxCalculationMethod[name]
     return nox_calculation_method
 
 
 def convert_proto_engine_to_feems(
-    proto_engine: proto.Engine, type_engine: TypeComponent = TypeComponent.AUXILIARY_ENGINE
+    proto_engine: proto.Engine,
+    type_engine: TypeComponent = TypeComponent.AUXILIARY_ENGINE,
 ) -> Engine:
     """Converts protobuf engine message to feems engine component"""
     nox_calculation_method = convert_nox_calculation_method(proto_engine)
@@ -204,8 +223,12 @@ def convert_proto_engine_to_feems(
             name=proto_engine.name,
             rated_power=proto_engine.rated_power_kw,
             rated_speed=proto_engine.rated_speed_rpm,
-            bsfc_curve=convert_proto_efficiency_bsfc_to_np_array(proto_engine.bsfc),
-            bspfc_curve=convert_proto_efficiency_bsfc_to_np_array(proto_engine.pilot_bsfc),
+            bsfc_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+                proto_engine.bsfc
+            ),
+            bspfc_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+                proto_engine.pilot_bsfc
+            ),
             fuel_type=TypeFuel(proto_engine.main_fuel.fuel_type),
             fuel_origin=FuelOrigin(proto_engine.main_fuel.fuel_origin),
             pilot_fuel_type=TypeFuel(proto_engine.pilot_fuel.fuel_type),
@@ -218,7 +241,7 @@ def convert_proto_engine_to_feems(
         name=proto_engine.name,
         rated_power=proto_engine.rated_power_kw,
         rated_speed=proto_engine.rated_speed_rpm,
-        bsfc_curve=convert_proto_efficiency_bsfc_to_np_array(proto_engine.bsfc),
+        bsfc_curve=convert_proto_efficiency_bsfc_power_to_np_array(proto_engine.bsfc),
         fuel_type=TypeFuel(proto_engine.main_fuel.fuel_type),
         fuel_origin=FuelOrigin(proto_engine.main_fuel.fuel_origin),
         nox_calculation_method=nox_calculation_method,
@@ -226,7 +249,42 @@ def convert_proto_engine_to_feems(
     )
 
 
-def convert_proto_genset_to_feems(subsystem: proto.Subsystem, switchboard_id: int) -> Genset:
+def convert_proto_cogas_to_feems(
+    proto_cogas: proto.COGAS,
+) -> Engine:
+    """Converts protobuf COGAS message to feems COGAS component"""
+    nox_calculation_method = convert_nox_calculation_method(proto_cogas)
+    emission_curves = (
+        [
+            convert_emission_curve_to_feems(emission_curve)
+            for emission_curve in proto_cogas.emission_curves
+        ]
+        if proto_cogas.emission_curves
+        else None
+    )
+    return COGAS(
+        name=proto_cogas.name,
+        rated_power=proto_cogas.rated_power_kw,
+        rated_speed=proto_cogas.rated_speed_rpm,
+        eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+            proto_cogas.efficiency
+        ),
+        gas_turbine_power_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+            proto_cogas.gas_turbine_power_curve
+        ),
+        steam_turbine_power_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+            proto_cogas.steam_turbine_power_curve
+        ),
+        fuel_type=TypeFuel(proto_cogas.fuel.fuel_type),
+        fuel_origin=FuelOrigin(proto_cogas.fuel.fuel_origin),
+        nox_calculation_method=nox_calculation_method,
+        emissions_curves=emission_curves,
+    )
+
+
+def convert_proto_genset_to_feems(
+    subsystem: proto.Subsystem, switchboard_id: int
+) -> Genset:
     """Converts protobuf subsystem message to feems component"""
     engine = convert_proto_engine_to_feems(proto_engine=subsystem.engine)
     generator = convert_proto_electric_machine_to_feems(
@@ -243,7 +301,23 @@ def convert_proto_genset_to_feems(subsystem: proto.Subsystem, switchboard_id: in
             power_type=TypePower.POWER_TRANSMISSION,
             switchboard_id=switchboard_id,
         )
-    return Genset(name=subsystem.name, aux_engine=engine, generator=generator, rectifier=rectifier)
+    return Genset(
+        name=subsystem.name, aux_engine=engine, generator=generator, rectifier=rectifier
+    )
+
+
+def convert_proto_coges_to_feems(
+    subsystem: proto.Subsystem, switchboard_id: int
+) -> COGES:
+    """Converts protobuf subsystem message to feems component"""
+    cogas = convert_proto_cogas_to_feems(proto_cogas=subsystem.cogas)
+    generator = convert_proto_electric_machine_to_feems(
+        proto_component=subsystem.electric_machine,
+        component_type=TypeComponent.SYNCHRONOUS_MACHINE,
+        power_type=TypePower.POWER_SOURCE,
+        switchboard_id=switchboard_id,
+    )
+    return COGES(name=subsystem.name, cogas=cogas, generator=generator)
 
 
 def convert_proto_battery_to_feems(
@@ -274,7 +348,10 @@ def convert_proto_battery_system_to_feems(
         power_type=TypePower.POWER_TRANSMISSION,
     )
     return BatterySystem(
-        name=subsystem.name, battery=battery, converter=converter, switchboard_id=switchboard_id
+        name=subsystem.name,
+        battery=battery,
+        converter=converter,
+        switchboard_id=switchboard_id,
     )
 
 
@@ -330,7 +407,9 @@ def collect_electric_components_from_sub_system(
     ]
     return sorted(
         components,
-        key=lambda component: component.get("proto_component").order_from_switchboard_or_shaftline,
+        key=lambda component: component.get(
+            "proto_component"
+        ).order_from_switchboard_or_shaftline,
     )
 
 
@@ -412,7 +491,9 @@ def convert_proto_serial_subsystem_to_feems(
         components=components_feems,
         switchboard_id=switchboard_id,
         rated_power=None if subsystem.rated_power_kw == 0 else subsystem.rated_power_kw,
-        rated_speed=None if subsystem.rated_speed_rpm == 0 else subsystem.rated_speed_rpm,
+        rated_speed=(
+            None if subsystem.rated_speed_rpm == 0 else subsystem.rated_speed_rpm
+        ),
     )
 
 
@@ -454,7 +535,15 @@ def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switch
             )
         elif subsystem.component_type == proto.Subsystem.ComponentType.GENSET:
             components.append(
-                convert_proto_genset_to_feems(subsystem=subsystem, switchboard_id=switchboard_id)
+                convert_proto_genset_to_feems(
+                    subsystem=subsystem, switchboard_id=switchboard_id
+                )
+            )
+        elif subsystem.component_type == proto.Subsystem.ComponentType.COGES:
+            components.append(
+                convert_proto_coges_to_feems(
+                    subsystem=subsystem, switchboard_id=switchboard_id
+                )
             )
         elif subsystem.component_type == proto.Subsystem.ComponentType.BATTERY_SYSTEM:
             components.append(
@@ -468,7 +557,10 @@ def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switch
                     proto_component=subsystem.battery, switchboard_id=switchboard_id
                 )
             )
-        elif subsystem.component_type == proto.Subsystem.ComponentType.SUPERCAPACITOR_SYSTEM:
+        elif (
+            subsystem.component_type
+            == proto.Subsystem.ComponentType.SUPERCAPACITOR_SYSTEM
+        ):
             components.append(
                 convert_proto_supercapacitor_system_to_feems(
                     subsystem=subsystem, switchboard_id=switchboard_id
@@ -477,7 +569,8 @@ def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switch
         elif subsystem.component_type == proto.Subsystem.ComponentType.SUPERCAPACITOR:
             components.append(
                 convert_proto_supercapacitor_to_feems(
-                    proto_component=subsystem.supercapacitor, switchboard_id=switchboard_id
+                    proto_component=subsystem.supercapacitor,
+                    switchboard_id=switchboard_id,
                 )
             )
         else:
@@ -508,12 +601,16 @@ def convert_proto_shaftline_to_feems(
                 MainEngineForMechanicalPropulsion(
                     name=sub_system.name,
                     engine=convert_proto_engine_to_feems(
-                        proto_engine=sub_system.engine, type_engine=TypeComponent.MAIN_ENGINE
+                        proto_engine=sub_system.engine,
+                        type_engine=TypeComponent.MAIN_ENGINE,
                     ),
                     shaft_line_id=shaft_line_id,
                 )
             )
-        elif sub_system.component_type == proto.Subsystem.ComponentType.MAIN_ENGINE_WITH_GEARBOX:
+        elif (
+            sub_system.component_type
+            == proto.Subsystem.ComponentType.MAIN_ENGINE_WITH_GEARBOX
+        ):
             components.append(
                 MainEngineWithGearBoxForMechanicalPropulsion(
                     name=sub_system.name,
@@ -527,8 +624,8 @@ def convert_proto_shaftline_to_feems(
                         power_type=TypePower.POWER_TRANSMISSION,
                         rated_power=sub_system.gear.rated_power_kw,
                         rated_speed=sub_system.gear.rated_speed_rpm,
-                        eff_curve=convert_proto_efficiency_bsfc_to_np_array(
-                            efficiency_bsfc=sub_system.gear.efficiency
+                        eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+                            efficiency_bsfc_power=sub_system.gear.efficiency
                         ),
                     ),
                     shaft_line_id=shaft_line_id,
@@ -538,20 +635,28 @@ def convert_proto_shaftline_to_feems(
             if pti_ptos is None:
                 components.append(
                     convert_proto_pti_pto_subsystem_to_feems(
-                        subsystem=sub_system, switchboard_id=1, shaft_line_id=shaft_line_id
+                        subsystem=sub_system,
+                        switchboard_id=1,
+                        shaft_line_id=shaft_line_id,
                     )
                 )
             else:
                 try:
                     pti_pto = next(
-                        filter(lambda pti_pto: pti_pto.name == sub_system.name, pti_ptos)
+                        filter(
+                            lambda pti_pto: pti_pto.name == sub_system.name, pti_ptos
+                        )
                     )
                 except StopIteration as e:
-                    print(f"PTI/PTO {sub_system.name} not found in pti_ptos given as argument.")
+                    print(
+                        f"PTI/PTO {sub_system.name} not found in pti_ptos given as argument."
+                    )
                     print("Creating a new PTI/PTO from the proto definition.")
                     components.append(
                         convert_proto_pti_pto_subsystem_to_feems(
-                            subsystem=sub_system, switchboard_id=1, shaft_line_id=shaft_line_id
+                            subsystem=sub_system,
+                            switchboard_id=1,
+                            shaft_line_id=shaft_line_id,
                         )
                     )
                 else:
@@ -565,8 +670,8 @@ def convert_proto_shaftline_to_feems(
                     shaft_line_id=shaft_line_id,
                     rated_power=sub_system.rated_power_kw,
                     rated_speed=sub_system.rated_speed_rpm,
-                    eff_curve=convert_proto_efficiency_bsfc_to_np_array(
-                        efficiency_bsfc=sub_system.propeller.efficiency
+                    eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+                        efficiency_bsfc_power=sub_system.propeller.efficiency
                     ),
                 )
             )
@@ -601,7 +706,9 @@ def convert_feems_switchboards_to_feems_electric_power_system(
         switchboards,
         [],
     )
-    bus_tie_connection = [(index + 1, index + 2) for index in range(len(switchboards) - 1)]
+    bus_tie_connection = [
+        (index + 1, index + 2) for index in range(len(switchboards) - 1)
+    ]
     return ElectricPowerSystem(
         name="electric power system",
         power_plant_components=components,
@@ -613,14 +720,18 @@ def convert_feems_shaftlines_to_feems_mechanical_propulsion_system(
     shaftlines: List[ShaftLine],
 ) -> MechanicalPropulsionSystem:
 
-    components = reduce(lambda acc, shaftline: [*acc, *shaftline.components], shaftlines, [])
+    components = reduce(
+        lambda acc, shaftline: [*acc, *shaftline.components], shaftlines, []
+    )
     return MechanicalPropulsionSystem(
         name="mechanical propulsion system",
         components_list=components,
     )
 
 
-def convert_proto_electric_system_to_feems(system: proto.ElectricSystem) -> ElectricPowerSystem:
+def convert_proto_electric_system_to_feems(
+    system: proto.ElectricSystem,
+) -> ElectricPowerSystem:
     switchboards = [
         convert_proto_switchboard_to_feems(proto_switchboard)
         for proto_switchboard in system.switchboards
@@ -636,7 +747,9 @@ def convert_proto_mechanical_system_to_feems(
         if pti_ptos is not None:
             pti_ptos_for_shaft_lines = list(
                 filter(
-                    lambda pti_pto: pti_pto.shaft_line_id == proto_shaftline.shaft_line_id, pti_ptos
+                    lambda pti_pto: pti_pto.shaft_line_id
+                    == proto_shaftline.shaft_line_id,
+                    pti_ptos,
                 )
             )
         else:
@@ -646,7 +759,9 @@ def convert_proto_mechanical_system_to_feems(
                 shaftline=proto_shaftline, pti_ptos=pti_ptos_for_shaft_lines
             )
         )
-    return convert_feems_shaftlines_to_feems_mechanical_propulsion_system(shaftlines=shaft_lines)
+    return convert_feems_shaftlines_to_feems_mechanical_propulsion_system(
+        shaftlines=shaft_lines
+    )
 
 
 def convert_proto_propulsion_system_to_feems(
@@ -660,8 +775,12 @@ def convert_proto_propulsion_system_to_feems(
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.MECHANICAL:
         return MechanicalPropulsionSystemWithElectricPowerSystem(
             name=system.name,
-            electric_system=convert_proto_electric_system_to_feems(system.electric_system),
-            mechanical_system=convert_proto_mechanical_system_to_feems(system.mechanical_system),
+            electric_system=convert_proto_electric_system_to_feems(
+                system.electric_system
+            ),
+            mechanical_system=convert_proto_mechanical_system_to_feems(
+                system.mechanical_system
+            ),
         )
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.ELECTRIC:
         return convert_proto_electric_system_to_feems(system.electric_system)

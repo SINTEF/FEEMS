@@ -41,7 +41,9 @@ class EnergySource:
         remaining capacity, returns the ratio of energy exceeding capacity to energy required and
         updated feems result.
         """
-        co2_factor = feems_result.co2_emission_total_kg / feems_result.fuel_consumption_total_kg
+        co2_factor = (
+            feems_result.co2_emission_total_kg / feems_result.fuel_consumption_total_kg
+        )
         energy_exceeding_capacity = 0
         if self.source_type == EnergySourceType.BATTERY:
             energy_consumption = -feems_result.energy_stored_total_mj / 3.6
@@ -51,19 +53,26 @@ class EnergySource:
             energy_consumption = feems_result.fuel_consumption_total_kg
         else:
             raise TypeError(
-                "The energy source type is not valid. It should be " "EnergySourceType enum type."
+                "The energy source type is not valid. It should be "
+                "EnergySourceType enum type."
             )
-        energy_consumption_actual = (1 - ratio_energy_used_in_previous_source) * energy_consumption
+        energy_consumption_actual = (
+            1 - ratio_energy_used_in_previous_source
+        ) * energy_consumption
         self.remaining_capacity -= energy_consumption_actual
         if self.remaining_capacity <= 0 and not is_last_energy_source:
             energy_exceeding_capacity = -self.remaining_capacity  # type: ignore[assignment]
             self.remaining_capacity = 0
 
         if self.source_type == EnergySourceType.BATTERY:
-            actual_energy_stored = -energy_consumption_actual + energy_exceeding_capacity
+            actual_energy_stored = (
+                -energy_consumption_actual + energy_exceeding_capacity
+            )
             feems_result.energy_stored_total_mj = actual_energy_stored * 3.6
             feems_result.energy_consumption_electric_total_mj *= (
-                (actual_energy_stored / energy_consumption) if energy_consumption != 0 else 0
+                (actual_energy_stored / energy_consumption)
+                if energy_consumption != 0
+                else 0
             )
         elif self.source_type == EnergySourceType.HYDROGEN:
             fuel = next(
@@ -72,7 +81,9 @@ class EnergySource:
                     feems_result.multi_fuel_consumption_total_kg.fuels,
                 )
             )
-            fuel.mass_or_mass_fraction = energy_consumption_actual - energy_exceeding_capacity
+            fuel.mass_or_mass_fraction = (
+                energy_consumption_actual - energy_exceeding_capacity
+            )
         elif self.source_type == EnergySourceType.LNG_DIESEL:
             if feems_result.multi_fuel_consumption_total_kg.diesel > 0:
                 fuel = next(
@@ -81,7 +92,9 @@ class EnergySource:
                         feems_result.multi_fuel_consumption_total_kg.fuels,
                     )
                 )
-                fuel.mass_or_mass_fraction = energy_consumption_actual - energy_exceeding_capacity
+                fuel.mass_or_mass_fraction = (
+                    energy_consumption_actual - energy_exceeding_capacity
+                )
                 feems_result.co2_emission_total_kg = (
                     energy_consumption_actual - energy_exceeding_capacity
                 ) * co2_factor
@@ -92,7 +105,9 @@ class EnergySource:
                         feems_result.multi_fuel_consumption_total_kg.fuels,
                     )
                 )
-                fuel.mass_or_mass_fraction = energy_consumption_actual - energy_exceeding_capacity
+                fuel.mass_or_mass_fraction = (
+                    energy_consumption_actual - energy_exceeding_capacity
+                )
                 feems_result.co2_emission_total_kg = (
                     energy_consumption_actual - energy_exceeding_capacity
                 ) * co2_factor
@@ -130,7 +145,9 @@ class EnergySource:
 
 
 class ElectricPowerPlantStatus(NamedTuple):
-    bus_tie_breaker_status: np.ndarray  # First index is time index, second is bus_tie_breaker_index
+    bus_tie_breaker_status: (
+        np.ndarray
+    )  # First index is time index, second is bus_tie_breaker_index
     genset_connection_status: Dict[SwbId, np.ndarray]
     # Dictionary where key is teh swbid, the value is a matrix where the first index is time,
     # and second is genset_index

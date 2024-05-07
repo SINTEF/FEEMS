@@ -9,14 +9,17 @@ from scipy.interpolate import PchipInterpolator
 
 from feems.components_model.component_base import BasicComponent, SerialSystem
 from feems.components_model.component_electric import (
+    COGES,
     ElectricMachine,
     ElectricComponent,
     PTIPTO,
     Genset,
     SerialSystemElectric,
     FuelCell,
+    FuelCellSystem,
 )
 from feems.components_model.component_mechanical import (
+    COGAS,
     Engine,
     MainEngineWithGearBoxForMechanicalPropulsion,
     EngineDualFuel,
@@ -27,9 +30,10 @@ from feems.components_model.utility import (
     get_efficiency_curve_from_dataframe,
 )
 from feems.fuel import FuelByMassFraction, TypeFuel, Fuel, FuelSpecifiedBy, FuelOrigin
-from feems.types_for_feems import Speed_rpm, NOxCalculationMethod, SwbId
+from feems.types_for_feems import EmissionType, Speed_rpm, NOxCalculationMethod, SwbId
 from feems.types_for_feems import TypeNode, TypeComponent, TypePower, Power_kW
 from tests.utility import (
+    create_cogas_system,
     create_components,
     create_random_monotonic_eff_curve,
     create_basic_components,
@@ -38,11 +42,61 @@ from tests.utility import (
     ELECTRIC_MACHINE_EFF_CURVE,
     create_electric_components_for_switchboard,
 )
+from feems.constant import nox_factor_imo_medium_speed_g_hWh
 
-CONVERTER_EFF = np.array([[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]).transpose()
+CONVERTER_EFF = np.array(
+    [[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]
+).transpose()
 
 
 class TestComponent(TestCase):
+
+    def setUp(self):
+        """Create a serial system for testing for a pti/pto system with 5 components."""
+        gearbox = BasicComponent(
+            type_=TypeComponent.GEARBOX,
+            name="gearbox",
+            power_type=TypePower.POWER_TRANSMISSION,
+            rated_power=3000,
+            rated_speed=150,
+            eff_curve=np.array([98.0]),
+        )
+        synch_mach = ElectricMachine(
+            type_=TypeComponent.SYNCHRONOUS_MACHINE,
+            name="synchronous machine",
+            rated_power=3000,
+            rated_speed=150,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        rectifier = ElectricComponent(
+            type_=TypeComponent.RECTIFIER,
+            name="rectifier",
+            rated_power=3000,
+            eff_curve=np.array([99.5]),
+        )
+        inverter = ElectricComponent(
+            type_=TypeComponent.INVERTER,
+            name="inverter",
+            rated_power=3000,
+            eff_curve=CONVERTER_EFF,
+        )
+        transformer = ElectricComponent(
+            type_=TypeComponent.TRANSFORMER,
+            name="transformer",
+            rated_power=3000,
+            eff_curve=np.array([99]),
+        )
+
+        self.components = [gearbox, synch_mach, rectifier, inverter, transformer]
+        self.pti_pto = SerialSystem(
+            TypeComponent.PTI_PTO_SYSTEM,
+            TypePower.PTI_PTO,
+            "PTIPTO 1",
+            self.components,
+            rated_power=transformer.rated_power,
+            rated_speed=synch_mach.rated_speed,
+        )
+
     def test_component(self):
         name = "component"
         component = create_components(name, 1, 1000, 1000)
@@ -92,7 +146,9 @@ class TestComponent(TestCase):
             "main engine 1", rated_power_max, rated_speed_max, bsfc_curve
         )
         #: Make the bsfc interpolation function anc compare with the component method
-        interp_func = PchipInterpolator(bsfc_curve[:, 0], bsfc_curve[:, 1], extrapolate=True)
+        interp_func = PchipInterpolator(
+            bsfc_curve[:, 0], bsfc_curve[:, 1], extrapolate=True
+        )
         np.testing.assert_allclose(bsfc_curve, eng.specific_fuel_consumption_points)
         power = np.random.rand(4) * eng.rated_power
         load = eng.get_load(power)
@@ -119,7 +175,9 @@ class TestComponent(TestCase):
             bsfc_curve=bsfc_curve,
             nox_calculation_method=NOxCalculationMethod.TIER_2,
         )
-        self.assertEqual(eng.specific_fuel_consumption_interp(np.random.rand()), bsfc_curve[0])
+        self.assertEqual(
+            eng.specific_fuel_consumption_interp(np.random.rand()), bsfc_curve[0]
+        )
 
     def test_engine_with_file_bsfc_curve(self):
         """
@@ -153,7 +211,8 @@ class TestComponent(TestCase):
         self.assertAlmostEqual(eng.rated_power, df["Rated Power"].values[0])
         np.testing.assert_allclose(eng.specific_fuel_consumption_points, bsfc)
         np.testing.assert_allclose(
-            eng.specific_fuel_consumption_interp(load_points), bsfc_function(load_points)
+            eng.specific_fuel_consumption_interp(load_points),
+            bsfc_function(load_points),
         )
         os.unlink(filename)
 
@@ -173,7 +232,9 @@ class TestComponent(TestCase):
         )
         load_point = np.random.rand(5)
         np.testing.assert_allclose(eng.specific_fuel_consumption_points, bsfc)
-        np.testing.assert_allclose(eng.specific_fuel_consumption_interp(load_point), bsfc[0, 1])
+        np.testing.assert_allclose(
+            eng.specific_fuel_consumption_interp(load_point), bsfc[0, 1]
+        )
         os.unlink(filename)
 
     def test_basic_component(self):
@@ -181,7 +242,9 @@ class TestComponent(TestCase):
         name = "basic_component"
         rated_power_max = 1000
         rated_speed_max = 500
-        basic_component = create_basic_components(name, 1, rated_power_max, rated_speed_max)
+        basic_component = create_basic_components(
+            name, 1, rated_power_max, rated_speed_max
+        )
         interp_func = PchipInterpolator(
             basic_component._efficiency_points[:, 0],
             basic_component._efficiency_points[:, 1],
@@ -190,12 +253,15 @@ class TestComponent(TestCase):
         # self.assertAlmostEqual((eff_curve - basic_component._efficiency_points).sum(), 0)
         load_perc = np.random.rand(5)
         np.testing.assert_allclose(
-            basic_component.get_efficiency_from_load_percentage(load_perc), interp_func(load_perc)
+            basic_component.get_efficiency_from_load_percentage(load_perc),
+            interp_func(load_perc),
         )
 
         #: test the power conversions, forward power
         no_of_pts_to_test = 100000
-        power_output = (2 * np.random.rand(no_of_pts_to_test) - 1) * basic_component.rated_power
+        power_output = (
+            2 * np.random.rand(no_of_pts_to_test) - 1
+        ) * basic_component.rated_power
         power_input = np.zeros(len(power_output))
         load_perc = basic_component.get_load(power_output)
         idx_forward_power = power_output > 0
@@ -203,10 +269,14 @@ class TestComponent(TestCase):
         power_input[idx_reverse_power] = power_output[idx_reverse_power]
         power_input[idx_forward_power] = power_output[
             idx_forward_power
-        ] / basic_component.get_efficiency_from_load_percentage(load_perc[idx_forward_power])
+        ] / basic_component.get_efficiency_from_load_percentage(
+            load_perc[idx_forward_power]
+        )
         power_output[idx_reverse_power] = power_input[
             idx_reverse_power
-        ] / basic_component.get_efficiency_from_load_percentage(load_perc[idx_reverse_power])
+        ] / basic_component.get_efficiency_from_load_percentage(
+            load_perc[idx_reverse_power]
+        )
         (
             power_input_comp,
             load_perc,
@@ -249,9 +319,14 @@ class TestComponent(TestCase):
                 switchboard_id,
             )
         switchboard_id_list_to_compare = np.array(
-            [electric_component.switchboard_id for electric_component in electric_components]
+            [
+                electric_component.switchboard_id
+                for electric_component in electric_components
+            ]
         )
-        np.testing.assert_array_equal(switchboard_id_list, switchboard_id_list_to_compare)
+        np.testing.assert_array_equal(
+            switchboard_id_list, switchboard_id_list_to_compare
+        )
 
     # noinspection DuplicatedCode
     def test_electric_machine(self):
@@ -280,7 +355,9 @@ class TestComponent(TestCase):
         load = electric_machine.get_load(power_electric)
         efficiency = electric_machine.get_efficiency_from_load_percentage(load)
         # noinspection DuplicatedCode
-        power_shaft[idx_generator] = power_electric[idx_generator] / efficiency[idx_generator]
+        power_shaft[idx_generator] = (
+            power_electric[idx_generator] / efficiency[idx_generator]
+        )
         power_electric[idx_motor] = power_shaft[idx_motor] / efficiency[idx_motor]
         # Test for power input from the mechanical side
         (
@@ -293,7 +370,9 @@ class TestComponent(TestCase):
         (
             power_shaft_pred,
             load_pred,
-        ) = electric_machine.get_shaft_power_load_from_electric_power(power_electric, True)
+        ) = electric_machine.get_shaft_power_load_from_electric_power(
+            power_electric, True
+        )
         np.testing.assert_allclose(power_shaft, power_shaft_pred)
         np.testing.assert_allclose(load, load_pred)
 
@@ -321,7 +400,9 @@ class TestComponent(TestCase):
         idx_motor = power_shaft > 0
         idx_generator = np.bitwise_not(idx_motor)
         power_electric[idx_motor] = power_shaft[idx_motor] / efficiency[idx_motor]
-        power_shaft[idx_generator] = power_electric[idx_generator] / efficiency[idx_generator]
+        power_shaft[idx_generator] = (
+            power_electric[idx_generator] / efficiency[idx_generator]
+        )
         # Test for power input from the shaft side
         (
             power_electric_pred,
@@ -333,7 +414,9 @@ class TestComponent(TestCase):
         (
             power_shaft_pred,
             load,
-        ) = electric_machine.get_shaft_power_load_from_electric_power(power_electric, True)
+        ) = electric_machine.get_shaft_power_load_from_electric_power(
+            power_electric, True
+        )
         np.testing.assert_allclose(power_shaft, power_shaft_pred)
         np.testing.assert_allclose(load, load_pred, rtol=2e-3)
 
@@ -348,14 +431,18 @@ class TestComponent(TestCase):
             rated_speed=100,
             eff_curve=np.array([efficiency]),
         )
-        self.assertAlmostEqual(generator.get_efficiency_from_load_percentage(0.45), efficiency)
+        self.assertAlmostEqual(
+            generator.get_efficiency_from_load_percentage(0.45), efficiency
+        )
 
     def test_electric_component_with_file_input(self):
         name = "generator 1"
         filename = "info.csv"
         columns = ["Switchboard No", "Rated Power", "Rated Speed"]
         df = create_dataframe_save_and_return(name, filename, columns)
-        efficiency_function, efficiency = get_efficiency_curve_from_dataframe(df, "Efficiency")
+        efficiency_function, efficiency = get_efficiency_curve_from_dataframe(
+            df, "Efficiency"
+        )
         #: Create an engine object and test_for_fuel_calculation_for_machinery_system
         gen = ElectricComponent(
             type_=TypeComponent.GENERATOR,
@@ -374,74 +461,28 @@ class TestComponent(TestCase):
         os.unlink(filename)
 
     def test_serial_system(self):
-        gearbox = BasicComponent(
-            type_=TypeComponent.GEARBOX,
-            name="gearbox",
-            power_type=TypePower.POWER_TRANSMISSION,
-            rated_power=3000,
-            rated_speed=150,
-            eff_curve=np.array([98.0]),
-        )
-        synch_mach = ElectricMachine(
-            type_=TypeComponent.SYNCHRONOUS_MACHINE,
-            name="synchronous machine",
-            rated_power=3000,
-            rated_speed=150,
-            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
-        )
-        rectifier = ElectricComponent(
-            type_=TypeComponent.RECTIFIER,
-            name="rectifier",
-            rated_power=3000,
-            eff_curve=np.array([99.5]),
-        )
-        inverter = ElectricComponent(
-            type_=TypeComponent.INVERTER,
-            name="inverter",
-            rated_power=3000,
-            eff_curve=CONVERTER_EFF,
-        )
-        transformer = ElectricComponent(
-            type_=TypeComponent.TRANSFORMER,
-            name="transformer",
-            rated_power=3000,
-            eff_curve=np.array([99]),
-        )
 
-        components = [gearbox, synch_mach, rectifier, inverter, transformer]
-        pti_pto = SerialSystem(
-            TypeComponent.PTI_PTO_SYSTEM,
-            TypePower.PTI_PTO,
-            "PTIPTO 1",
-            components,
-            rated_power=transformer.rated_power,
-            rated_speed=synch_mach.rated_speed,
-        )
         load_perc = 0.50  # np.random.rand() * 100
         efficiency = 1
-        for component in components:
+        for component in self.components:
             efficiency *= component.get_efficiency_from_load_percentage(load_perc)
         self.assertAlmostEqual(
-            pti_pto.get_efficiency_from_load_percentage(load_perc),
+            self.pti_pto.get_efficiency_from_load_percentage(load_perc),
             efficiency,
             places=-1,
         )
-        return pti_pto
 
     def test_pti_pto(self):
-
-        #: Get a generic pti_pto instance from SerialSystem testing
-        pti_pto_serial = self.test_serial_system()
 
         #: Create a PTIPTO instance
         switchboard_id = 1
         shaft_line_id = 1
         pti_pto = PTIPTO(
-            pti_pto_serial.name,
-            pti_pto_serial.components,
+            self.pti_pto.name,
+            self.pti_pto.components,
             switchboard_id,
-            pti_pto_serial.rated_power,
-            pti_pto_serial.rated_speed,
+            self.pti_pto.rated_power,
+            self.pti_pto.rated_speed,
             shaft_line_id,
         )
         self.assertEqual(shaft_line_id, pti_pto.shaft_line_id)
@@ -450,18 +491,17 @@ class TestComponent(TestCase):
         switchboard_no = 0
         power_type = TypePower.PTI_PTO
         # noinspection PyShadowingNames
-        PTIPTO = self.test_serial_system()
-        PTIPTO_electric = SerialSystemElectric(
-            PTIPTO.type,
-            PTIPTO.name,
+        pti_pto_electric = SerialSystemElectric(
+            self.pti_pto.type,
+            self.pti_pto.name,
             power_type,
-            PTIPTO.components,
+            self.pti_pto.components,
             switchboard_no,
-            PTIPTO.rated_power,
-            PTIPTO.rated_speed,
+            self.pti_pto.rated_power,
+            self.pti_pto.rated_speed,
         )
-        self.assertEqual(PTIPTO_electric.switchboard_id, switchboard_no)
-        self.assertEqual(PTIPTO_electric.power_type, power_type)
+        self.assertEqual(pti_pto_electric.switchboard_id, switchboard_no)
+        self.assertEqual(pti_pto_electric.power_type, power_type)
 
     # noinspection DuplicatedCode
     def test_main_engine_with_gear_box(self):
@@ -481,15 +521,21 @@ class TestComponent(TestCase):
         load = gearbox.get_load(power_at_gearbox_out)
         eff_gearbox = gearbox.get_efficiency_from_load_percentage(load)
         power_at_engine_shaft = power_at_gearbox_out / eff_gearbox
-        engine_run_point = engine.get_engine_run_point_from_power_out_kw(power_at_engine_shaft)
-        engine_run_point_comp = main_engine_with_gearbox.get_engine_run_point_from_power_out_kw(
-            power_at_gearbox_out
+        engine_run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_at_engine_shaft
+        )
+        engine_run_point_comp = (
+            main_engine_with_gearbox.get_engine_run_point_from_power_out_kw(
+                power_at_gearbox_out
+            )
         )
         np.testing.assert_allclose(
             engine_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
             engine_run_point_comp.fuel_flow_rate_kg_per_s.total_fuel_consumption,
         )
-        np.testing.assert_allclose(engine_run_point.load_ratio, engine_run_point_comp.load_ratio)
+        np.testing.assert_allclose(
+            engine_run_point.load_ratio, engine_run_point_comp.load_ratio
+        )
         np.testing.assert_allclose(
             engine_run_point.bsfc_g_per_kWh, engine_run_point_comp.bsfc_g_per_kWh
         )
@@ -518,8 +564,9 @@ class TestComponent(TestCase):
         genset_dc = Genset("genset 1", engine, generator, rectifier)
         power_electric = np.random.rand(5) * genset_ac.rated_power
         load_at_genset = generator.get_load(power_electric)
-        power_dc_at_generator = power_electric / rectifier.get_efficiency_from_load_percentage(
-            load_at_genset
+        power_dc_at_generator = (
+            power_electric
+            / rectifier.get_efficiency_from_load_percentage(load_at_genset)
         )
         power_shaft_ac, load_perc = generator.get_shaft_power_load_from_electric_power(
             power_electric
@@ -568,12 +615,16 @@ class TestComponent(TestCase):
         )
         power = np.random.rand(5) * engine.rated_power
         engine_run_point = engine.get_engine_run_point_from_power_out_kw(power)
-        natual_gas_consumption_kg_per_s = engine_run_point.bsfc_g_per_kWh * power / 3600 / 1000
+        natual_gas_consumption_kg_per_s = (
+            engine_run_point.bsfc_g_per_kWh * power / 3600 / 1000
+        )
         assert np.allclose(
             engine_run_point.fuel_flow_rate_kg_per_s.fuels[0].mass_or_mass_fraction,
             natual_gas_consumption_kg_per_s,
         )
-        diesel_consumption_kg_per_s = engine_run_point.bpsfc_g_per_kWh * power / 3600 / 1000
+        diesel_consumption_kg_per_s = (
+            engine_run_point.bpsfc_g_per_kWh * power / 3600 / 1000
+        )
         assert np.allclose(
             engine_run_point.fuel_flow_rate_kg_per_s.fuels[1].mass_or_mass_fraction,
             diesel_consumption_kg_per_s,
@@ -618,4 +669,110 @@ class TestComponent(TestCase):
         assert np.allclose(
             fuel_cell_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
             natural_gas_consumption_kg_per_s,
+        )
+
+        number_modules = 2
+        converter = ElectricComponent(
+            type_=TypeComponent.POWER_CONVERTER,
+            name="converter",
+            rated_power=fuel_cell.rated_power * number_modules * 1.05,
+            eff_curve=create_random_monotonic_eff_curve(),
+        )
+        fuel_cell_system = FuelCellSystem(
+            name="fuel cell system 1",
+            fuel_cell_module=fuel_cell,
+            converter=converter,
+            switchboard_id=1,
+            number_modules=2,
+        )
+        power = np.random.rand(5) * fuel_cell_system.rated_power
+        power_after_converter, _ = converter.get_power_input_from_bidirectional_output(
+            power
+        )
+        fuel_cell_system_run_point = fuel_cell_system.get_fuel_cell_run_point(power)
+        fuel_cell_module_run_point = fuel_cell_system.fuel_cell.get_fuel_cell_run_point(
+            power_out_kw=power_after_converter / number_modules,
+        )
+        assert np.allclose(
+            fuel_cell_system_run_point.load_ratio,
+            fuel_cell_module_run_point.load_ratio,
+        )
+        for fuel_con_system, fuel_con_module in zip(
+            fuel_cell_system_run_point.fuel_flow_rate_kg_per_s.fuels,
+            fuel_cell_module_run_point.fuel_flow_rate_kg_per_s.fuels,
+        ):
+            assert np.allclose(
+                fuel_con_system.mass_or_mass_fraction,
+                fuel_con_module.mass_or_mass_fraction * number_modules,
+            )
+        assert np.allclose(
+            fuel_cell_system_run_point.efficiency,
+            fuel_cell_module_run_point.efficiency,
+        )
+
+    def test_cogas(self):
+        """Test combined gas and steam system - mechanical output"""
+        cogas = create_cogas_system()
+        power_output_kw = np.random.rand(5) * cogas.rated_power
+        eff_cogas = cogas.get_efficiency_from_load_percentage(
+            cogas.get_load(power_output_kw)
+        )
+        fuel = Fuel(
+            fuel_type=cogas.fuel_type,
+            origin=cogas.fuel_origin,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+        fuel_consumption_kg_per_s_ref = (
+            power_output_kw / eff_cogas / (fuel.lhv_mj_per_g * 1000) / 1000
+        )
+        gas_turbine_run_point = cogas.get_gas_turbine_run_point_from_power_output_kw(
+            power_output_kw
+        )
+        np.testing.assert_allclose(eff_cogas, gas_turbine_run_point.efficiency)
+        np.testing.assert_allclose(
+            fuel_consumption_kg_per_s_ref,
+            gas_turbine_run_point.fuel_flow_rate_kg_per_s.fuels[
+                0
+            ].mass_or_mass_fraction,
+        )
+
+        # Test if the default NOx emission curve is IMO Tier 3
+        factor, exponent = nox_factor_imo_medium_speed_g_hWh[
+            NOxCalculationMethod.TIER_3.value
+        ]
+        nox_g_per_kwh = factor * np.power(cogas.rated_speed, exponent)
+        np.testing.assert_equal(
+            cogas._emissions_per_kwh_interp[EmissionType.NOX](np.random.rand()),
+            nox_g_per_kwh,
+        )
+
+    def test_coges(self):
+        #: Create an engine component
+        cogas = create_cogas_system()
+        #: Create a generator component
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator 1",
+            rated_power=cogas.rated_power * 0.9,
+            rated_speed=cogas.rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        coges = COGES(
+            name="coges 1",
+            cogas=cogas,
+            generator=generator,
+        )
+        power_electric = np.random.rand(5) * coges.rated_power
+        power_shaft, load_at_generator = (
+            generator.get_shaft_power_load_from_electric_power(power_electric)
+        )
+        res_cogas = cogas.get_gas_turbine_run_point_from_power_output_kw(power_shaft)
+        res_coges = coges.get_system_run_point_from_power_output_kw(power_electric)
+        np.testing.assert_allclose(load_at_generator, res_coges.coges_load_ratio)
+        np.testing.assert_allclose(
+            res_coges.cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            res_cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
         )

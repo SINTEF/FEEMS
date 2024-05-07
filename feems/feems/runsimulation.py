@@ -25,7 +25,9 @@ def run_simulation(
     simulation_interface: SimulationInterface,
     energy_source_to_prioritize: EnergySourceType = None,
 ) -> None:
-    power_kw_per_switchboard = electric_power_system.get_sum_consumption_kw_sources_switchboard()
+    power_kw_per_switchboard = (
+        electric_power_system.get_sum_consumption_kw_sources_switchboard()
+    )
 
     simulation_interface.set_status(
         power_kw_per_switchboard=power_kw_per_switchboard,
@@ -49,7 +51,9 @@ class EqualEngineSizeAllClosedSimulationInterface(SimulationInterface):
         self.n_gensets = sum([x for x in swb2n_gensets.values()])
         self.n_bus_ties = n_bus_ties
         self.rated_power_gensets = rated_power_gensets
-        self.maximum_allowable_genset_load_percentage = maximum_allowable_genset_load_percentage
+        self.maximum_allowable_genset_load_percentage = (
+            maximum_allowable_genset_load_percentage
+        )
 
     def set_status(
         self,
@@ -82,14 +86,20 @@ class EqualEngineSizeAllClosedSimulationInterface(SimulationInterface):
     def _make_genset_on_matrix(
         self, power_kw_per_switchboard: Dict[SwbId, np.ndarray], n_datapoints: int
     ) -> Dict[SwbId, np.ndarray]:
-        total_power_kw = self._sum_switchboard_power(n_datapoints, power_kw_per_switchboard)
-        ideal_number_genset = self._ideal_number_of_gensets_on(n_datapoints, total_power_kw)
+        total_power_kw = self._sum_switchboard_power(
+            n_datapoints, power_kw_per_switchboard
+        )
+        ideal_number_genset = self._ideal_number_of_gensets_on(
+            n_datapoints, total_power_kw
+        )
         return self._convert_number_of_engines_on_to_status_matrix(
             ideal_number_genset=ideal_number_genset, n_datapoints=n_datapoints
         )
 
     @staticmethod
-    def _sum_switchboard_power(n_datapoints: int, power_kw_per_switchboard: dict) -> np.ndarray:
+    def _sum_switchboard_power(
+        n_datapoints: int, power_kw_per_switchboard: dict
+    ) -> np.ndarray:
         #: Calculate the total power load on all switchboards
         total_power_kw = np.zeros(shape=[n_datapoints])
         for power_kw_on_swb in power_kw_per_switchboard.values():

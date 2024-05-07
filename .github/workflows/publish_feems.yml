@@ -1,0 +1,49 @@
+name: Publish Python 🐍 distribution 📦 to PyPI for FEEMS
+
+on:
+  pull_request:
+    branches: ["release"]
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry --user
+      - name: Build package
+        run: |
+          cd feems
+          poetry build
+      - name: Store the distribution packages 📦
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-package-distributions-feems
+          path: feems/dist/
+
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/feems
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: python-package-distributions-feems
+          path: dist/
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

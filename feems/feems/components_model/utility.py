@@ -6,7 +6,7 @@ from typing import Union, List, Callable, Tuple, Optional
 import numpy as np
 import pandas as pd
 from numpy import cumsum
-from scipy.integrate import trapz, simps
+from scipy.integrate import trapezoid, simpson
 from scipy.interpolate import PchipInterpolator
 
 from feems import get_logger
@@ -54,15 +54,19 @@ def integrate_data(
 
     :param data_to_integrate: Data samples to integrate, numpy float array
     :param time_interval_s: Time interval of the data samples in seconds must be a float for
-        simpson or trapezoid, and a array for 'sum_with_time'. sum_with_times is the dot product
+        simpson or trapezoid, and an array for 'sum_with_time'. sum_with_times is the dot product
         of data_to_integrate and time_interval_s
     :param integration_method: Numerical integration method. Choose among `IntegrationMethod`
     :return: Integrated value
     """
+    data_to_integrate = np.atleast_1d(data_to_integrate)
     time_interval_s_is_scalar_number = np.isscalar(time_interval_s) and isinstance(
         time_interval_s, (float, int)
     )
-    if len(data_to_integrate) == 1 and integration_method != IntegrationMethod.sum_with_time:
+    if (
+        len(data_to_integrate) == 1
+        and integration_method != IntegrationMethod.sum_with_time
+    ):
         logger.warning(
             "The integration method is not 'sum_with_time' while the data to integrate "
             "has only one point. 'sum_with_time' will be used for integration to avoid "
@@ -74,18 +78,22 @@ def integrate_data(
             msg = f"The time interval for {integration_method.value} must be a scalar value"
             logger.error(msg)
             raise IntegrationError(msg)
-        return simps(data_to_integrate) * time_interval_s
+        return simpson(data_to_integrate) * time_interval_s
     elif integration_method == IntegrationMethod.trapezoid:
         if not time_interval_s_is_scalar_number:
             msg = f"The time interval for {integration_method.value} must be a scalar value"
             logger.error(msg)
             raise IntegrationError(msg)
-        return trapz(data_to_integrate) * time_interval_s
+        return trapezoid(data_to_integrate) * time_interval_s
     elif integration_method == IntegrationMethod.sum_with_time:
         if not data_is_valid_for_variable_time_interval(
             time_interval_s=time_interval_s, data_to_integrate=data_to_integrate
         ):
-            err_msg = "The data is not compatible with the given time step."
+            err_msg = (
+                "The data is not compatible with the given time step. "
+                "Either the data should have the same shape as time step "
+                "if time step is given as an array or the data should be scalar."
+            )
             logger.error(err_msg)
             raise IntegrationError(err_msg)
         result = np.dot(data_to_integrate, time_interval_s)  # type: ignore[arg-type]
@@ -93,7 +101,10 @@ def integrate_data(
             result = result[0]
         return result
     else:
-        msg = "The given method (%s) for the integration is not valid" % integration_method
+        msg = (
+            "The given method (%s) for the integration is not valid"
+            % integration_method
+        )
         logging.error(msg)
         raise TypeError(msg)
 
@@ -107,7 +118,10 @@ def integrate_multi_fuel_consumption(
     Integrates fuel consumption rate of each fuel component.
     """
     fuel_consumption_kg = FuelConsumption(
-        fuels=[fuel.copy_except_mass_or_mass_fraction for fuel in fuel_consumption_kg_per_s.fuels]
+        fuels=[
+            fuel.copy_except_mass_or_mass_fraction
+            for fuel in fuel_consumption_kg_per_s.fuels
+        ]
     )
     for each_fuel_rate, each_fuel_mass in zip(
         fuel_consumption_kg_per_s.fuels, fuel_consumption_kg.fuels
@@ -147,7 +161,10 @@ def integrate_data_accumulative(
         res = np.insert(res, 0, 0, axis=0)
         return res
     else:
-        msg = "The given method (%s) for the integration is not valid" % integration_method
+        msg = (
+            "The given method (%s) for the integration is not valid"
+            % integration_method
+        )
         logging.error(msg)
         raise TypeError(msg)
 
@@ -210,7 +227,9 @@ def get_efficiency_curve_from_dataframe(
         curve_points = np.ravel(df[eff_columns].values)
     else:
         for i, eff_column in enumerate(eff_columns):
-            curve_points[i, 0] = float(eff_column[eff_column.find("@") + 1 : eff_column.find("%")])
+            curve_points[i, 0] = float(
+                eff_column[eff_column.find("@") + 1 : eff_column.find("%")]
+            )
             curve_points[i, 1] = df[eff_column].values[0]
         curve_points = curve_points[curve_points[:, 0].argsort()]
     return get_efficiency_curve_from_points(curve_points)

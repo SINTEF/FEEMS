@@ -10,7 +10,10 @@ config.read("settings.ini")
 cfg = config["DEFAULT"]
 
 cfg_keys = "version description keywords author author_email".split()
-expected = cfg_keys + "lib_name user branch license status min_python audience language".split()
+expected = (
+    cfg_keys
+    + "lib_name user branch license status min_python audience language".split()
+)
 for o in expected:
     assert o in cfg, "missing expected setting: {}".format(o)
 setup_cfg = {o: cfg[o] for o in cfg_keys}
@@ -72,7 +75,9 @@ for ext in ["png", "svg"]:
     )
     long_description = re.sub(
         r"src=\"(.*)\." + ext + '"',
-        'src="https://raw.githubusercontent.com/{}/{}'.format(cfg["user"], cfg["lib_name"])
+        'src="https://raw.githubusercontent.com/{}/{}'.format(
+            cfg["user"], cfg["lib_name"]
+        )
         + "/"
         + cfg["branch"]
         + "/\\1."
@@ -95,6 +100,7 @@ setuptools.setup(
     + (["License :: " + lic[1]] if lic[1] else []),
     url=cfg["git_url"],
     packages=setuptools.find_packages(),
+    package_data={cfg["lib_name"]: ["py.typed", "*.pyi", "**/*.pyi"]},
     include_package_data=True,
     install_requires=requirements,
     extras_require={"dev": dev_requirements},

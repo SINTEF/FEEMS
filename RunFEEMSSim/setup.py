@@ -101,6 +101,7 @@ setuptools.setup(
     + (["License :: " + lic[1]] if lic[1] else []),
     url=cfg["git_url"],
     packages=setuptools.find_packages(),
+    package_data={cfg["lib_name"]: ["py.typed", "*.pyi", "**/*.pyi"]},
     include_package_data=True,
     install_requires=requirements,
     extras_require={"dev": dev_requirements},
