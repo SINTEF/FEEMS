@@ -1,0 +1,90 @@
+[
+  {
+    "shipX": "task",
+    "deSim": "task_type"
+  },
+  {
+    "shipX": "assignment",
+    "deSim": "task_name"
+  },
+  {
+    "shipX": "latitude",
+    "deSim": "latitude_deg"
+  },
+  {
+    "shipX": "longitude",
+    "deSim": "longitude_deg"
+  },
+  {
+    "shipX": "heading",
+    "deSim": "heading_deg"
+  },
+  {
+    "shipX": "wave height significant",
+    "deSim": "wave_height_significant_m"
+  },
+  {
+    "shipX": "wave peak period (tp)",
+    "deSim": "wave_peak_period_s"
+  },
+  {
+    "shipX": "wave direction in degrees relative to geographic north",
+    "deSim": "wave_dir_rel_north_deg"
+  },
+  {
+    "shipX": "wave direction in degrees relative to vessel heading",
+    "deSim": "wave_dir_rel_vessel_deg"
+  },
+  {
+    "shipX": "wind speed in meter per sec",
+    "deSim": "wind_speed_mps"
+  },
+  {
+    "shipX": "wind direction in degrees relative to geographic north",
+    "deSim": "wind_dir_rel_north_deg"
+  },
+  {
+    "shipX": "wind direction in degrees relative to vessel heading",
+    "deSim": "wind_dir_rel_vessel_deg"
+  },
+  {
+    "shipX": "speed over ground",
+    "deSim": "speed_over_ground_kn"
+  },
+  {
+    "shipX": "speed",
+    "deSim": "speed_over_ground_kn"
+  },
+  {
+    "shipX": "speed through water",
+    "deSim": "speed_through_water_kn"
+  },
+  {
+    "shipX": "sea current speed in meter pr sec",
+    "deSim": "current_speed_mps"
+  },
+  {
+    "shipX": "sea current direction in degrees relative to geographic north",
+    "deSim": "current_dir_rel_north_deg"
+  },
+  {
+    "shipX": "power",
+    "deSim": "power_kw"
+  },
+  {
+    "shipX": "torque",
+    "deSim": "torque_k_nm"
+  },
+  {
+    "shipX": "thrust",
+    "deSim": "thrust_k_n"
+  },
+  {
+    "shipX": "rtot",
+    "deSim": "total_resistance_k_n"
+  },
+  {
+    "shipX": "weather source",
+    "deSim": "weather_source"
+  }
+]

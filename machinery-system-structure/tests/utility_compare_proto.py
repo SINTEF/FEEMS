@@ -157,6 +157,7 @@ def compare_proto_subsystems(
         "name",
         "ratedPowerKw",
         "ratedSpeedRpm",
+        "uid",
     ]
     subsystem1_dict = MessageToDict(subsystem1)
     subsystem2_dict = MessageToDict(subsystem2)

@@ -5,7 +5,7 @@ d = {
         "branch": "master",
         "doc_baseurl": "/RunFeemsSim/",
         "doc_host": "https://kevinkoosup.yum@sintef.no.github.io",
-        "git_url": "https://SintefOceanEnergySystem@dev.azure.com/SintefOceanEnergySystem/FEEMSService/_git/RunFEEMSSim",
+        "git_url": "https://github.com/SINTEF/FEEMS",
         "lib_path": "RunFeemsSim",
     },
     "syms": {

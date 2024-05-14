@@ -5,7 +5,7 @@ d = {
         "branch": "master",
         "doc_baseurl": "/MachSysS/",
         "doc_host": "https://keviny.github.io",
-        "git_url": "https://SintefOceanEnergySystem@dev.azure.com/SintefOceanEnergySystem/MachinerySystemStucture/_git/MachinerySystemStucture",
+        "git_url": "https://github.com/SINTEF/FEEMS",
         "lib_path": "MachSysS",
     },
     "syms": {
