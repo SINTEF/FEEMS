@@ -135,6 +135,7 @@ def convert_electric_machine_to_protobuf(
         rated_speed_rpm=component.rated_speed,
         efficiency=convert_efficiency_curve_to_protobuf(component),
         order_from_switchboard_or_shaftline=order_from_switchboard,
+        uid=component.uid,
     )
 
 
@@ -147,6 +148,7 @@ def convert_electric_component_to_protobuf(
         rated_power_kw=component.rated_power,
         efficiency=convert_efficiency_curve_to_protobuf(component),
         order_from_switchboard_or_shaftline=order_from_switchboard,
+        uid=component.uid,
     )
 
 
@@ -163,6 +165,7 @@ def convert_battery_component_to_protobuf(
         efficiency_discharging=component.eff_discharging,
         initial_state_of_charge=component.soc0,
         order_from_switchboard_or_shaftline=order_from_switchboard,
+        uid=component.uid,
     )
 
 
@@ -178,6 +181,7 @@ def convert_supercapacitor_component_to_protobuf(
         efficiency_discharging=component.eff_discharging,
         initial_state_of_charge=component.soc0,
         order_from_switchboard_or_shaftline=order_from_switchboard,
+        uid=component.uid,
     )
 
 
@@ -187,7 +191,14 @@ def convert_serial_electric_system_to_protobuf(
 ) -> proto.Subsystem:
     """Convert serial electric system or PTI/PTO component to protobuf message"""
     order = initial_order_from_switchboard
-    subsystem = proto.Subsystem()
+    subsystem = proto.Subsystem(
+        name=component.name,
+        rated_power_kw=component.rated_power,
+        rated_speed_rpm=component.rated_speed,
+        component_type=component.type.value,
+        power_type=component.power_type.value,
+        uid=component.uid,
+    )
     for subcomponent in component.components:
         if subcomponent.type == TypeComponent.TRANSFORMER:
             subsystem.transformer.CopyFrom(
@@ -280,6 +291,7 @@ def convert_engine_component_to_protobuf(
             engine_feems.emission_curves
         ),
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
+        uid=engine_feems.uid,
     )
     if isinstance(engine_feems, EngineDualFuel):
         engine.pilot_bsfc.CopyFrom(
@@ -313,6 +325,7 @@ def convert_cogas_component_to_protobuf(
         ),
         emission_curves=convert_emission_curves_to_protobuf(component.emission_curves),
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
+        uid=component.uid,
     )
     if component.gas_turbine_power_curve is not None:
         cogas.gas_turbine_power_curve.CopyFrom(
@@ -339,6 +352,7 @@ def convert_switchboard_to_protobuf(
             name=component.name,
             rated_power_kw=component.rated_power,
             rated_speed_rpm=component.rated_speed,
+            uid=component.uid,
         )
         if component.type == TypeComponent.GENERATOR:
             subsystem.electric_machine.CopyFrom(
@@ -364,6 +378,7 @@ def convert_switchboard_to_protobuf(
                     ),
                     number_modules=component.number_modules,
                     order_from_switchboard_or_shaftline=2,
+                    uid=component.fuel_cell.uid,
                 )
             )
         elif component.type == TypeComponent.COGES:
@@ -459,6 +474,7 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
             rated_speed_rpm=gear.rated_speed,
             efficiency=convert_efficiency_curve_to_protobuf(gear),
             order_from_switchboard_or_shaftline=1,
+            uid=gear.uid,
         )
 
     for component in shaftline_feems.components:
@@ -468,6 +484,7 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
             name=component.name,
             rated_power_kw=component.rated_power,
             rated_speed_rpm=component.rated_speed,
+            uid=component.uid,
         )
         if component.type == TypeComponent.MAIN_ENGINE:
             component = cast(MainEngineForMechanicalPropulsion, component)
@@ -497,6 +514,7 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
                     rated_speed_rpm=component.gearbox.rated_speed,
                     efficiency=convert_efficiency_curve_to_protobuf(component.gearbox),
                     order_from_switchboard_or_shaftline=1,
+                    uid=component.gearbox.uid,
                 )
             )
         elif component.type == TypeComponent.PROPELLER_LOAD:
@@ -507,6 +525,7 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
                     efficiency=convert_efficiency_curve_to_protobuf(component),
                     propulsor_id=propeller_id,
                     order_from_switchboard_or_shaftline=2,
+                    uid=component.uid,
                 )
             )
             propeller_id += 1

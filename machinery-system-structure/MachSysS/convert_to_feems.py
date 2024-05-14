@@ -79,6 +79,8 @@ from feems.types_for_feems import (
 
 import MachSysS.system_structure_pb2 as proto
 
+_MIN_LENGTH_UID = 5
+
 
 def convert_proto_point_to_list(point: proto.Point) -> List[float]:
     """Converts protobuf point to a list"""
@@ -120,6 +122,7 @@ def convert_proto_electric_component_to_feems(
         ),
         power_type=power_type,
         switchboard_id=switchboard_id,
+        uid=proto_component.uid if len(proto_component.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -139,6 +142,7 @@ def convert_proto_electric_machine_to_feems(
             proto_component.efficiency
         ),
         switchboard_id=switchboard_id,
+        uid=proto_component.uid if len(proto_component.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -157,6 +161,11 @@ def convert_proto_fuel_cell_system_to_feems(
         ),
         fuel_type=TypeFuel(subsystem.fuel_cell.fuel.fuel_type),
         fuel_origin=FuelOrigin(subsystem.fuel_cell.fuel.fuel_origin),
+        uid=(
+            subsystem.fuel_cell.uid
+            if len(subsystem.fuel_cell.uid) > _MIN_LENGTH_UID
+            else None
+        ),
     )
     converter = convert_proto_electric_component_to_feems(
         subsystem.converter1,
@@ -170,6 +179,7 @@ def convert_proto_fuel_cell_system_to_feems(
         converter=converter,
         switchboard_id=switchboard_id,
         number_modules=number_modules,
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -235,6 +245,7 @@ def convert_proto_engine_to_feems(
             pilot_fuel_origin=FuelOrigin(proto_engine.pilot_fuel.fuel_origin),
             nox_calculation_method=nox_calculation_method,
             emissions_curves=emission_curves,
+            uid=proto_engine.uid if len(proto_engine.uid) > _MIN_LENGTH_UID else None,
         )
     return Engine(
         type_=type_engine,
@@ -246,6 +257,7 @@ def convert_proto_engine_to_feems(
         fuel_origin=FuelOrigin(proto_engine.main_fuel.fuel_origin),
         nox_calculation_method=nox_calculation_method,
         emissions_curves=emission_curves,
+        uid=proto_engine.uid if len(proto_engine.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -279,6 +291,7 @@ def convert_proto_cogas_to_feems(
         fuel_origin=FuelOrigin(proto_cogas.fuel.fuel_origin),
         nox_calculation_method=nox_calculation_method,
         emissions_curves=emission_curves,
+        uid=proto_cogas.uid if len(proto_cogas.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -302,7 +315,11 @@ def convert_proto_genset_to_feems(
             switchboard_id=switchboard_id,
         )
     return Genset(
-        name=subsystem.name, aux_engine=engine, generator=generator, rectifier=rectifier
+        name=subsystem.name,
+        aux_engine=engine,
+        generator=generator,
+        rectifier=rectifier,
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -317,7 +334,12 @@ def convert_proto_coges_to_feems(
         power_type=TypePower.POWER_SOURCE,
         switchboard_id=switchboard_id,
     )
-    return COGES(name=subsystem.name, cogas=cogas, generator=generator)
+    return COGES(
+        name=subsystem.name,
+        cogas=cogas,
+        generator=generator,
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
+    )
 
 
 def convert_proto_battery_to_feems(
@@ -332,6 +354,7 @@ def convert_proto_battery_to_feems(
         eff_discharging=proto_component.efficiency_discharging,
         soc0=proto_component.initial_state_of_charge,
         switchboard_id=switchboard_id,
+        uid=proto_component.uid if len(proto_component.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -352,6 +375,7 @@ def convert_proto_battery_system_to_feems(
         battery=battery,
         converter=converter,
         switchboard_id=switchboard_id,
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -366,6 +390,7 @@ def convert_proto_supercapacitor_to_feems(
         eff_discharging=proto_component.efficiency_discharging,
         soc0=proto_component.initial_state_of_charge,
         switchboard_id=switchboard_id,
+        uid=proto_component.uid if len(proto_component.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -386,6 +411,7 @@ def convert_proto_supercapacitor_system_to_feems(
         supercapacitor=supercapacitor,
         converter=converter,
         switchboard_id=switchboard_id,
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -469,6 +495,7 @@ def convert_proto_pti_pto_subsystem_to_feems(
         rated_speed=subsystem.rated_speed_rpm,
         switchboard_id=switchboard_id,
         shaft_line_id=shaft_line_id,
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -494,6 +521,7 @@ def convert_proto_serial_subsystem_to_feems(
         rated_speed=(
             None if subsystem.rated_speed_rpm == 0 else subsystem.rated_speed_rpm
         ),
+        uid=subsystem.uid if len(subsystem.uid) > _MIN_LENGTH_UID else None,
     )
 
 
@@ -605,6 +633,11 @@ def convert_proto_shaftline_to_feems(
                         type_engine=TypeComponent.MAIN_ENGINE,
                     ),
                     shaft_line_id=shaft_line_id,
+                    uid=(
+                        sub_system.uid
+                        if len(sub_system.uid) > _MIN_LENGTH_UID
+                        else None
+                    ),
                 )
             )
         elif (
@@ -620,15 +653,25 @@ def convert_proto_shaftline_to_feems(
                     ),
                     gearbox=BasicComponent(
                         type_=TypeComponent.GEARBOX,
-                        name=sub_system.gearbox.name,
+                        name=sub_system.gear.name,
                         power_type=TypePower.POWER_TRANSMISSION,
                         rated_power=sub_system.gear.rated_power_kw,
                         rated_speed=sub_system.gear.rated_speed_rpm,
                         eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
                             efficiency_bsfc_power=sub_system.gear.efficiency
                         ),
+                        uid=(
+                            sub_system.gear.uid
+                            if len(sub_system.gear.uid) > _MIN_LENGTH_UID
+                            else None
+                        ),
                     ),
                     shaft_line_id=shaft_line_id,
+                    uid=(
+                        sub_system.uid
+                        if len(sub_system.uid) > _MIN_LENGTH_UID
+                        else None
+                    ),
                 )
             )
         elif sub_system.component_type == proto.Subsystem.ComponentType.PTI_PTO_SYSTEM:
@@ -672,6 +715,11 @@ def convert_proto_shaftline_to_feems(
                     rated_speed=sub_system.rated_speed_rpm,
                     eff_curve=convert_proto_efficiency_bsfc_power_to_np_array(
                         efficiency_bsfc_power=sub_system.propeller.efficiency
+                    ),
+                    uid=(
+                        sub_system.uid
+                        if len(sub_system.uid) > _MIN_LENGTH_UID
+                        else None
                     ),
                 )
             )

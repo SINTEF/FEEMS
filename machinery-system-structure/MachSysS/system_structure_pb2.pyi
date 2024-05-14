@@ -237,6 +237,7 @@ class Gear(_message.Message):
         "efficiency",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     GEAR_RATIO_FIELD_NUMBER: _ClassVar[int]
@@ -245,6 +246,7 @@ class Gear(_message.Message):
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
     ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     gear_ratio: float
     rated_power_kw: float
@@ -252,6 +254,7 @@ class Gear(_message.Message):
     efficiency: Efficiency
     order_from_switchboard_or_shaftline: int
     unit_price_usd: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -261,6 +264,7 @@ class Gear(_message.Message):
         efficiency: _Optional[_Union[Efficiency, _Mapping]] = ...,
         order_from_switchboard_or_shaftline: _Optional[int] = ...,
         unit_price_usd: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class Fuel(_message.Message):
@@ -291,6 +295,7 @@ class Engine(_message.Message):
         "unit_price_usd",
         "start_delay_s",
         "turn_off_power_kw",
+        "uid",
     )
 
     class NOxCalculationMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -330,6 +335,7 @@ class Engine(_message.Message):
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
     START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
     TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     rated_speed_rpm: float
@@ -344,6 +350,7 @@ class Engine(_message.Message):
     unit_price_usd: float
     start_delay_s: float
     turn_off_power_kw: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -362,6 +369,7 @@ class Engine(_message.Message):
         unit_price_usd: _Optional[float] = ...,
         start_delay_s: _Optional[float] = ...,
         turn_off_power_kw: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class COGAS(_message.Message):
@@ -379,6 +387,7 @@ class COGAS(_message.Message):
         "unit_price_usd",
         "start_delay_s",
         "turn_off_power_kw",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
@@ -393,6 +402,7 @@ class COGAS(_message.Message):
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
     START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
     TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     rated_speed_rpm: float
@@ -406,6 +416,7 @@ class COGAS(_message.Message):
     unit_price_usd: float
     start_delay_s: float
     turn_off_power_kw: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -423,6 +434,7 @@ class COGAS(_message.Message):
         unit_price_usd: _Optional[float] = ...,
         start_delay_s: _Optional[float] = ...,
         turn_off_power_kw: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class ElectricMachine(_message.Message):
@@ -433,6 +445,7 @@ class ElectricMachine(_message.Message):
         "efficiency",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
@@ -440,12 +453,14 @@ class ElectricMachine(_message.Message):
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
     ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     rated_speed_rpm: float
     efficiency: Efficiency
     order_from_switchboard_or_shaftline: int
     unit_price_usd: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -454,6 +469,7 @@ class ElectricMachine(_message.Message):
         efficiency: _Optional[_Union[Efficiency, _Mapping]] = ...,
         order_from_switchboard_or_shaftline: _Optional[int] = ...,
         unit_price_usd: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class Battery(_message.Message):
@@ -470,6 +486,7 @@ class Battery(_message.Message):
         "self_discharge_percent_per_day",
         "state_of_energy_minimum",
         "state_of_energy_maximum",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CAPACITY_KWH_FIELD_NUMBER: _ClassVar[int]
@@ -483,6 +500,7 @@ class Battery(_message.Message):
     SELF_DISCHARGE_PERCENT_PER_DAY_FIELD_NUMBER: _ClassVar[int]
     STATE_OF_ENERGY_MINIMUM_FIELD_NUMBER: _ClassVar[int]
     STATE_OF_ENERGY_MAXIMUM_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     energy_capacity_kwh: float
     rated_charging_rate_c: float
@@ -495,6 +513,7 @@ class Battery(_message.Message):
     self_discharge_percent_per_day: float
     state_of_energy_minimum: float
     state_of_energy_maximum: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -509,6 +528,7 @@ class Battery(_message.Message):
         self_discharge_percent_per_day: _Optional[float] = ...,
         state_of_energy_minimum: _Optional[float] = ...,
         state_of_energy_maximum: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class ElectricComponent(_message.Message):
@@ -518,17 +538,20 @@ class ElectricComponent(_message.Message):
         "efficiency",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
     ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     efficiency: Efficiency
     order_from_switchboard_or_shaftline: int
     unit_price_usd: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -536,6 +559,7 @@ class ElectricComponent(_message.Message):
         efficiency: _Optional[_Union[Efficiency, _Mapping]] = ...,
         order_from_switchboard_or_shaftline: _Optional[int] = ...,
         unit_price_usd: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class FuelCell(_message.Message):
@@ -549,6 +573,7 @@ class FuelCell(_message.Message):
         "number_modules",
         "power_minimum_specific",
         "start_delay_s",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
@@ -559,6 +584,7 @@ class FuelCell(_message.Message):
     NUMBER_MODULES_FIELD_NUMBER: _ClassVar[int]
     POWER_MINIMUM_SPECIFIC_FIELD_NUMBER: _ClassVar[int]
     START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     efficiency: Efficiency
@@ -568,6 +594,7 @@ class FuelCell(_message.Message):
     number_modules: int
     power_minimum_specific: float
     start_delay_s: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -579,6 +606,7 @@ class FuelCell(_message.Message):
         number_modules: _Optional[int] = ...,
         power_minimum_specific: _Optional[float] = ...,
         start_delay_s: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class Propeller(_message.Message):
@@ -587,21 +615,25 @@ class Propeller(_message.Message):
         "efficiency",
         "propulsor_id",
         "order_from_switchboard_or_shaftline",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
     PROPULSOR_ID_FIELD_NUMBER: _ClassVar[int]
     ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     efficiency: Efficiency
     propulsor_id: int
     order_from_switchboard_or_shaftline: int
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
         efficiency: _Optional[_Union[Efficiency, _Mapping]] = ...,
         propulsor_id: _Optional[int] = ...,
         order_from_switchboard_or_shaftline: _Optional[int] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class BusBreaker(_message.Message):
@@ -620,6 +652,7 @@ class SuperCapacitor(_message.Message):
         "initial_state_of_charge",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CAPACITY_WH_FIELD_NUMBER: _ClassVar[int]
@@ -629,6 +662,7 @@ class SuperCapacitor(_message.Message):
     INITIAL_STATE_OF_CHARGE_FIELD_NUMBER: _ClassVar[int]
     ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     energy_capacity_wh: float
     rated_power_kw: float
@@ -637,6 +671,7 @@ class SuperCapacitor(_message.Message):
     initial_state_of_charge: float
     order_from_switchboard_or_shaftline: int
     unit_price_usd: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -647,6 +682,7 @@ class SuperCapacitor(_message.Message):
         initial_state_of_charge: _Optional[float] = ...,
         order_from_switchboard_or_shaftline: _Optional[int] = ...,
         unit_price_usd: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class MechanicalComponent(_message.Message):
@@ -656,17 +692,20 @@ class MechanicalComponent(_message.Message):
         "efficiency",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
+        "uid",
     )
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
     ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
     UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     efficiency: Efficiency
     order_from_switchboard_or_shaftline: int
     unit_price_usd: float
+    uid: str
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -674,6 +713,7 @@ class MechanicalComponent(_message.Message):
         efficiency: _Optional[_Union[Efficiency, _Mapping]] = ...,
         order_from_switchboard_or_shaftline: _Optional[int] = ...,
         unit_price_usd: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class Subsystem(_message.Message):
@@ -699,6 +739,7 @@ class Subsystem(_message.Message):
         "ramp_up_rate_limit_percent_per_second",
         "ramp_down_rate_limit_percent_per_second",
         "base_load_order",
+        "uid",
     )
 
     class PowerType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -801,6 +842,7 @@ class Subsystem(_message.Message):
     RAMP_UP_RATE_LIMIT_PERCENT_PER_SECOND_FIELD_NUMBER: _ClassVar[int]
     RAMP_DOWN_RATE_LIMIT_PERCENT_PER_SECOND_FIELD_NUMBER: _ClassVar[int]
     BASE_LOAD_ORDER_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
     gear: Gear
     engine: Engine
     electric_machine: ElectricMachine
@@ -822,6 +864,7 @@ class Subsystem(_message.Message):
     ramp_up_rate_limit_percent_per_second: float
     ramp_down_rate_limit_percent_per_second: float
     base_load_order: int
+    uid: str
     def __init__(
         self,
         gear: _Optional[_Union[Gear, _Mapping]] = ...,
@@ -845,6 +888,7 @@ class Subsystem(_message.Message):
         ramp_up_rate_limit_percent_per_second: _Optional[float] = ...,
         ramp_down_rate_limit_percent_per_second: _Optional[float] = ...,
         base_load_order: _Optional[int] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...
 
 class Switchboard(_message.Message):
