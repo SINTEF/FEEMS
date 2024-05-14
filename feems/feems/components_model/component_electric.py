@@ -52,6 +52,7 @@ class ElectricComponent(BasicComponent):
         rated_speed: Speed_rpm = Speed_rpm(0),
         switchboard_id: SwbId = SwbId(0),
         file_name: str = None,
+        uid: Optional[str] = None,
     ):
         super().__init__(
             type_=type_,
@@ -61,6 +62,7 @@ class ElectricComponent(BasicComponent):
             rated_speed=rated_speed,
             eff_curve=eff_curve,
             file_name=file_name,
+            uid=uid,
         )
         self.power_type = power_type
         if power_type in [
@@ -91,6 +93,7 @@ class ElectricMachine(ElectricComponent):
         switchboard_id: SwbId = SwbId(0),
         number_poles: int = 1,
         eff_curve: np.ndarray = np.ones(1),
+        uid: Optional[str] = None,
     ):
         super(ElectricMachine, self).__init__(
             type_=type_,
@@ -100,6 +103,7 @@ class ElectricMachine(ElectricComponent):
             rated_speed=rated_speed,
             eff_curve=eff_curve,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
         self.number_of_poles = number_poles
 
@@ -203,6 +207,7 @@ class Battery(ElectricComponent):
         eff_charging: float = 0.975,
         eff_discharging: float = 0.975,
         switchboard_id: SwbId = SwbId(0),
+        uid: Optional[str] = None,
     ):
         rated_power = Power_kW(rated_capacity_kwh * discharge_rate_c)
         super().__init__(
@@ -211,6 +216,7 @@ class Battery(ElectricComponent):
             rated_power,
             power_type=TypePower.ENERGY_STORAGE,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
         self.rated_capacity_kWh = rated_capacity_kwh
         self.charging_rate_C = charging_rate_c
@@ -337,9 +343,16 @@ class SerialSystemElectric(SerialSystem):
         switchboard_id: SwbId,
         rated_power: Power_kW,
         rated_speed: Speed_rpm = Speed_rpm(0),
+        uid: Optional[str] = None,
     ):
         super(SerialSystemElectric, self).__init__(
-            type_, power_type, name, components, rated_power, rated_speed
+            type_=type_, 
+            power_type=power_type, 
+            name=name, 
+            components=components, 
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            uid=uid,
         )
 
         #: Set the load sharing mode 0 as default value if the component is either a power source,
@@ -361,6 +374,7 @@ class FuelCell(BasicComponent):
         eff_curve: np.ndarray,
         fuel_type: TypeFuel = TypeFuel.HYDROGEN,
         fuel_origin: FuelOrigin = FuelOrigin.RENEWABLE_NON_BIO,
+        uid: Optional[str] = None,
     ):
         super(FuelCell, self).__init__(
             type_=TypeComponent.FUEL_CELL,
@@ -368,6 +382,7 @@ class FuelCell(BasicComponent):
             name=name,
             rated_power=rated_power,
             eff_curve=eff_curve,
+            uid=uid,
         )
         self.fuel_type = fuel_type
         self.fuel_origin = fuel_origin
@@ -441,6 +456,7 @@ class FuelCellSystem(ElectricComponent):
         converter: ElectricComponent,
         switchboard_id: SwbId,
         number_modules: int = 1,
+        uid: Optional[str] = None,
     ):
         super(FuelCellSystem, self).__init__(
             name=name,
@@ -449,6 +465,7 @@ class FuelCellSystem(ElectricComponent):
             eff_curve=converter._efficiency_points,
             power_type=TypePower.POWER_SOURCE,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
         self.converter = converter
         self.fuel_cell = fuel_cell_module
@@ -515,6 +532,7 @@ class BatterySystem(Battery):
         battery: Battery,
         converter: ElectricComponent,
         switchboard_id: SwbId,
+        uid: Optional[str] = None,
     ):
         super().__init__(
             name=name,
@@ -525,6 +543,7 @@ class BatterySystem(Battery):
             eff_charging=battery.eff_charging,
             eff_discharging=battery.eff_discharging,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
         self.type = TypeComponent.BATTERY_SYSTEM
         self.rated_power = converter.rated_power
@@ -588,6 +607,7 @@ class Genset(Component):
         aux_engine: Engine,
         generator: ElectricMachine,
         rectifier: ElectricComponent = None,
+        uid: Optional[str] = None,
     ):
         super(Genset, self).__init__(
             name=name,
@@ -595,6 +615,7 @@ class Genset(Component):
             power_type=TypePower.POWER_SOURCE,
             rated_power=generator.rated_power,
             rated_speed=generator.rated_speed,
+            uid=uid,
         )
         self.fuel_type = aux_engine.fuel_type
         self.aux_engine = aux_engine
@@ -666,6 +687,7 @@ class PTIPTO(SerialSystemElectric):
         rated_power: Power_kW,
         rated_speed: Speed_rpm = Speed_rpm(0),
         shaft_line_id: int = 1,
+        uid: Optional[str] = None,
     ):
         super(PTIPTO, self).__init__(
             TypeComponent.PTI_PTO_SYSTEM,
@@ -675,6 +697,7 @@ class PTIPTO(SerialSystemElectric):
             switchboard_id,
             rated_power,
             rated_speed,
+            uid=uid,
         )
         self.shaft_line_id = shaft_line_id
         self.full_pti_mode = np.zeros(1).astype(bool)
@@ -691,6 +714,7 @@ class SuperCapacitor(ElectricComponent):
     :param eff_charging: Efficiency for charging in percentage
     :param eff_discharging: Efficiency for discharging in percentage
     :param switchboard_id: Switchboard ID
+    :param uid: Unique ID
     """
 
     def __init__(
@@ -702,6 +726,7 @@ class SuperCapacitor(ElectricComponent):
         eff_charging: float = 0.995,
         eff_discharging: float = 0.995,
         switchboard_id: SwbId = SwbId(0),
+        uid: Optional[str] = None,
     ):
         super().__init__(
             TypeComponent.SUPERCAPACITOR,
@@ -709,6 +734,7 @@ class SuperCapacitor(ElectricComponent):
             rated_power,
             power_type=TypePower.ENERGY_STORAGE,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
         self.rated_capacity_Wh = rated_capacity_wh
         self.soc0 = soc0
@@ -821,6 +847,7 @@ class SuperCapacitorSystem(SuperCapacitor):
         supercapacitor: SuperCapacitor,
         converter: ElectricComponent,
         switchboard_id: SwbId,
+        uid: Optional[str] = None,
     ):
         super().__init__(
             name=name,
@@ -830,6 +857,7 @@ class SuperCapacitorSystem(SuperCapacitor):
             eff_charging=supercapacitor.eff_charging,
             eff_discharging=supercapacitor.eff_discharging,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
         self.converter = converter
         self.supercapacitor = supercapacitor
@@ -882,7 +910,11 @@ class ShorePowerConnection(ElectricComponent):
     """
 
     def __init__(
-        self, name: str, rated_power: Power_kW, switchboard_id: SwbId = SwbId(0)
+        self, 
+        name: str, 
+        rated_power: Power_kW, 
+        switchboard_id: SwbId = SwbId(0),
+        uid: Optional[str] = None,
     ):
         super().__init__(
             TypeComponent.SHORE_POWER,
@@ -890,6 +922,7 @@ class ShorePowerConnection(ElectricComponent):
             rated_power,
             power_type=TypePower.POWER_SOURCE,
             switchboard_id=switchboard_id,
+            uid=uid,
         )
 
 
@@ -929,6 +962,7 @@ class COGES(Component):
         name: str,
         cogas: COGAS,
         generator: ElectricMachine,
+        uid: Optional[str] = None,
     ):
         super().__init__(
             name=name,
@@ -936,6 +970,7 @@ class COGES(Component):
             power_type=TypePower.POWER_SOURCE,
             rated_power=generator.rated_power,
             rated_speed=generator.rated_speed,
+            uid=uid,
         )
         self.fuel_type = cogas.fuel_type
         self.cogas = cogas

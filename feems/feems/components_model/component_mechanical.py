@@ -72,6 +72,7 @@ class Engine(Component):
         file_name: str = None,
         emissions_curves: List[EmissionCurve] = None,
         engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL,
+        uid: Optional[str] = None,
     ):
         super(Engine, self).__init__(
             name=name,
@@ -79,6 +80,7 @@ class Engine(Component):
             power_type=TypePower.POWER_SOURCE,
             rated_power=rated_power,
             rated_speed=rated_speed,
+            uid=uid,
         )
         self.fuel_type = fuel_type
         self.fuel_origin = fuel_origin
@@ -238,6 +240,7 @@ class EngineDualFuel(Engine):
         pilot_fuel_type: TypeFuel.DIESEL,
         pilot_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
         emissions_curves: List[EmissionCurve] = None,
+        uid: Optional[str] = None,
     ):
         super().__init__(
             type_=type_,
@@ -249,6 +252,7 @@ class EngineDualFuel(Engine):
             fuel_type=fuel_type,
             fuel_origin=fuel_origin,
             emissions_curves=emissions_curves,
+            uid=uid,
         )
         self.bspfc_curve = bspfc_curve
         self.pilot_fuel_type = pilot_fuel_type
@@ -321,6 +325,7 @@ class MainEngineForMechanicalPropulsion(Component):
         name,
         engine: Union[Engine, EngineDualFuel],
         shaft_line_id: int = 1,
+        uid: Optional[str] = None,
     ):
         super().__init__(
             name=name,
@@ -328,6 +333,7 @@ class MainEngineForMechanicalPropulsion(Component):
             type_=TypeComponent.MAIN_ENGINE,
             rated_power=engine.rated_power,
             rated_speed=engine.rated_speed,
+            uid=uid,
         )
         self.engine = engine
         self.shaft_line_id = shaft_line_id
@@ -392,9 +398,17 @@ class MechanicalPropulsionComponent(BasicComponent):
         rated_speed: Speed_rpm = Speed_rpm(0),
         shaft_line_id: int = 1,
         file_name: str = None,
+        uid: Optional[str] = None,
     ):
         super(MechanicalPropulsionComponent, self).__init__(
-            type_, power_type, name, rated_power, eff_curve, rated_speed, file_name
+            type_=type_, 
+            power_type=power_type,
+            name=name,
+            rated_power=rated_power,
+            eff_curve=eff_curve,
+            rated_speed=rated_speed,
+            file_name=file_name,
+            uid=uid,
         )
         self.shaft_line_id = shaft_line_id
 
@@ -406,11 +420,13 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         engine: Union[Engine, EngineDualFuel],
         gearbox: BasicComponent,
         shaft_line_id: int = 1,
+        uid: Optional[str] = None,
     ):
         super(MainEngineWithGearBoxForMechanicalPropulsion, self).__init__(
             name=name,
             engine=engine,
             shaft_line_id=shaft_line_id,
+            uid=uid,
         )
         self.gearbox = gearbox
 
@@ -478,6 +494,7 @@ class COGAS(BasicComponent):
         fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
         emissions_curves: List[EmissionCurve] = None,
         nox_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_3,
+        uid: Optional[str] = None,
     ):
         """Constructor for COGES component"""
         # Validate the inputs for curves. The length of the curves should be the same and the x values should be the same.
@@ -505,6 +522,7 @@ class COGAS(BasicComponent):
             rated_power=rated_power,
             eff_curve=eff_curve,
             rated_speed=rated_speed,
+            uid=uid,
         )
         self.gas_turbine_power_curve = gas_turbine_power_curve
         self.steam_turbine_power_curve = steam_turbine_power_curve

@@ -1,5 +1,6 @@
 from typing import Union, List, Tuple, Optional, TypeVar, Dict
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -52,6 +53,7 @@ class Component:
         power_type: TypePower,
         rated_power: Power_kW = Power_kW(0.0),
         rated_speed: Speed_rpm = Speed_rpm(0.0),
+        uid: Optional[str] = None,
     ):
         self.type = type_
         self.power_type = power_type
@@ -61,6 +63,8 @@ class Component:
         self.status = np.ones(1).astype(bool)  # Status on/off
         self.power_input = np.array([0])  # power input
         self.power_output = np.array([0])  # power output
+        # if uid is not given, create a random uid
+        self.uid = str(uuid4()) if uid is None else uid
 
     def get_type_name(self) -> str:
         return self.type.name
@@ -94,9 +98,15 @@ class BasicComponent(Component):
         eff_curve: np.ndarray = np.array([1]),
         rated_speed: Speed_rpm = Speed_rpm(0.0),
         file_name: str = None,
+        uid: Optional[str] = None,
     ):
         super(BasicComponent, self).__init__(
-            name, type_, power_type, rated_power, rated_speed
+            name=name, 
+            type_=type_, 
+            power_type=power_type, 
+            rated_power=rated_power, 
+            rated_speed=rated_speed, 
+            uid=uid
         )
         if file_name is not None:
             df = pd.read_csv(file_name, index_col=0)
@@ -417,6 +427,7 @@ class SerialSystem(BasicComponent):
         components: List[BasicComponent],
         rated_power: Power_kW = None,
         rated_speed: Speed_rpm = None,
+        uid: Optional[str] = None,
     ):
         self.component_names = []
         self.components = components
@@ -445,4 +456,5 @@ class SerialSystem(BasicComponent):
             rated_power=rated_power,
             rated_speed=rated_speed,
             eff_curve=efficiency_points,
+            uid=uid,
         )
