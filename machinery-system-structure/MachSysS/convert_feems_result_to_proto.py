@@ -73,7 +73,7 @@ class FEEMSResultConverter:
     def __init__(
         self,
         feems_result: Union[FEEMSResult, FEEMSResultForMachinerySystem],
-        system_feems: [
+        system_feems: Union[
             MechanicalPropulsionSystemWithElectricPowerSystem,
             ElectricPowerSystem,
             HybridPropulsionSystem,
@@ -193,7 +193,7 @@ class FEEMSResultConverter:
                 TypeComponent.BATTERY_SYSTEM,
             ]:
                 pass
-            elif power_source.type == [TypeComponent.PTI_PTO_SYSTEM]:
+            elif power_source.type == TypeComponent.PTI_PTO_SYSTEM:
                 pass
             else:
                 raise NotImplementedError(

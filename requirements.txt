@@ -1,5 +1,5 @@
 pandas
 numpy
 scipy
-protobuf
+protobuf~=4.21.12
 pandas
