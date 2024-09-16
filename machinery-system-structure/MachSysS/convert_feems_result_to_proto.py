@@ -73,7 +73,7 @@ class FEEMSResultConverter:
     def __init__(
         self,
         feems_result: Union[FEEMSResult, FEEMSResultForMachinerySystem],
-        system_feems: [
+        system_feems: Union[
             MechanicalPropulsionSystemWithElectricPowerSystem,
             ElectricPowerSystem,
             HybridPropulsionSystem,
@@ -193,7 +193,7 @@ class FEEMSResultConverter:
                 TypeComponent.BATTERY_SYSTEM,
             ]:
                 pass
-            elif power_source.type == [TypeComponent.PTI_PTO_SYSTEM]:
+            elif power_source.type == TypeComponent.PTI_PTO_SYSTEM:
                 pass
             else:
                 raise NotImplementedError(
@@ -278,7 +278,9 @@ class FEEMSResultConverter:
                     )
                 continue
             if key == "total_emission_kg":
-                result.nox_emission_total_kg = value[EmissionType.NOX]
+                result.nox_emission_total_kg = (
+                    value[EmissionType.NOX] if value is not None else 0.0
+                )
                 continue
             if hasattr(result, key):
                 if value is not None:
