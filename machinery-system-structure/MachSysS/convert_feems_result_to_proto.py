@@ -278,7 +278,9 @@ class FEEMSResultConverter:
                     )
                 continue
             if key == "total_emission_kg":
-                result.nox_emission_total_kg = value[EmissionType.NOX]
+                result.nox_emission_total_kg = (
+                    value[EmissionType.NOX] if value is not None else 0.0
+                )
                 continue
             if hasattr(result, key):
                 if value is not None:
