@@ -401,7 +401,7 @@ class MechanicalPropulsionComponent(BasicComponent):
         uid: Optional[str] = None,
     ):
         super(MechanicalPropulsionComponent, self).__init__(
-            type_=type_, 
+            type_=type_,
             power_type=power_type,
             name=name,
             rated_power=rated_power,

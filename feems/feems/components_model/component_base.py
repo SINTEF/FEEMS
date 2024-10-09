@@ -101,12 +101,12 @@ class BasicComponent(Component):
         uid: Optional[str] = None,
     ):
         super(BasicComponent, self).__init__(
-            name=name, 
-            type_=type_, 
-            power_type=power_type, 
-            rated_power=rated_power, 
-            rated_speed=rated_speed, 
-            uid=uid
+            name=name,
+            type_=type_,
+            power_type=power_type,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            uid=uid,
         )
         if file_name is not None:
             df = pd.read_csv(file_name, index_col=0)
