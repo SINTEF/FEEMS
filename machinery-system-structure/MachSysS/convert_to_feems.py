@@ -75,6 +75,7 @@ from feems.types_for_feems import (
     EmissionCurvePoint,
     EmissionType,
     NOxCalculationMethod,
+    EngineCycleType,
 )
 
 import MachSysS.system_structure_pb2 as proto
@@ -245,6 +246,7 @@ def convert_proto_engine_to_feems(
             pilot_fuel_origin=FuelOrigin(proto_engine.pilot_fuel.fuel_origin),
             nox_calculation_method=nox_calculation_method,
             emissions_curves=emission_curves,
+            engine_cycle_type=EngineCycleType(proto_engine.engine_cycle_type),
             uid=proto_engine.uid if len(proto_engine.uid) > _MIN_LENGTH_UID else None,
         )
     return Engine(
