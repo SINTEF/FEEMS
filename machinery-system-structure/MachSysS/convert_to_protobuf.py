@@ -290,6 +290,7 @@ def convert_engine_component_to_protobuf(
         emission_curves=convert_emission_curves_to_protobuf(
             engine_feems.emission_curves
         ),
+        engine_cycle_type=engine_feems.engine_cycle_type.value,
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
         uid=engine_feems.uid,
     )
