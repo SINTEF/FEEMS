@@ -23,6 +23,10 @@ class TypeFuel(Enum):
     ETHANOL = 7
     METHANOL = 8
     LFO = 9
+    LSFO_CRUDE = 10
+    LSFO_BLEND = 11
+    ULSFO = 12
+    VLSFO = 13
 
 
 @unique
@@ -81,6 +85,10 @@ _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING = {
     TypeFuel.ETHANOL: "Ethanol",
     TypeFuel.METHANOL: "Methanol",
     TypeFuel.LFO: "LFO",
+    TypeFuel.LSFO_CRUDE: "LSFO (Crude)",
+    TypeFuel.LSFO_BLEND: "LSFO (Blend)",
+    TypeFuel.ULSFO: "ULSFO",
+    TypeFuel.VLSFO: "VLSFO",
 }
 
 
@@ -354,6 +362,22 @@ def get_prescribed_factors(
         lhv_mj_per_g,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj,
         ghg_emission_factor_tank_to_wake,
+    )
+
+
+def get_ghg_factors_for_fuel_eu_maritime(
+    fuel_type: TypeFuel,
+    origin: FuelOrigin,
+    fuel_consumer_class: FuelConsumerClassFuelEUMaritime,
+) -> PrescribedFactors:
+    """Get the GHG emission factors for fuel specified by EU Maritime Fuel"""
+    fuel_class = _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING[origin]
+    fuel_type_eu = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[fuel_type]
+    fuel_consumer_class_str = _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING[
+        fuel_consumer_class
+    ]
+    return _DF_GHG_FACTORS_DICTIONARY["eu"].query(
+        f"pathway_name == '{fuel_type_eu}' and fuel_class == '{fuel_class}' and fuel_consumer_unit_class == '{fuel_consumer_class_str}'"
     )
 
 

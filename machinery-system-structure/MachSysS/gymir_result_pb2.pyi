@@ -12,7 +12,7 @@ from typing import (
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class GymirResult(_message.Message):
-    __slots__ = ("name", "auxiliary_load_kw", "result")
+    __slots__ = ["name", "auxiliary_load_kw", "result"]
     NAME_FIELD_NUMBER: _ClassVar[int]
     AUXILIARY_LOAD_KW_FIELD_NUMBER: _ClassVar[int]
     RESULT_FIELD_NUMBER: _ClassVar[int]
@@ -27,7 +27,7 @@ class GymirResult(_message.Message):
     ) -> None: ...
 
 class SimulationInstance(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "epoch_s",
         "task_type",
         "task_name",
@@ -50,7 +50,7 @@ class SimulationInstance(_message.Message):
         "torque_k_nm",
         "thrust_k_n",
         "total_resistance_k_n",
-    )
+    ]
     EPOCH_S_FIELD_NUMBER: _ClassVar[int]
     TASK_TYPE_FIELD_NUMBER: _ClassVar[int]
     TASK_NAME_FIELD_NUMBER: _ClassVar[int]
@@ -122,7 +122,7 @@ class SimulationInstance(_message.Message):
     ) -> None: ...
 
 class PropulsionPowerInstance(_message.Message):
-    __slots__ = ("epoch_s", "propulsion_power_kw", "auxiliary_power_kw")
+    __slots__ = ["epoch_s", "propulsion_power_kw", "auxiliary_power_kw"]
     EPOCH_S_FIELD_NUMBER: _ClassVar[int]
     PROPULSION_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     AUXILIARY_POWER_KW_FIELD_NUMBER: _ClassVar[int]
@@ -137,7 +137,7 @@ class PropulsionPowerInstance(_message.Message):
     ) -> None: ...
 
 class OperationProfilePoint(_message.Message):
-    __slots__ = ("epoch_s", "speed_kn", "draft_m")
+    __slots__ = ["epoch_s", "speed_kn", "draft_m"]
     EPOCH_S_FIELD_NUMBER: _ClassVar[int]
     SPEED_KN_FIELD_NUMBER: _ClassVar[int]
     DRAFT_M_FIELD_NUMBER: _ClassVar[int]
@@ -152,11 +152,11 @@ class OperationProfilePoint(_message.Message):
     ) -> None: ...
 
 class TimeSeriesResult(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "propulsion_power_timeseries",
         "auxiliary_power_kw",
         "operation_profile",
-    )
+    ]
     PROPULSION_POWER_TIMESERIES_FIELD_NUMBER: _ClassVar[int]
     AUXILIARY_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     OPERATION_PROFILE_FIELD_NUMBER: _ClassVar[int]

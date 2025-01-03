@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "feems"
-version = "0.10.9"
+version = "0.10.10"
 description = ""
 authors = ["Kevin Koosup Yum <kevinkoosup.yum@sintef.no>"]
 readme = "readme.md"
