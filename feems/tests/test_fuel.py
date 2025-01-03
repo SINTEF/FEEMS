@@ -1,4 +1,5 @@
 import random
+from typing import List
 
 import numpy as np
 import pytest
@@ -10,6 +11,7 @@ from feems.fuel import (
     TypeFuel,
     FuelOrigin,
     FuelConsumerClassFuelEUMaritime,
+    get_ghg_factors_for_fuel_eu_maritime,
     _GWP100_N2O,
     _GWP100_CH4,
 )
@@ -51,7 +53,7 @@ def test_fuel_class():
         )
         for fuel_type in TypeFuel:
             for origin in FuelOrigin:
-                if origin not in [FuelOrigin.NONE, FuelOrigin.BIO]:
+                if origin not in [FuelOrigin.NONE]:
                     try:
                         fuel = Fuel(
                             fuel_type=fuel_type,
@@ -64,10 +66,6 @@ def test_fuel_class():
                     for fuel_kind_by_consumer in fuel.ghg_emission_factor_tank_to_wake:
                         name = fuel.fuel_type.name
                         origin = fuel.origin.name
-                        if isinstance(fuel_kind_by_consumer.fuel_consumer_class, float):
-                            import pdb
-
-                            pdb.set_trace()
                         consumer_type = (
                             fuel_kind_by_consumer.fuel_consumer_class.name
                             if isinstance(
@@ -82,6 +80,16 @@ def test_fuel_class():
                         )
                         ghg_wtw = ghg_ttw + ghg_wtt
                         ghg_wtw_per_mj = ghg_wtw / fuel.lhv_mj_per_g
+                        if specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
+                            fuel_data = get_ghg_factors_for_fuel_eu_maritime(
+                                fuel_type=fuel.fuel_type,
+                                origin=fuel.origin,
+                                fuel_consumer_class=fuel_kind_by_consumer.fuel_consumer_class,
+                            )
+                            if not np.isnan(fuel_data.WTW_energy.values[0]):
+                                assert fuel_data.WTW_energy.values[0] == pytest.approx(
+                                    ghg_wtw_per_mj
+                                ), f"WTW energy is not equal for fuel {name}, origin {origin} and consumer {consumer_type} ({fuel_data.WTW_energy.values[0]} != {ghg_wtw_per_mj})"
                         lhv_mj_per_kg = fuel.lhv_mj_per_g * 1000
                         print(
                             f"{name}\t{ghg_wtt:.2f}\t{ghg_ttw:.2f}\t{ghg_wtw}\t{ghg_wtw_per_mj}"
@@ -110,7 +118,7 @@ def create_random_fuel_by_mass_fraction(
         fuel_types = np.random.choice(
             fuel_types_available_for_test, size=number_fuel_type, replace=False
         )
-        fuel_list = []
+        fuel_list: List[Fuel] = []
         fuel_origins = np.random.choice(
             [FuelOrigin.FOSSIL, FuelOrigin.RENEWABLE_NON_BIO],
             size=number_fuel_type,
@@ -199,20 +207,73 @@ def test_fuel_by_mass_fraction_class(subtests: SubTests):
 
 def test_fuel_consumption_class():
     # Test FuelConsumption class
-    pass
-    # fuel = create_random_fuel_by_mass_fraction()
-    # fuel_consumption_each = 10
-    # fuel_consumption_kg_per_h = FuelConsumption(
-    #     total_fuel_consumption=fuel_consumption_each, fuel_by_mass_fraction=fuel
-    # )
-    #
-    # fuel_consumption_kg_per_h_new = fuel_consumption_kg_per_h + fuel_consumption_kg_per_h
-    # assert fuel_consumption_kg_per_h_new.total_fuel_consumption == pytest.approx(
-    #     2 * fuel_consumption_each
-    # )
-    #
-    # for fuel_type in fuel_consumption_kg_per_h.__dict__:
-    #     if not fuel_type.startswith("_"):
-    #         assert getattr(fuel_consumption_kg_per_h_new, fuel_type) == pytest.approx(
-    #             2 * getattr(fuel_consumption_kg_per_h, fuel_type)
-    #         )
+    fuel_by_mass_fraction = FuelByMassFraction(
+        fuels=[
+            Fuel(
+                fuel_type=TypeFuel.NATURAL_GAS,
+                origin=FuelOrigin.FOSSIL,
+                fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME,
+                mass_or_mass_fraction=0.9,
+            ),
+            Fuel(
+                fuel_type=TypeFuel.DIESEL,
+                origin=FuelOrigin.FOSSIL,
+                fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME,
+                mass_or_mass_fraction=0.1,
+            ),
+        ]
+    )
+
+    total_fuel_consumption_kg = 10
+    fuels = [
+        Fuel(
+            fuel_type=each_fuel_by_mass_fraction.fuel_type,
+            origin=each_fuel_by_mass_fraction.origin,
+            fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME,
+            mass_or_mass_fraction=each_fuel_by_mass_fraction.mass_or_mass_fraction
+            * total_fuel_consumption_kg,
+        )
+        for each_fuel_by_mass_fraction in fuel_by_mass_fraction.fuels
+    ]
+
+    multi_fuel_consumption = FuelConsumption(
+        fuels=fuels,
+    )
+
+    # Verify the total ghg factor
+    total_co2_kg = multi_fuel_consumption.get_total_co2_emissions(
+        fuel_consumer_class=FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED
+    )
+    total_fuel_energy_mj = sum(
+        [fuel.lhv_mj_per_g * fuel.mass_or_mass_fraction * 1e3 for fuel in fuels]
+    )
+    total_ghg_intensity_gco2_per_mj = total_co2_kg * 1000 / total_fuel_energy_mj
+    total_ghg_intensity_gco2_per_gfuel_list = [
+        (
+            fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
+            + fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                fuel_consumer_class=(
+                    FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED
+                    if fuel.fuel_type == TypeFuel.NATURAL_GAS
+                    else FuelConsumerClassFuelEUMaritime.ICE
+                )
+            )
+        )
+        * fuel_fraction.mass_or_mass_fraction
+        for fuel, fuel_fraction in zip(fuels, fuel_by_mass_fraction.fuels)
+    ]
+    average_lhv_mj_per_g = sum(
+        [
+            fuel.lhv_mj_per_g * fuel_fraction.mass_or_mass_fraction
+            for fuel, fuel_fraction in zip(fuels, fuel_by_mass_fraction.fuels)
+        ]
+    )
+    total_ghg_intensity_gco2_per_mj_expected = (
+        sum(total_ghg_intensity_gco2_per_gfuel_list) / average_lhv_mj_per_g
+    )
+    print(total_ghg_intensity_gco2_per_gfuel_list)
+    print(total_ghg_intensity_gco2_per_mj_expected)
+    print(total_ghg_intensity_gco2_per_mj)
+    assert total_ghg_intensity_gco2_per_mj == pytest.approx(
+        total_ghg_intensity_gco2_per_mj_expected
+    )

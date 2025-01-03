@@ -241,6 +241,7 @@ class EngineDualFuel(Engine):
         pilot_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
         emissions_curves: List[EmissionCurve] = None,
         uid: Optional[str] = None,
+        engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL,
     ):
         super().__init__(
             type_=type_,
@@ -253,6 +254,7 @@ class EngineDualFuel(Engine):
             fuel_origin=fuel_origin,
             emissions_curves=emissions_curves,
             uid=uid,
+            engine_cycle_type=engine_cycle_type,
         )
         self.bspfc_curve = bspfc_curve
         self.pilot_fuel_type = pilot_fuel_type
@@ -401,7 +403,7 @@ class MechanicalPropulsionComponent(BasicComponent):
         uid: Optional[str] = None,
     ):
         super(MechanicalPropulsionComponent, self).__init__(
-            type_=type_, 
+            type_=type_,
             power_type=power_type,
             name=name,
             rated_power=rated_power,
