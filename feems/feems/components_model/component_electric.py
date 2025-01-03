@@ -346,10 +346,10 @@ class SerialSystemElectric(SerialSystem):
         uid: Optional[str] = None,
     ):
         super(SerialSystemElectric, self).__init__(
-            type_=type_, 
-            power_type=power_type, 
-            name=name, 
-            components=components, 
+            type_=type_,
+            power_type=power_type,
+            name=name,
+            components=components,
             rated_power=rated_power,
             rated_speed=rated_speed,
             uid=uid,
@@ -910,9 +910,9 @@ class ShorePowerConnection(ElectricComponent):
     """
 
     def __init__(
-        self, 
-        name: str, 
-        rated_power: Power_kW, 
+        self,
+        name: str,
+        rated_power: Power_kW,
         switchboard_id: SwbId = SwbId(0),
         uid: Optional[str] = None,
     ):
