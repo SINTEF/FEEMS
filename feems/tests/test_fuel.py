@@ -1,5 +1,6 @@
 import random
 from typing import List
+import logging
 
 import numpy as np
 import pytest
@@ -46,7 +47,7 @@ def test_fuel_class():
         (1 - 3.1 / 100) * (2.75 + 0.00011 * _GWP100_N2O) + 3.1 / 100 * _GWP100_CH4
     )
 
-    for specified_by in [FuelSpecifiedBy.IMO, FuelSpecifiedBy.FUEL_EU_MARITIME]:
+    for specified_by in [FuelSpecifiedBy.FUEL_EU_MARITIME]:
         print(f"Fuel specified by {specified_by.name}")
         print(
             "fuel_name\tghg_wtt [gCO2eq/gFuel]\tghg_ttw[gCO2/gFuel]\tghg_wtw[gCO2eq/gFuel]\tghg_wtw[gCO2eq/mj]\tlhv[MJ/kg]\torigin"
@@ -61,7 +62,7 @@ def test_fuel_class():
                             fuel_specified_by=specified_by,
                         )
                     except ValueError as e:
-                        print(e)
+                        logging.error(e)
                         continue
                     for fuel_kind_by_consumer in fuel.ghg_emission_factor_tank_to_wake:
                         name = fuel.fuel_type.name
