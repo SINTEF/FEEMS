@@ -69,7 +69,7 @@ for path in [_PATH_TO_FUELEU_MARITIME_GHG_FACTORS, _PATH_TO_IMO_GHG_FACTORS]:
 
 _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING = {
     FuelOrigin.FOSSIL: "Fossil",
-    FuelOrigin.BIO: "Bio",
+    FuelOrigin.BIO: "BIO",
     FuelOrigin.RENEWABLE_NON_BIO: "RFNBO",
 }
 
