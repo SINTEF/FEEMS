@@ -163,6 +163,58 @@ class GhgEmissionFactorTankToWake:
         ) + self.c_slip_percent / 100 * _GWP100_CH4
 
 
+@dataclass
+class GHGEmissions:
+    tank_to_wake_kg_or_gco2eq_per_gfuel: Union[float, np.ndarray] = 0.0
+    well_to_tank_kg_or_gco2eq_per_gfuel: Union[float, np.ndarray] = 0.0
+    
+    @property
+    def well_to_wake_kg(self):
+        return self.tank_to_wake_kg_or_gco2eq_per_gfuel + self.well_to_tank_kg_or_gco2eq_per_gfuel
+    
+    def __add__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel + other.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel + other.well_to_tank_kg_or_gco2eq_per_gfuel,
+        )
+        
+    def __radd__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return self.__add__(other)
+    
+    def __mul__(self, other: float) -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel * other,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel * other,
+        )
+        
+    def __rmul__(self, other: float) -> "GHGEmissions":
+        return self.__mul__(other)
+    
+    def __truediv__(self, other: float) -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel / other,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel / other,
+        )
+        
+    def __rtruediv__(self, other: float) -> "GHGEmissions":
+        return self.__truediv__(other)
+    
+    def __sub__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel - other.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel - other.well_to_tank_kg_or_gco2eq_per_gfuel,
+        )
+        
+    def __rsub__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return self.__sub__(other)
+    
+    def __neg__(self) -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            well_to_tank_kg_or_gco2eq_per_gfuel=-self.well_to_tank_kg_or_gco2eq_per_gfuel,
+        )
+
+
 class Fuel:
     fuel_type: TypeFuel
     origin: FuelOrigin
@@ -431,7 +483,7 @@ class FuelByMassFraction:
 
     def get_kg_co2_per_kg_fuel(
         self, fuel_consumer_class: Optional[FuelConsumerClassFuelEUMaritime] = None
-    ) -> float:
+    ) -> GHGEmissions:
         """Returns the GHG emission factor from tank to wake in gCO2eq/gfuel as defined by IMO or EU
 
         Args:
@@ -439,7 +491,7 @@ class FuelByMassFraction:
                 It should be provided if the organization is "eu". Defaults to None.
 
         Returns:
-            float: GHG emission factor from tank to wake in gCO2eq/gfuel
+            GHGEmissions: GHG emission factor from tank to wake in gCO2eq/gfuel
         """
 
         if self.fuel_specified_by == FuelSpecifiedBy.IMO:
@@ -456,32 +508,32 @@ class FuelByMassFraction:
             raise ValueError(
                 "The fuel is not specified by properly for this calculation."
             )
-        res = 0
+        res = GHGEmissions(tank_to_wake_kg_or_gco2eq_per_gfuel=0, well_to_tank_kg_or_gco2eq_per_gfuel=0)
         for fuel in self.fuels:
             # If the fuel contains other fuel than LNG and the consumer is a gas engine,
             # the GHG factor for those fuel should be calculated as generic internal combustion
             # engine (ICE)
             if fuel_consumer_class is not None and "LNG" in fuel_consumer_class.name:
                 if fuel.fuel_type != TypeFuel.NATURAL_GAS:
-                    res += (
-                        fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                    res += GHGEmissions(
+                        tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
                             fuel_consumer_class=FuelConsumerClassFuelEUMaritime.ICE
-                        )
-                        + fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
+                        ),
+                        well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
                     ) * fuel.mass_or_mass_fraction
                 else:
-                    res += (
-                        fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                    res += GHGEmissions(
+                        tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
                             fuel_consumer_class=fuel_consumer_class
-                        )
-                        + fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
+                        ),
+                        well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
                     ) * fuel.mass_or_mass_fraction
             else:
-                res += (
-                    fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                res += GHGEmissions(
+                    tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
                         fuel_consumer_class=fuel_consumer_class
-                    )
-                    + fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
+                    ),
+                    well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
                 ) * fuel.mass_or_mass_fraction
 
         return res
@@ -625,7 +677,7 @@ class FuelConsumption:
 
     def get_total_co2_emissions(
         self, fuel_consumer_class: FuelConsumerClassFuelEUMaritime = None
-    ) -> Union[float, np.ndarray]:
+    ) -> GHGEmissions:
         """Returns the total CO2 emissions in kg or kg/s depending on the context.
 
         Args:

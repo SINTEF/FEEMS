@@ -30,7 +30,7 @@ class EmissionType(Enum):
 
 @dataclass
 class FEEMSResult:
-    from feems.fuel import FuelConsumption, FuelByMassFraction
+    from feems.fuel import FuelConsumption, FuelByMassFraction, GHGEmissions
 
     duration_s: Optional[float] = None
     energy_consumption_electric_total_mj: float = 0.0
@@ -48,7 +48,7 @@ class FEEMSResult:
     multi_fuel_consumption_total_kg: FuelConsumption = field(
         default_factory=FuelConsumption
     )
-    co2_emission_total_kg: float = 0.0
+    co2_emission_total_kg: GHGEmissions = field(default_factory=GHGEmissions)
     energy_input_mechanical_total_mj: float = (
         0.0  # Energy input for generator / PTO (electric side) or PTI (mechanical side)
     )

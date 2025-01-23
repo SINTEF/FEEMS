@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import Union, List, Dict, Optional, cast
 
 from feems.components_model.component_electric import FuelCellSystem
-from feems.fuel import FuelSpecifiedBy
+from feems.fuel import FuelSpecifiedBy, GHGEmissions
 from feems.types_for_feems import FEEMSResult, TypeComponent, EmissionType
 from feems.system_model import (
     MechanicalPropulsionSystemWithElectricPowerSystem,
@@ -197,7 +197,8 @@ class FEEMSResultConverter:
                 pass
             else:
                 raise NotImplementedError(
-                    f"Retrieving time series data for component type {power_source.type} "
+                    f"Retrieving time series data for component type {
+                        power_source.type} "
                     f"is not implemented."
                 )
             self._time_series_data_for_electric_component.append(
@@ -282,6 +283,15 @@ class FEEMSResultConverter:
                     value[EmissionType.NOX] if value is not None else 0.0
                 )
                 continue
+            if key == "co2_emission_total_kg":
+                result.co2_emission_total_kg.CopyFrom(
+                    proto.GHGEmissions(
+                        well_to_tank=value.well_to_tank_kg_or_gco2eq_per_gfuel,
+                        tank_to_wake=value.tank_to_wake_kg_or_gco2eq_per_gfuel,
+                        well_to_wake=value.well_to_wake_kg,
+                    )
+                )
+                continue
             if hasattr(result, key):
                 if value is not None:
                     setattr(result, key, value)
@@ -291,7 +301,8 @@ class FEEMSResultConverter:
             else:
                 if verbose:
                     logger.warning(
-                        f"There is no matching key in Protobuf message for {key}"
+                        f"There is no matching key in Protobuf message for {
+                            key}"
                     )
         if feems_result.detail_result is not None:
             for (
@@ -318,6 +329,16 @@ class FEEMSResultConverter:
                                     )
                                 )
                             continue
+                        if key_result_per_component == "co2_emissions_kg":
+                            value = cast(GHGEmissions, value)
+                            result_per_component.co2_emissions_kg.CopyFrom(
+                                proto.GHGEmissions(
+                                    well_to_tank=value.well_to_tank_kg_or_gco2eq_per_gfuel,
+                                    tank_to_wake=value.tank_to_wake_kg_or_gco2eq_per_gfuel,
+                                    well_to_wake=value.well_to_wake_kg,
+                                )
+                            )
+                            continue
                         if value is not None:
                             setattr(
                                 result_per_component, key_result_per_component, value
@@ -328,7 +349,8 @@ class FEEMSResultConverter:
                     else:
                         if verbose:
                             logger.warning(
-                                f"There is no matching key in Protobuf message for {key} in "
+                                f"There is no matching key in Protobuf message for {
+                                    key} in "
                                 f"{component_name}: {key_result_per_component}"
                             )
                 if include_time_series_for_components:

@@ -119,6 +119,21 @@ class TimeSeriesResultForComponent(_message.Message):
         ] = ...,
     ) -> None: ...
 
+class GHGEmissions(_message.Message):
+    __slots__ = ["well_to_tank", "tank_to_wake", "well_to_wake"]
+    WELL_TO_TANK_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    WELL_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    well_to_tank: float
+    tank_to_wake: float
+    well_to_wake: float
+    def __init__(
+        self,
+        well_to_tank: _Optional[float] = ...,
+        tank_to_wake: _Optional[float] = ...,
+        well_to_wake: _Optional[float] = ...,
+    ) -> None: ...
+
 class ResultPerComponent(_message.Message):
     __slots__ = [
         "component_name",
@@ -156,7 +171,7 @@ class ResultPerComponent(_message.Message):
     mechanical_energy_consumption_mj: float
     energy_stored_mj: float
     running_hours_h: float
-    co2_emissions_kg: float
+    co2_emissions_kg: GHGEmissions
     nox_emissions_kg: float
     component_type: str
     rated_capacity: float
@@ -174,7 +189,7 @@ class ResultPerComponent(_message.Message):
         mechanical_energy_consumption_mj: _Optional[float] = ...,
         energy_stored_mj: _Optional[float] = ...,
         running_hours_h: _Optional[float] = ...,
-        co2_emissions_kg: _Optional[float] = ...,
+        co2_emissions_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ...,
         nox_emissions_kg: _Optional[float] = ...,
         component_type: _Optional[str] = ...,
         rated_capacity: _Optional[float] = ...,
@@ -230,7 +245,7 @@ class FeemsResult(_message.Message):
     running_hours_genset_total_hr: float
     running_hours_fuel_cell_total_hr: float
     running_hours_pti_pto_total_hr: float
-    co2_emission_total_kg: float
+    co2_emission_total_kg: GHGEmissions
     nox_emission_total_kg: float
     detailed_result: _containers.RepeatedCompositeFieldContainer[ResultPerComponent]
     energy_input_mechanical_total_mj: float
@@ -250,7 +265,7 @@ class FeemsResult(_message.Message):
         running_hours_genset_total_hr: _Optional[float] = ...,
         running_hours_fuel_cell_total_hr: _Optional[float] = ...,
         running_hours_pti_pto_total_hr: _Optional[float] = ...,
-        co2_emission_total_kg: _Optional[float] = ...,
+        co2_emission_total_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ...,
         nox_emission_total_kg: _Optional[float] = ...,
         detailed_result: _Optional[
             _Iterable[_Union[ResultPerComponent, _Mapping]]
