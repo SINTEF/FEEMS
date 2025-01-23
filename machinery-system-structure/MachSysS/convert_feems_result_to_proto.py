@@ -300,8 +300,7 @@ class FEEMSResultConverter:
             else:
                 if verbose:
                     logger.warning(
-                        f"There is no matching key in Protobuf message for {
-                            key}"
+                        f"There is no matching key in Protobuf message for {key}"
                     )
         if feems_result.detail_result is not None:
             for (
@@ -348,8 +347,7 @@ class FEEMSResultConverter:
                     else:
                         if verbose:
                             logger.warning(
-                                f"There is no matching key in Protobuf message for {
-                                    key} in "
+                                f"There is no matching key in Protobuf message for {key} in "
                                 f"{component_name}: {key_result_per_component}"
                             )
                 if include_time_series_for_components:
