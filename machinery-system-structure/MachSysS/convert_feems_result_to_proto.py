@@ -197,8 +197,7 @@ class FEEMSResultConverter:
                 pass
             else:
                 raise NotImplementedError(
-                    f"Retrieving time series data for component type {
-                        power_source.type} "
+                    f"Retrieving time series data for component type {power_source.type} "
                     f"is not implemented."
                 )
             self._time_series_data_for_electric_component.append(
