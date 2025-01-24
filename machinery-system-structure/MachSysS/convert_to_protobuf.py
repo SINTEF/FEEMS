@@ -264,7 +264,7 @@ def convert_emission_curves_to_protobuf(
                     for each_point in each_curve.points_per_kwh
                 ]
             ),
-            emission_type=proto.EmissionType.Value(each_curve.emission_type.value),
+            emission_type=each_curve.emission.value,
         )
         for each_curve in emission_curves_feems
     ]
@@ -290,6 +290,7 @@ def convert_engine_component_to_protobuf(
         emission_curves=convert_emission_curves_to_protobuf(
             engine_feems.emission_curves
         ),
+        engine_cycle_type=engine_feems.engine_cycle_type.value,
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
         uid=engine_feems.uid,
     )
