@@ -43,6 +43,8 @@ message GHGEmissions {
     double well_to_tank = 1;
     double tank_to_wake = 2;
     double well_to_wake = 3;
+    double tank_to_wake_without_slip = 4;
+    double well_to_wake_without_slip = 5;
 }
 
 message ResultPerComponent {

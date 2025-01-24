@@ -25,9 +25,7 @@ def test_fuel_class():
         origin=FuelOrigin.FOSSIL,
         fuel_specified_by=FuelSpecifiedBy.IMO,
     )
-    assert fuel_by_imo.ghg_emission_factor_well_to_tank_gco2_per_gfuel == pytest.approx(
-        0
-    )
+    assert fuel_by_imo.ghg_emission_factor_well_to_tank_gco2_per_gfuel == pytest.approx(0)
     assert len(fuel_by_imo.ghg_emission_factor_tank_to_wake) == 1
     assert fuel_by_imo.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel() == 3.206
     assert fuel_by_imo.lhv_mj_per_g == 0.0427
@@ -37,15 +35,11 @@ def test_fuel_class():
         origin=FuelOrigin.FOSSIL,
         fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME,
     )
-    assert fuel_by_eu.ghg_emission_factor_well_to_tank_gco2eq_per_mj == pytest.approx(
-        18.5
-    )
+    assert fuel_by_eu.ghg_emission_factor_well_to_tank_gco2eq_per_mj == pytest.approx(18.5)
     assert len(fuel_by_eu.ghg_emission_factor_tank_to_wake) == 5
     assert fuel_by_eu.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
         fuel_consumer_class=FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED,
-    ) == pytest.approx(
-        (1 - 3.1 / 100) * (2.75 + 0.00011 * _GWP100_N2O) + 3.1 / 100 * _GWP100_CH4
-    )
+    ) == pytest.approx((1 - 3.1 / 100) * (2.75 + 0.00011 * _GWP100_N2O) + 3.1 / 100 * _GWP100_CH4)
 
     for specified_by in [FuelSpecifiedBy.FUEL_EU_MARITIME]:
         print(f"Fuel specified by {specified_by.name}")
@@ -150,7 +144,12 @@ def create_random_fuel_by_mass_fraction(
 
 def test_fuel_by_mass_fraction_class(subtests: SubTests):
     with subtests.test(msg="Test fuel with no component"):
-        assert FuelByMassFraction(fuels=[]).get_kg_co2_per_kg_fuel().well_to_wake_kg == 0
+        assert (
+            FuelByMassFraction(fuels=[])
+            .get_kg_co2_per_kg_fuel()
+            .well_to_wake_kg_or_gco2eq_per_gfuel
+            == 0
+        )
 
     with subtests.test(msg="Test fuel with random components for IMO specified fuels"):
         fuel_by_mass_fraction = create_random_fuel_by_mass_fraction(4)
@@ -159,19 +158,22 @@ def test_fuel_by_mass_fraction_class(subtests: SubTests):
         lhv = 0
         for fuel in fuel_by_mass_fraction.fuels:
             lhv += fuel.mass_or_mass_fraction * fuel.lhv_mj_per_g * 1000
-            ghg_factor_wtt += fuel.mass_or_mass_fraction * fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
-            ghg_factor_ttw += fuel.mass_or_mass_fraction * fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel()
+            ghg_factor_wtt += (
+                fuel.mass_or_mass_fraction * fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
+            )
+            ghg_factor_ttw += (
+                fuel.mass_or_mass_fraction
+                * fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel()
+            )
         ghg_factors = fuel_by_mass_fraction.get_kg_co2_per_kg_fuel()
         assert ghg_factors.well_to_tank_kg_or_gco2eq_per_gfuel == pytest.approx(ghg_factor_wtt)
         assert ghg_factors.tank_to_wake_kg_or_gco2eq_per_gfuel == pytest.approx(ghg_factor_ttw)
-        assert ghg_factors.well_to_wake_kg == pytest.approx(
+        assert ghg_factors.well_to_wake_kg_or_gco2eq_per_gfuel == pytest.approx(
             ghg_factor_wtt + ghg_factor_ttw
         )
         assert fuel_by_mass_fraction.lhv_mj_per_kg == pytest.approx(lhv)
 
-    with subtests.test(
-        msg="Test fuel with random components for FuelEU specified fuels"
-    ):
+    with subtests.test(msg="Test fuel with random components for FuelEU specified fuels"):
         fuel_by_mass_fraction = create_random_fuel_by_mass_fraction(
             number_fuel_type=3, fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME
         )
@@ -188,25 +190,28 @@ def test_fuel_by_mass_fraction_class(subtests: SubTests):
         for fuel in fuel_by_mass_fraction.fuels:
             lhv += fuel.mass_or_mass_fraction * fuel.lhv_mj_per_g * 1000
             if fuel.fuel_type == TypeFuel.NATURAL_GAS:
-                fuel_consumption_class_each = (
-                    FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED
-                )
+                fuel_consumption_class_each = FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED
             elif fuel.fuel_type == TypeFuel.HYDROGEN:
                 fuel_consumption_class_each = FuelConsumerClassFuelEUMaritime.FUEL_CELL
             else:
                 fuel_consumption_class_each = FuelConsumerClassFuelEUMaritime.ICE
-            ghg_factor_wtt += fuel.mass_or_mass_fraction * fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
-            ghg_factor_ttw += fuel.mass_or_mass_fraction * fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
-                fuel_consumer_class=fuel_consumption_class_each,
+            ghg_factor_wtt += (
+                fuel.mass_or_mass_fraction * fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
+            )
+            ghg_factor_ttw += (
+                fuel.mass_or_mass_fraction
+                * fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                    fuel_consumer_class=fuel_consumption_class_each,
+                )
             )
             if np.isnan(ghg_factor_wtt) or np.isnan(ghg_factor_ttw):
                 pass
         ghg_factors = fuel_by_mass_fraction.get_kg_co2_per_kg_fuel(
             fuel_consumer_class=fuel_consumer_class
         )
-        assert ghg_factors.tank_to_wake_kg_or_gco2eq_per_gfuel== pytest.approx(ghg_factor_ttw)
+        assert ghg_factors.tank_to_wake_kg_or_gco2eq_per_gfuel == pytest.approx(ghg_factor_ttw)
         assert ghg_factors.well_to_tank_kg_or_gco2eq_per_gfuel == pytest.approx(ghg_factor_wtt)
-        assert ghg_factors.well_to_wake_kg == pytest.approx(
+        assert ghg_factors.well_to_wake_kg_or_gco2eq_per_gfuel == pytest.approx(
             ghg_factor_wtt + ghg_factor_ttw
         )
         assert fuel_by_mass_fraction.lhv_mj_per_kg == pytest.approx(lhv)
@@ -250,7 +255,7 @@ def test_fuel_consumption_class():
     # Verify the total ghg factor
     total_co2_kg = multi_fuel_consumption.get_total_co2_emissions(
         fuel_consumer_class=FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED
-    ).well_to_wake_kg
+    ).well_to_wake_kg_or_gco2eq_per_gfuel
     total_fuel_energy_mj = sum(
         [fuel.lhv_mj_per_g * fuel.mass_or_mass_fraction * 1e3 for fuel in fuels]
     )
