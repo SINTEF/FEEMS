@@ -120,18 +120,30 @@ class TimeSeriesResultForComponent(_message.Message):
     ) -> None: ...
 
 class GHGEmissions(_message.Message):
-    __slots__ = ["well_to_tank", "tank_to_wake", "well_to_wake"]
+    __slots__ = [
+        "well_to_tank",
+        "tank_to_wake",
+        "well_to_wake",
+        "tank_to_wake_without_slip",
+        "well_to_wake_without_slip",
+    ]
     WELL_TO_TANK_FIELD_NUMBER: _ClassVar[int]
     TANK_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
     WELL_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_WITHOUT_SLIP_FIELD_NUMBER: _ClassVar[int]
+    WELL_TO_WAKE_WITHOUT_SLIP_FIELD_NUMBER: _ClassVar[int]
     well_to_tank: float
     tank_to_wake: float
     well_to_wake: float
+    tank_to_wake_without_slip: float
+    well_to_wake_without_slip: float
     def __init__(
         self,
         well_to_tank: _Optional[float] = ...,
         tank_to_wake: _Optional[float] = ...,
         well_to_wake: _Optional[float] = ...,
+        tank_to_wake_without_slip: _Optional[float] = ...,
+        well_to_wake_without_slip: _Optional[float] = ...,
     ) -> None: ...
 
 class ResultPerComponent(_message.Message):

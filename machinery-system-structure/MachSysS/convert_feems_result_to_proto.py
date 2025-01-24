@@ -283,11 +283,14 @@ class FEEMSResultConverter:
                 )
                 continue
             if key == "co2_emission_total_kg":
+                value = cast(GHGEmissions, value)
                 result.co2_emission_total_kg.CopyFrom(
                     proto.GHGEmissions(
                         well_to_tank=value.well_to_tank_kg_or_gco2eq_per_gfuel,
                         tank_to_wake=value.tank_to_wake_kg_or_gco2eq_per_gfuel,
-                        well_to_wake=value.well_to_wake_kg,
+                        well_to_wake=value.well_to_wake_kg_or_gco2eq_per_gfuel,
+                        tank_to_wake_without_slip=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+                        well_to_wake_without_slip=value.well_to_wake_without_slip_kg_or_gco2eq_per_gfuel,
                     )
                 )
                 continue
@@ -333,7 +336,9 @@ class FEEMSResultConverter:
                                 proto.GHGEmissions(
                                     well_to_tank=value.well_to_tank_kg_or_gco2eq_per_gfuel,
                                     tank_to_wake=value.tank_to_wake_kg_or_gco2eq_per_gfuel,
-                                    well_to_wake=value.well_to_wake_kg,
+                                    well_to_wake=value.well_to_wake_kg_or_gco2eq_per_gfuel,
+                                    well_to_wake_without_slip=value.well_to_wake_without_slip_kg_or_gco2eq_per_gfuel,
+                                    tank_to_wake_without_slip=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
                                 )
                             )
                             continue
