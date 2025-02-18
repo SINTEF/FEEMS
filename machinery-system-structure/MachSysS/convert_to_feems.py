@@ -649,7 +649,7 @@ def convert_proto_shaftline_to_feems(
             components.append(
                 MainEngineWithGearBoxForMechanicalPropulsion(
                     name=sub_system.name,
-                    main_engine=convert_proto_engine_to_feems(
+                    engine=convert_proto_engine_to_feems(
                         proto_engine=sub_system.engine,
                         type_engine=TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
                     ),
@@ -795,13 +795,22 @@ def convert_proto_mechanical_system_to_feems(
     shaft_lines = []
     for proto_shaftline in system.shaft_lines:
         if pti_ptos is not None:
+            pti_ptos_shaft_line_proto = list(
+                filter(
+                    lambda subsystem: subsystem.component_type
+                    == proto.Subsystem.ComponentType.PTI_PTO_SYSTEM,
+                    proto_shaftline.subsystems,
+                )
+            )
+            uid_list = list(map(lambda x: x.uid, pti_ptos_shaft_line_proto))
             pti_ptos_for_shaft_lines = list(
                 filter(
-                    lambda pti_pto: pti_pto.shaft_line_id
-                    == proto_shaftline.shaft_line_id,
+                    lambda pti_pto: pti_pto.uid in uid_list,
                     pti_ptos,
                 )
             )
+            for each in pti_ptos_for_shaft_lines:
+                each.shaft_line_id = proto_shaftline.shaft_line_id
         else:
             pti_ptos_for_shaft_lines = None
         shaft_lines.append(
