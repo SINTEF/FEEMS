@@ -217,18 +217,22 @@ def get_fuel_emission_energy_balance_for_component(
     # Calculate electric energy input / consumption for PTI/PTO
     elif component.type == TypeComponent.PTI_PTO_SYSTEM:
         power_input = component.power_input.copy()
-        power_input[power_input < 0] = 0  # PTI mode
+        power_output = component.power_output.copy()
+        index_pti_mode = power_input > 0
+        index_pto_mode = power_input < 0
+        power_input[index_pto_mode] = 0  # PTI mode
+        power_output[index_pto_mode] = 0  # PTI mode
         if isSystemMechanical:
             res.energy_input_mechanical_total_mj = (
                 integrate_data(
-                    data_to_integrate=power_input,
+                    data_to_integrate=power_output,
                     time_interval_s=time_interval_s,
                     integration_method=integration_method,
                 )
                 / 1000
             )
         else:
-            res.energy_consumption_mechanical_total_mj = (
+            res.energy_consumption_electric_total_mj = (
                 integrate_data(
                     data_to_integrate=power_input,
                     time_interval_s=time_interval_s,
@@ -237,18 +241,20 @@ def get_fuel_emission_energy_balance_for_component(
                 / 1000
             )
         power_input = component.power_input.copy()
-        power_input[power_input > 0] = 0  # PTO mode
+        power_output = component.power_output.copy()
+        power_input[index_pti_mode] = 0  # PTO mode
+        power_output[index_pti_mode] = 0  # PTO mode
         if isSystemMechanical:
             res.energy_consumption_mechanical_total_mj = (
                 integrate_data(
-                    data_to_integrate=power_input,
+                    data_to_integrate=power_output,
                     time_interval_s=time_interval_s,
                     integration_method=integration_method,
                 )
                 / 1000
             )
         else:
-            res.energy_input_mechanical_total_mj = (
+            res.energy_input_electric_total_mj = (
                 integrate_data(
                     data_to_integrate=-power_input,
                     time_interval_s=time_interval_s,
@@ -1286,6 +1292,7 @@ class ShaftLine(Node):
                 time_interval_s=time_step,
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
+                isSystemMechanical=True,
             )
             res = res.sum_with_freeze_duration(res_comp)
             if not (
