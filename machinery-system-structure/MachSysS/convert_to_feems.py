@@ -75,6 +75,7 @@ from feems.types_for_feems import (
     EmissionCurvePoint,
     EmissionType,
     NOxCalculationMethod,
+    EngineCycleType,
 )
 
 import MachSysS.system_structure_pb2 as proto
@@ -93,7 +94,7 @@ def convert_proto_curve1d_to_np_array(curve: proto.Curve1D) -> np.ndarray:
 
 
 def convert_proto_efficiency_bsfc_power_to_np_array(
-    efficiency_bsfc_power: Union[proto.Efficiency, proto.BSFC, proto.PowerCurve]
+    efficiency_bsfc_power: Union[proto.Efficiency, proto.BSFC, proto.PowerCurve],
 ) -> np.ndarray:
     """Converts protobuf efficiency or bsfc to numpy array"""
     if isinstance(efficiency_bsfc_power, proto.PowerCurve):
@@ -198,7 +199,7 @@ def convert_emission_curve_to_feems(
 
 
 def convert_nox_calculation_method(
-    proto_comp: Union[proto.Engine, proto.COGAS]
+    proto_comp: Union[proto.Engine, proto.COGAS],
 ) -> NOxCalculationMethod:
     """Converts protobuf nox calculation type to feems nox calculation method"""
     if isinstance(proto_comp, proto.Engine):
@@ -245,6 +246,7 @@ def convert_proto_engine_to_feems(
             pilot_fuel_origin=FuelOrigin(proto_engine.pilot_fuel.fuel_origin),
             nox_calculation_method=nox_calculation_method,
             emissions_curves=emission_curves,
+            engine_cycle_type=EngineCycleType(proto_engine.engine_cycle_type),
             uid=proto_engine.uid if len(proto_engine.uid) > _MIN_LENGTH_UID else None,
         )
     return Engine(
@@ -647,7 +649,7 @@ def convert_proto_shaftline_to_feems(
             components.append(
                 MainEngineWithGearBoxForMechanicalPropulsion(
                     name=sub_system.name,
-                    main_engine=convert_proto_engine_to_feems(
+                    engine=convert_proto_engine_to_feems(
                         proto_engine=sub_system.engine,
                         type_engine=TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
                     ),
@@ -793,13 +795,22 @@ def convert_proto_mechanical_system_to_feems(
     shaft_lines = []
     for proto_shaftline in system.shaft_lines:
         if pti_ptos is not None:
+            pti_ptos_shaft_line_proto = list(
+                filter(
+                    lambda subsystem: subsystem.component_type
+                    == proto.Subsystem.ComponentType.PTI_PTO_SYSTEM,
+                    proto_shaftline.subsystems,
+                )
+            )
+            uid_list = list(map(lambda x: x.uid, pti_ptos_shaft_line_proto))
             pti_ptos_for_shaft_lines = list(
                 filter(
-                    lambda pti_pto: pti_pto.shaft_line_id
-                    == proto_shaftline.shaft_line_id,
+                    lambda pti_pto: pti_pto.uid in uid_list,
                     pti_ptos,
                 )
             )
+            for each in pti_ptos_for_shaft_lines:
+                each.shaft_line_id = proto_shaftline.shaft_line_id
         else:
             pti_ptos_for_shaft_lines = None
         shaft_lines.append(

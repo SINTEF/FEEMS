@@ -39,6 +39,16 @@ message TimeSeriesResultForComponent {
     FuelConsumptionRateArray fuel_consumption_kg_per_s = 3;
 }
 
+message GHGEmissions {
+    double well_to_tank = 1;
+    double tank_to_wake = 2;
+    double well_to_wake = 3;
+    double tank_to_wake_without_slip = 4;
+    double well_to_wake_without_slip = 5;
+    double tank_to_wake_from_green_fuel = 6;
+    double tank_to_wake_without_slip_from_green_fuel = 7;
+}
+
 message ResultPerComponent {
     string component_name = 1;
     FuelConsumptionScalar multi_fuel_consumption_kg = 2;
@@ -46,7 +56,7 @@ message ResultPerComponent {
     double mechanical_energy_consumption_mj = 4;
     double energy_stored_mj= 5;
     double running_hours_h = 6;
-    double co2_emissions_kg = 7;
+    GHGEmissions co2_emissions_kg = 7;
     double nox_emissions_kg = 8;
     string component_type = 9;
     double rated_capacity = 10;
@@ -54,6 +64,7 @@ message ResultPerComponent {
     uint32 switchboard_id = 12;
     uint32 shaftline_id = 13;
     TimeSeriesResultForComponent result_time_series = 14;
+    string fuel_consumer_type = 15;
 }
 
 message FeemsResult {
@@ -66,7 +77,7 @@ message FeemsResult {
     double running_hours_genset_total_hr = 7;
     double running_hours_fuel_cell_total_hr = 8;
     double running_hours_pti_pto_total_hr = 9;
-    double co2_emission_total_kg = 10;
+    GHGEmissions co2_emission_total_kg = 10;
     double nox_emission_total_kg = 11;
     repeated ResultPerComponent detailed_result = 12;
     double energy_input_mechanical_total_mj = 13;
