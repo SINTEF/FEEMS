@@ -308,6 +308,153 @@ class EngineDualFuel(Engine):
         return engine_run_point
 
 
+@dataclass
+class FuelCharacteristics:
+    """
+    Class for specific fuel consumption
+    """
+
+    nox_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_2
+    main_fuel_type: TypeFuel = TypeFuel.DIESEL
+    main_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL
+    pilot_fuel_type: TypeFuel = TypeFuel.DIESEL
+    pilot_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL
+    bsfc_curve: np.ndarray = None
+    bpsfc_curve: np.ndarray = None
+    emission_curves: List[EmissionCurve] = None
+    engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL
+
+
+class EngineMultiFuel(Engine):
+    """
+    Engine class for multi-fuel engines
+    """
+
+    def __init__(
+        self,
+        *,
+        type_: TypeComponent,
+        name: str = "",
+        rated_power: Power_kW = Power_kW(0.0),
+        rated_speed: Speed_rpm = Speed_rpm(0.0),
+        multi_fuel_characteristics: List[FuelCharacteristics] = None,
+        uid: Optional[str] = None,
+    ):
+        self.type = type_
+        self.name = name
+        self.rated_power = rated_power
+        self.rated_speed = rated_speed
+        self.multi_fuel_characteristics = multi_fuel_characteristics
+        if self.multi_fuel_characteristics is None:
+            raise ValueError("Multi-fuel characteristics must be provided for EngineMultiFuel.")
+        if len(self.multi_fuel_characteristics) == 0:
+            raise ValueError("Multi-fuel characteristics must not be empty for EngineMultiFuel.")
+        self.uid = uid
+
+    def get_engine_run_point_from_power_out_kw(
+        self,
+        power_kw: np.ndarray = None,
+        fuel_type: TypeFuel = TypeFuel.DIESEL,
+        fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        lhv_mj_per_g: Optional[float] = None,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
+        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        alternative_fuel_origin: FuelOrigin = None,
+        alternative_fuel_ratio: float = 0.0,
+    ) -> EngineRunPoint:
+        """
+        Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
+        use the power_output value of the instance.
+        Args:
+            power_kw (np.ndarray, Optional): single value or ndarray of power in kW. If not given,
+                the power_output value of the instance will be used.
+            fuel_type (TypeFuel, Optional): Fuel type. Defaults to TypeFuel.DIESEL.
+            fuel_origin (FuelOrigin, Optional): Fuel origin. Defaults to FuelOrigin.FOSSIL.
+            fuel_specified_by (FuelSpecifiedBy, Optional): Fuel specification.
+                Defaults to FuelSpecifiedBy.IMO.
+            lhv_mj_per_g (Optional[float], optional): Lower heating value of the fuel in MJ/kg.
+                Defaults to None. Should be provided if fuel_specified_by is FuelSpecifiedBy.USER.
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj (Optional[float], optional): GHG emission
+                factor from well to tank in gCO2eq/MJ. Defaults to None. Should be provided if
+                fuel_specified_by is FuelSpecifiedBy.USER.
+            ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
+                GHG emission factor from tank to wake. Defaults to None. Should be provided if
+                fuel_specified_by is FuelSpecifiedBy.USER.
+
+        Returns:
+            EngineRunPoint
+        """
+        if power_kw is None:
+            power_kw = self.power_output
+        engine = self.get_engine_object(
+            fuel_type=fuel_type,
+            fuel_origin=fuel_origin,
+        )
+        return engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
+            fuel_specified_by=fuel_specified_by,
+            lhv_mj_per_g=lhv_mj_per_g,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+            ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            alternative_fuel_origin=alternative_fuel_origin,
+            alternative_fuel_ratio=alternative_fuel_ratio,
+        )
+
+    def get_engine_object(
+        self,
+        fuel_type: TypeFuel,
+        fuel_origin: FuelOrigin,
+    ) -> Union[Engine, EngineDualFuel]:
+        """
+        Get the engine object based on the fuel type and origin.
+        Args:
+            fuel_type (TypeFuel): Fuel type.
+            fuel_origin (FuelOrigin): Fuel origin.
+
+        Returns:
+            Union[Engine, EngineDualFuel]: Engine object.
+        """
+        fuel_characteristics = next(
+            (
+                fc
+                for fc in self.multi_fuel_characteristics
+                if fc.main_fuel_type == fuel_type and fc.main_fuel_origin == fuel_origin
+            ),
+            None,
+        )
+        if fuel_characteristics is None:
+            raise ValueError(
+                f"Fuel characteristics for fuel type {fuel_type} and origin {fuel_origin} not found."
+            )
+        if fuel_characteristics.pilot_fuel_type is not None:
+            return EngineDualFuel(
+                type_=self.type,
+                name=self.name,
+                rated_power=self.rated_power,
+                rated_speed=self.rated_speed,
+                bsfc_curve=fuel_characteristics.bsfc_curve,
+                fuel_type=fuel_characteristics.main_fuel_type,
+                fuel_origin=fuel_characteristics.main_fuel_origin,
+                bspfc_curve=fuel_characteristics.bpsfc_curve,
+                pilot_fuel_type=fuel_characteristics.pilot_fuel_type,
+                pilot_fuel_origin=fuel_characteristics.pilot_fuel_origin,
+                emissions_curves=fuel_characteristics.emission_curves,
+                engine_cycle_type=fuel_characteristics.engine_cycle_type,
+            )
+        return Engine(
+            type_=self.type,
+            name=self.name,
+            rated_power=self.rated_power,
+            rated_speed=self.rated_speed,
+            bsfc_curve=fuel_characteristics.bsfc_curve,
+            fuel_type=fuel_characteristics.main_fuel_type,
+            fuel_origin=fuel_characteristics.main_fuel_origin,
+            emissions_curves=fuel_characteristics.emission_curves,
+            engine_cycle_type=fuel_characteristics.engine_cycle_type,
+        )
+
+
 class MainEngineForMechanicalPropulsion(Component):
     """
     Main engine component class used for mechanical/hybrid propulsion

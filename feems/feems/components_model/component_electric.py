@@ -25,6 +25,7 @@ from ..fuel import (
     Fuel,
     FuelOrigin,
     GhgEmissionFactorTankToWake,
+    FuelConsumerClassFuelEUMaritime,
 )
 from ..types_for_feems import (
     TypeComponent,
@@ -375,6 +376,10 @@ class FuelCell(BasicComponent):
         self.fuel_type = fuel_type
         self.fuel_origin = fuel_origin
 
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        return FuelConsumerClassFuelEUMaritime.FUEL_CELL
+
     def get_fuel_cell_run_point(
         self,
         power_out_kw: np.ndarray = None,
@@ -454,6 +459,10 @@ class FuelCellSystem(ElectricComponent):
         self.converter = converter
         self.fuel_cell = fuel_cell_module
         self.number_modules = number_modules
+
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        return FuelConsumerClassFuelEUMaritime.FUEL_CELL
 
     def get_fuel_cell_run_point(
         self,
@@ -625,6 +634,10 @@ class Genset(Component):
         self.switchboard_id = generator.switchboard_id
         self.status = np.ones(0).astype(bool)
         self.load_sharing_mode = np.zeros(1)
+
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        return self.aux_engine.fuel_consumer_type_fuel_eu_maritime
 
     def get_fuel_cons_load_bsfc_from_power_out_generator_kw(
         self,

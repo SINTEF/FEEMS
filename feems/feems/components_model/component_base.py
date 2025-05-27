@@ -22,7 +22,7 @@ from ..types_for_feems import (
     Numeric,
     NumericT,
 )
-from ..fuel import FuelConsumption
+from ..fuel import FuelConsumption, FuelConsumerClassFuelEUMaritime
 
 # Define logger
 logger = get_logger(__name__)
@@ -82,6 +82,10 @@ class Component:
     @property
     def rated_capacity_unit(self) -> str:
         return "kW"
+
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        return None
 
 
 class BasicComponent(Component):

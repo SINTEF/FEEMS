@@ -49,6 +49,7 @@ _COLUMN_NAMES = {
     "rated capacity unit": "rated_capacity_unit",
     "switchboard id": "switchboard_id",
     "shaftline id": "shaftline_id",
+    "fuel consumer type": "fuel_consumer_type",
 }
 
 
@@ -291,6 +292,8 @@ class FEEMSResultConverter:
                         well_to_wake=value.well_to_wake_kg_or_gco2eq_per_gfuel,
                         tank_to_wake_without_slip=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
                         well_to_wake_without_slip=value.well_to_wake_without_slip_kg_or_gco2eq_per_gfuel,
+                        tank_to_wake_from_green_fuel=value.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+                        tank_to_wake_without_slip_from_green_fuel=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
                     )
                 )
                 continue

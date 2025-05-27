@@ -45,6 +45,8 @@ message GHGEmissions {
     double well_to_wake = 3;
     double tank_to_wake_without_slip = 4;
     double well_to_wake_without_slip = 5;
+    double tank_to_wake_from_green_fuel = 6;
+    double tank_to_wake_without_slip_from_green_fuel = 7;
 }
 
 message ResultPerComponent {
@@ -62,6 +64,7 @@ message ResultPerComponent {
     uint32 switchboard_id = 12;
     uint32 shaftline_id = 13;
     TimeSeriesResultForComponent result_time_series = 14;
+    string fuel_consumer_type = 15;
 }
 
 message FeemsResult {

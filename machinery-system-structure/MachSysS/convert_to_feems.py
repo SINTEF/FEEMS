@@ -94,7 +94,7 @@ def convert_proto_curve1d_to_np_array(curve: proto.Curve1D) -> np.ndarray:
 
 
 def convert_proto_efficiency_bsfc_power_to_np_array(
-    efficiency_bsfc_power: Union[proto.Efficiency, proto.BSFC, proto.PowerCurve]
+    efficiency_bsfc_power: Union[proto.Efficiency, proto.BSFC, proto.PowerCurve],
 ) -> np.ndarray:
     """Converts protobuf efficiency or bsfc to numpy array"""
     if isinstance(efficiency_bsfc_power, proto.PowerCurve):
@@ -199,7 +199,7 @@ def convert_emission_curve_to_feems(
 
 
 def convert_nox_calculation_method(
-    proto_comp: Union[proto.Engine, proto.COGAS]
+    proto_comp: Union[proto.Engine, proto.COGAS],
 ) -> NOxCalculationMethod:
     """Converts protobuf nox calculation type to feems nox calculation method"""
     if isinstance(proto_comp, proto.Engine):
