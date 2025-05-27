@@ -168,6 +168,10 @@ class GHGEmissions:
     tank_to_wake_kg_or_gco2eq_per_gfuel: Union[float, np.ndarray] = 0.0
     well_to_tank_kg_or_gco2eq_per_gfuel: Union[float, np.ndarray] = 0.0
     tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip: Union[float, np.ndarray] = 0.0
+    tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel: Union[float, np.ndarray] = 0.0
+    tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel: Union[float, np.ndarray] = (
+        0.0
+    )
 
     @property
     def well_to_wake_kg_or_gco2eq_per_gfuel(self):
@@ -180,6 +184,22 @@ class GHGEmissions:
             + self.well_to_tank_kg_or_gco2eq_per_gfuel
         )
 
+    @property
+    def tank_to_wake_emissions_kg_for_ets(self) -> float:
+        """Returns the emissions in kg for ETS"""
+        return (
+            self.tank_to_wake_kg_or_gco2eq_per_gfuel
+            - self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+        )
+
+    @property
+    def tank_to_wake_emissions_without_slip_kg_for_ets(self) -> float:
+        """Returns the emissions in kg for ETS"""
+        return (
+            self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            - self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+        )
+
     def __add__(self, other: "GHGEmissions") -> "GHGEmissions":
         return GHGEmissions(
             tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel
@@ -188,6 +208,10 @@ class GHGEmissions:
             + other.well_to_tank_kg_or_gco2eq_per_gfuel,
             tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
             + other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            + other.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            + other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
         )
 
     def __radd__(self, other: "GHGEmissions") -> "GHGEmissions":
@@ -199,6 +223,10 @@ class GHGEmissions:
             well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel * other,
             tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
             * other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            * other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            * other,
         )
 
     def __rmul__(self, other: float) -> "GHGEmissions":
@@ -209,6 +237,10 @@ class GHGEmissions:
             tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel / other,
             well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel / other,
             tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            / other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            / other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
             / other,
         )
 
@@ -223,6 +255,10 @@ class GHGEmissions:
             - other.well_to_tank_kg_or_gco2eq_per_gfuel,
             tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
             - other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            - other.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            - other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
         )
 
     def __rsub__(self, other: "GHGEmissions") -> "GHGEmissions":
@@ -233,6 +269,8 @@ class GHGEmissions:
             tank_to_wake_kg_or_gco2eq_per_gfuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel,
             well_to_tank_kg_or_gco2eq_per_gfuel=-self.well_to_tank_kg_or_gco2eq_per_gfuel,
             tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=-self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
         )
 
 
@@ -518,7 +556,7 @@ class FuelByMassFraction:
             # engine (ICE)
             if fuel_consumer_class is not None and "LNG" in fuel_consumer_class.name:
                 if fuel.fuel_type != TypeFuel.NATURAL_GAS:
-                    res += (
+                    ghg_emission_for_fuel = (
                         GHGEmissions(
                             tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
                                 fuel_consumer_class=FuelConsumerClassFuelEUMaritime.ICE
@@ -532,20 +570,21 @@ class FuelByMassFraction:
                         * fuel.mass_or_mass_fraction
                     )
                 else:
-                    res += (
+                    ghg_emission_for_fuel = (
                         GHGEmissions(
                             tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
                                 fuel_consumer_class=fuel_consumer_class
                             ),
                             well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel,
                             tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
-                                fuel_consumer_class=fuel_consumer_class, exclude_slip=True
+                                fuel_consumer_class=fuel_consumer_class,
+                                exclude_slip=True,
                             ),
                         )
                         * fuel.mass_or_mass_fraction
                     )
             else:
-                res += (
+                ghg_emission_for_fuel = (
                     GHGEmissions(
                         tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
                             fuel_consumer_class=fuel_consumer_class
@@ -557,7 +596,14 @@ class FuelByMassFraction:
                     )
                     * fuel.mass_or_mass_fraction
                 )
-
+            if fuel.origin in [FuelOrigin.BIO, FuelOrigin.RENEWABLE_NON_BIO]:
+                ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel = (
+                    ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel
+                )
+                ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel = (
+                    ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+                )
+            res += ghg_emission_for_fuel
         return res
 
     def get_kg_co2_per_kwh_fuel(
@@ -679,9 +725,10 @@ class FuelConsumption:
         else:
             for fuel in self.fuels:
                 fuel_fraction_new = fuel.copy
-                fuel_fraction_new.mass_or_mass_fraction[~index_fuel_consumption_zero] = (
-                    fuel.mass_or_mass_fraction[~index_fuel_consumption_zero]
-                    / self.total_fuel_consumption[~index_fuel_consumption_zero]
+                index_fuel_consumption_non_zero = np.bitwise_not(index_fuel_consumption_zero)
+                fuel_fraction_new.mass_or_mass_fraction[index_fuel_consumption_non_zero] = (
+                    fuel.mass_or_mass_fraction[index_fuel_consumption_non_zero]
+                    / self.total_fuel_consumption[index_fuel_consumption_non_zero]
                 )
                 fuel_fraction_new.mass_or_mass_fraction[index_fuel_consumption_zero] = 0
                 fuel_by_mass_fraction.fuels.append(fuel_fraction_new)

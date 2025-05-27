@@ -126,17 +126,23 @@ class GHGEmissions(_message.Message):
         "well_to_wake",
         "tank_to_wake_without_slip",
         "well_to_wake_without_slip",
+        "tank_to_wake_from_green_fuel",
+        "tank_to_wake_without_slip_from_green_fuel",
     ]
     WELL_TO_TANK_FIELD_NUMBER: _ClassVar[int]
     TANK_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
     WELL_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
     TANK_TO_WAKE_WITHOUT_SLIP_FIELD_NUMBER: _ClassVar[int]
     WELL_TO_WAKE_WITHOUT_SLIP_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_FROM_GREEN_FUEL_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_WITHOUT_SLIP_FROM_GREEN_FUEL_FIELD_NUMBER: _ClassVar[int]
     well_to_tank: float
     tank_to_wake: float
     well_to_wake: float
     tank_to_wake_without_slip: float
     well_to_wake_without_slip: float
+    tank_to_wake_from_green_fuel: float
+    tank_to_wake_without_slip_from_green_fuel: float
     def __init__(
         self,
         well_to_tank: _Optional[float] = ...,
@@ -144,6 +150,8 @@ class GHGEmissions(_message.Message):
         well_to_wake: _Optional[float] = ...,
         tank_to_wake_without_slip: _Optional[float] = ...,
         well_to_wake_without_slip: _Optional[float] = ...,
+        tank_to_wake_from_green_fuel: _Optional[float] = ...,
+        tank_to_wake_without_slip_from_green_fuel: _Optional[float] = ...,
     ) -> None: ...
 
 class ResultPerComponent(_message.Message):
@@ -162,6 +170,7 @@ class ResultPerComponent(_message.Message):
         "switchboard_id",
         "shaftline_id",
         "result_time_series",
+        "fuel_consumer_type",
     ]
     COMPONENT_NAME_FIELD_NUMBER: _ClassVar[int]
     MULTI_FUEL_CONSUMPTION_KG_FIELD_NUMBER: _ClassVar[int]
@@ -177,6 +186,7 @@ class ResultPerComponent(_message.Message):
     SWITCHBOARD_ID_FIELD_NUMBER: _ClassVar[int]
     SHAFTLINE_ID_FIELD_NUMBER: _ClassVar[int]
     RESULT_TIME_SERIES_FIELD_NUMBER: _ClassVar[int]
+    FUEL_CONSUMER_TYPE_FIELD_NUMBER: _ClassVar[int]
     component_name: str
     multi_fuel_consumption_kg: FuelConsumptionScalar
     electric_energy_consumption_mj: float
@@ -191,6 +201,7 @@ class ResultPerComponent(_message.Message):
     switchboard_id: int
     shaftline_id: int
     result_time_series: TimeSeriesResultForComponent
+    fuel_consumer_type: str
     def __init__(
         self,
         component_name: _Optional[str] = ...,
@@ -211,6 +222,7 @@ class ResultPerComponent(_message.Message):
         result_time_series: _Optional[
             _Union[TimeSeriesResultForComponent, _Mapping]
         ] = ...,
+        fuel_consumer_type: _Optional[str] = ...,
     ) -> None: ...
 
 class FeemsResult(_message.Message):

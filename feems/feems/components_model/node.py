@@ -818,6 +818,7 @@ class Switchboard(Node):
             "component type",
             "rated capacity",
             "rated capacity unit",
+            "fuel consumer type",
         ]
         res = FEEMSResult(
             detail_result=pd.DataFrame(columns=column_names),
@@ -859,6 +860,11 @@ class Switchboard(Node):
                 component.type.name,
                 component.rated_capacity,
                 component.rated_capacity_unit,
+                (
+                    component.fuel_consumer_type_fuel_eu_maritime.name
+                    if component.fuel_consumer_type_fuel_eu_maritime
+                    else "None"
+                ),
             ]
 
             res.detail_result = pd.concat(
@@ -930,7 +936,9 @@ class Switchboard(Node):
             )
             res = res.sum_with_freeze_duration(res_component)
 
-        def get_length(v: Union[float, int, List[float], np.ndarray, np.float64]) -> int:
+        def get_length(
+            v: Union[float, int, List[float], np.ndarray, np.float64],
+        ) -> int:
             if isinstance(v, float) or isinstance(v, int) or np.isscalar(v):
                 return 1
             elif isinstance(v, np.ndarray):
@@ -1281,6 +1289,7 @@ class ShaftLine(Node):
             "component type",
             "rated capacity",
             "rated capacity unit",
+            "fuel consumer type",
         ]
         res = FEEMSResult(detail_result=pd.DataFrame(columns=column_names))
 
@@ -1322,6 +1331,11 @@ class ShaftLine(Node):
                 component.type.name,
                 component.rated_capacity,
                 component.rated_capacity_unit,
+                (
+                    component.fuel_consumer_type_fuel_eu_maritime.name
+                    if component.fuel_consumer_type_fuel_eu_maritime
+                    else "None"
+                ),
             ]
             res.detail_result = pd.concat(
                 [
