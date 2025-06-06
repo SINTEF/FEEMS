@@ -13,7 +13,7 @@ from typing import (
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class EmissionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
+    __slots__ = []
     NONE: _ClassVar[EmissionType]
     SOX: _ClassVar[EmissionType]
     NOX: _ClassVar[EmissionType]
@@ -24,7 +24,7 @@ class EmissionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     N2O: _ClassVar[EmissionType]
 
 class FuelType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
+    __slots__ = []
     DIESEL: _ClassVar[FuelType]
     HFO: _ClassVar[FuelType]
     NATURAL_GAS: _ClassVar[FuelType]
@@ -35,16 +35,20 @@ class FuelType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ETHANOL: _ClassVar[FuelType]
     METHANOL: _ClassVar[FuelType]
     LFO: _ClassVar[FuelType]
+    LSFO_CRUDE: _ClassVar[FuelType]
+    LSFO_BLEND: _ClassVar[FuelType]
+    ULSFO: _ClassVar[FuelType]
+    VLSFO: _ClassVar[FuelType]
 
 class FuelOrigin(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
+    __slots__ = []
     NONE1: _ClassVar[FuelOrigin]
     FOSSIL: _ClassVar[FuelOrigin]
     BIO: _ClassVar[FuelOrigin]
     RENEWABLE_NON_BIO: _ClassVar[FuelOrigin]
 
 class FuelSpecifiedBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
+    __slots__ = []
     NONE2: _ClassVar[FuelSpecifiedBy]
     FUEL_EU_MARITIME: _ClassVar[FuelSpecifiedBy]
     IMO: _ClassVar[FuelSpecifiedBy]
@@ -68,6 +72,10 @@ LPG_BUTANE: FuelType
 ETHANOL: FuelType
 METHANOL: FuelType
 LFO: FuelType
+LSFO_CRUDE: FuelType
+LSFO_BLEND: FuelType
+ULSFO: FuelType
+VLSFO: FuelType
 NONE1: FuelOrigin
 FOSSIL: FuelOrigin
 BIO: FuelOrigin
@@ -78,7 +86,7 @@ IMO: FuelSpecifiedBy
 USER: FuelSpecifiedBy
 
 class Point(_message.Message):
-    __slots__ = ("x", "y")
+    __slots__ = ["x", "y"]
     X_FIELD_NUMBER: _ClassVar[int]
     Y_FIELD_NUMBER: _ClassVar[int]
     x: float
@@ -88,7 +96,7 @@ class Point(_message.Message):
     ) -> None: ...
 
 class Curve1D(_message.Message):
-    __slots__ = ("points",)
+    __slots__ = ["points"]
     POINTS_FIELD_NUMBER: _ClassVar[int]
     points: _containers.RepeatedCompositeFieldContainer[Point]
     def __init__(
@@ -96,7 +104,7 @@ class Curve1D(_message.Message):
     ) -> None: ...
 
 class BSFCCurve(_message.Message):
-    __slots__ = ("x_label", "y_label", "curve")
+    __slots__ = ["x_label", "y_label", "curve"]
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
     Y_LABEL_FIELD_NUMBER: _ClassVar[int]
     CURVE_FIELD_NUMBER: _ClassVar[int]
@@ -111,7 +119,7 @@ class BSFCCurve(_message.Message):
     ) -> None: ...
 
 class EfficiencyCurve(_message.Message):
-    __slots__ = ("x_label", "y_label", "curve")
+    __slots__ = ["x_label", "y_label", "curve"]
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
     Y_LABEL_FIELD_NUMBER: _ClassVar[int]
     CURVE_FIELD_NUMBER: _ClassVar[int]
@@ -126,7 +134,7 @@ class EfficiencyCurve(_message.Message):
     ) -> None: ...
 
 class BSFC(_message.Message):
-    __slots__ = ("curve", "value")
+    __slots__ = ["curve", "value"]
     CURVE_FIELD_NUMBER: _ClassVar[int]
     VALUE_FIELD_NUMBER: _ClassVar[int]
     curve: BSFCCurve
@@ -138,7 +146,7 @@ class BSFC(_message.Message):
     ) -> None: ...
 
 class Efficiency(_message.Message):
-    __slots__ = ("curve", "value")
+    __slots__ = ["curve", "value"]
     CURVE_FIELD_NUMBER: _ClassVar[int]
     VALUE_FIELD_NUMBER: _ClassVar[int]
     curve: EfficiencyCurve
@@ -150,7 +158,7 @@ class Efficiency(_message.Message):
     ) -> None: ...
 
 class PowerCurve(_message.Message):
-    __slots__ = ("x_label", "y_label", "curve")
+    __slots__ = ["x_label", "y_label", "curve"]
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
     Y_LABEL_FIELD_NUMBER: _ClassVar[int]
     CURVE_FIELD_NUMBER: _ClassVar[int]
@@ -165,7 +173,7 @@ class PowerCurve(_message.Message):
     ) -> None: ...
 
 class PropulsionPowerTimeSeries(_message.Message):
-    __slots__ = ("x_label", "y_label", "propulsor_id", "curve")
+    __slots__ = ["x_label", "y_label", "propulsor_id", "curve"]
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
     Y_LABEL_FIELD_NUMBER: _ClassVar[int]
     PROPULSOR_ID_FIELD_NUMBER: _ClassVar[int]
@@ -183,7 +191,7 @@ class PropulsionPowerTimeSeries(_message.Message):
     ) -> None: ...
 
 class AuxiliaryLoadTimeSeries(_message.Message):
-    __slots__ = ("x_label", "y_label", "switchboard_id", "curve")
+    __slots__ = ["x_label", "y_label", "switchboard_id", "curve"]
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
     Y_LABEL_FIELD_NUMBER: _ClassVar[int]
     SWITCHBOARD_ID_FIELD_NUMBER: _ClassVar[int]
@@ -201,7 +209,7 @@ class AuxiliaryLoadTimeSeries(_message.Message):
     ) -> None: ...
 
 class AuxiliaryLoad(_message.Message):
-    __slots__ = ("switchboard_id", "load_kw")
+    __slots__ = ["switchboard_id", "load_kw"]
     SWITCHBOARD_ID_FIELD_NUMBER: _ClassVar[int]
     LOAD_KW_FIELD_NUMBER: _ClassVar[int]
     switchboard_id: int
@@ -211,7 +219,7 @@ class AuxiliaryLoad(_message.Message):
     ) -> None: ...
 
 class EmissionCurve(_message.Message):
-    __slots__ = ("x_label", "y_label", "curve", "emission_type")
+    __slots__ = ["x_label", "y_label", "curve", "emission_type"]
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
     Y_LABEL_FIELD_NUMBER: _ClassVar[int]
     CURVE_FIELD_NUMBER: _ClassVar[int]
@@ -229,7 +237,7 @@ class EmissionCurve(_message.Message):
     ) -> None: ...
 
 class Gear(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "gear_ratio",
         "rated_power_kw",
@@ -238,7 +246,7 @@ class Gear(_message.Message):
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     GEAR_RATIO_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
@@ -268,7 +276,7 @@ class Gear(_message.Message):
     ) -> None: ...
 
 class Fuel(_message.Message):
-    __slots__ = ("fuel_type", "fuel_origin")
+    __slots__ = ["fuel_type", "fuel_origin"]
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     fuel_type: FuelType
@@ -280,7 +288,7 @@ class Fuel(_message.Message):
     ) -> None: ...
 
 class Engine(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "rated_power_kw",
         "rated_speed_rpm",
@@ -296,10 +304,10 @@ class Engine(_message.Message):
         "start_delay_s",
         "turn_off_power_kw",
         "uid",
-    )
+    ]
 
     class NOxCalculationMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
+        __slots__ = []
         TIER_2: _ClassVar[Engine.NOxCalculationMethod]
         TIER_1: _ClassVar[Engine.NOxCalculationMethod]
         TIER_3: _ClassVar[Engine.NOxCalculationMethod]
@@ -311,7 +319,7 @@ class Engine(_message.Message):
     CURVE: Engine.NOxCalculationMethod
 
     class EngineCycleType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
+        __slots__ = []
         NONE: _ClassVar[Engine.EngineCycleType]
         DIESEL: _ClassVar[Engine.EngineCycleType]
         OTTO: _ClassVar[Engine.EngineCycleType]
@@ -373,7 +381,7 @@ class Engine(_message.Message):
     ) -> None: ...
 
 class COGAS(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "rated_power_kw",
         "rated_speed_rpm",
@@ -388,7 +396,7 @@ class COGAS(_message.Message):
         "start_delay_s",
         "turn_off_power_kw",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]
@@ -438,7 +446,7 @@ class COGAS(_message.Message):
     ) -> None: ...
 
 class ElectricMachine(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "rated_power_kw",
         "rated_speed_rpm",
@@ -446,7 +454,7 @@ class ElectricMachine(_message.Message):
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]
@@ -473,7 +481,7 @@ class ElectricMachine(_message.Message):
     ) -> None: ...
 
 class Battery(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "energy_capacity_kwh",
         "rated_charging_rate_c",
@@ -487,7 +495,7 @@ class Battery(_message.Message):
         "state_of_energy_minimum",
         "state_of_energy_maximum",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CAPACITY_KWH_FIELD_NUMBER: _ClassVar[int]
     RATED_CHARGING_RATE_C_FIELD_NUMBER: _ClassVar[int]
@@ -532,14 +540,14 @@ class Battery(_message.Message):
     ) -> None: ...
 
 class ElectricComponent(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "rated_power_kw",
         "efficiency",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
@@ -563,7 +571,7 @@ class ElectricComponent(_message.Message):
     ) -> None: ...
 
 class FuelCell(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "rated_power_kw",
         "efficiency",
@@ -574,7 +582,7 @@ class FuelCell(_message.Message):
         "power_minimum_specific",
         "start_delay_s",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
@@ -610,13 +618,13 @@ class FuelCell(_message.Message):
     ) -> None: ...
 
 class Propeller(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "efficiency",
         "propulsor_id",
         "order_from_switchboard_or_shaftline",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
     PROPULSOR_ID_FIELD_NUMBER: _ClassVar[int]
@@ -637,13 +645,13 @@ class Propeller(_message.Message):
     ) -> None: ...
 
 class BusBreaker(_message.Message):
-    __slots__ = ("switchboard_to",)
+    __slots__ = ["switchboard_to"]
     SWITCHBOARD_TO_FIELD_NUMBER: _ClassVar[int]
     switchboard_to: int
     def __init__(self, switchboard_to: _Optional[int] = ...) -> None: ...
 
 class SuperCapacitor(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "energy_capacity_wh",
         "rated_power_kw",
@@ -653,7 +661,7 @@ class SuperCapacitor(_message.Message):
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CAPACITY_WH_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
@@ -686,14 +694,14 @@ class SuperCapacitor(_message.Message):
     ) -> None: ...
 
 class MechanicalComponent(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "rated_power_kw",
         "efficiency",
         "order_from_switchboard_or_shaftline",
         "unit_price_usd",
         "uid",
-    )
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
@@ -717,7 +725,7 @@ class MechanicalComponent(_message.Message):
     ) -> None: ...
 
 class Subsystem(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "gear",
         "engine",
         "electric_machine",
@@ -740,10 +748,10 @@ class Subsystem(_message.Message):
         "ramp_down_rate_limit_percent_per_second",
         "base_load_order",
         "uid",
-    )
+    ]
 
     class PowerType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
+        __slots__ = []
         NONE1: _ClassVar[Subsystem.PowerType]
         POWER_SOURCE: _ClassVar[Subsystem.PowerType]
         POWER_CONSUMER: _ClassVar[Subsystem.PowerType]
@@ -759,7 +767,7 @@ class Subsystem(_message.Message):
     SHORE_CONNECTION: Subsystem.PowerType
 
     class ComponentType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
+        __slots__ = []
         NONE: _ClassVar[Subsystem.ComponentType]
         MAIN_ENGINE: _ClassVar[Subsystem.ComponentType]
         AUXILIARY_ENGINE: _ClassVar[Subsystem.ComponentType]
@@ -892,7 +900,7 @@ class Subsystem(_message.Message):
     ) -> None: ...
 
 class Switchboard(_message.Message):
-    __slots__ = ("switchboard_id", "subsystems")
+    __slots__ = ["switchboard_id", "subsystems"]
     SWITCHBOARD_ID_FIELD_NUMBER: _ClassVar[int]
     SUBSYSTEMS_FIELD_NUMBER: _ClassVar[int]
     switchboard_id: int
@@ -904,7 +912,7 @@ class Switchboard(_message.Message):
     ) -> None: ...
 
 class ShaftLine(_message.Message):
-    __slots__ = ("shaft_line_id", "subsystems")
+    __slots__ = ["shaft_line_id", "subsystems"]
     SHAFT_LINE_ID_FIELD_NUMBER: _ClassVar[int]
     SUBSYSTEMS_FIELD_NUMBER: _ClassVar[int]
     shaft_line_id: int
@@ -916,7 +924,7 @@ class ShaftLine(_message.Message):
     ) -> None: ...
 
 class MechanicalSystem(_message.Message):
-    __slots__ = ("shaft_lines",)
+    __slots__ = ["shaft_lines"]
     SHAFT_LINES_FIELD_NUMBER: _ClassVar[int]
     shaft_lines: _containers.RepeatedCompositeFieldContainer[ShaftLine]
     def __init__(
@@ -924,7 +932,7 @@ class MechanicalSystem(_message.Message):
     ) -> None: ...
 
 class ElectricSystem(_message.Message):
-    __slots__ = ("switchboards",)
+    __slots__ = ["switchboards"]
     SWITCHBOARDS_FIELD_NUMBER: _ClassVar[int]
     switchboards: _containers.RepeatedCompositeFieldContainer[Switchboard]
     def __init__(
@@ -932,7 +940,7 @@ class ElectricSystem(_message.Message):
     ) -> None: ...
 
 class FuelStorage(_message.Message):
-    __slots__ = ("fuel_type", "capacity_kg")
+    __slots__ = ["fuel_type", "capacity_kg"]
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     CAPACITY_KG_FIELD_NUMBER: _ClassVar[int]
     fuel_type: FuelType
@@ -944,7 +952,7 @@ class FuelStorage(_message.Message):
     ) -> None: ...
 
 class MachinerySystem(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "name",
         "propulsion_type",
         "fuel_storage",
@@ -953,10 +961,10 @@ class MachinerySystem(_message.Message):
         "electric_system",
         "maximum_allowed_fuel_cell_load_percentage",
         "average_base_load_percentage",
-    )
+    ]
 
     class PropulsionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
+        __slots__ = []
         MECHANICAL: _ClassVar[MachinerySystem.PropulsionType]
         ELECTRIC: _ClassVar[MachinerySystem.PropulsionType]
         HYBRID: _ClassVar[MachinerySystem.PropulsionType]

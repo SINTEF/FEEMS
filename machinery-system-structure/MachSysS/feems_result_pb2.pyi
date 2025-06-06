@@ -13,7 +13,7 @@ from typing import (
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class FuelScalar(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "fuel_type",
         "fuel_origin",
         "fuel_specified_by",
@@ -21,7 +21,7 @@ class FuelScalar(_message.Message):
         "lhv_mj_per_g",
         "ghg_emission_factor_well_to_tank_gco2eq_per_mj",
         "ghg_emission_factor_tank_to_wake",
-    )
+    ]
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     FUEL_SPECIFIED_BY_FIELD_NUMBER: _ClassVar[int]
@@ -50,7 +50,7 @@ class FuelScalar(_message.Message):
     ) -> None: ...
 
 class FuelArray(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "fuel_type",
         "fuel_origin",
         "fuel_specified_by",
@@ -58,7 +58,7 @@ class FuelArray(_message.Message):
         "lhv_mj_per_g",
         "ghg_emission_factor_well_to_tank_gco2eq_per_mj",
         "ghg_emission_factor_tank_to_wake",
-    )
+    ]
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     FUEL_SPECIFIED_BY_FIELD_NUMBER: _ClassVar[int]
@@ -87,7 +87,7 @@ class FuelArray(_message.Message):
     ) -> None: ...
 
 class FuelConsumptionScalar(_message.Message):
-    __slots__ = ("fuels",)
+    __slots__ = ["fuels"]
     FUELS_FIELD_NUMBER: _ClassVar[int]
     fuels: _containers.RepeatedCompositeFieldContainer[FuelScalar]
     def __init__(
@@ -95,7 +95,7 @@ class FuelConsumptionScalar(_message.Message):
     ) -> None: ...
 
 class FuelConsumptionRateArray(_message.Message):
-    __slots__ = ("fuels",)
+    __slots__ = ["fuels"]
     FUELS_FIELD_NUMBER: _ClassVar[int]
     fuels: _containers.RepeatedCompositeFieldContainer[FuelArray]
     def __init__(
@@ -103,7 +103,7 @@ class FuelConsumptionRateArray(_message.Message):
     ) -> None: ...
 
 class TimeSeriesResultForComponent(_message.Message):
-    __slots__ = ("time", "power_output_kw", "fuel_consumption_kg_per_s")
+    __slots__ = ["time", "power_output_kw", "fuel_consumption_kg_per_s"]
     TIME_FIELD_NUMBER: _ClassVar[int]
     POWER_OUTPUT_KW_FIELD_NUMBER: _ClassVar[int]
     FUEL_CONSUMPTION_KG_PER_S_FIELD_NUMBER: _ClassVar[int]
@@ -119,8 +119,43 @@ class TimeSeriesResultForComponent(_message.Message):
         ] = ...,
     ) -> None: ...
 
+class GHGEmissions(_message.Message):
+    __slots__ = [
+        "well_to_tank",
+        "tank_to_wake",
+        "well_to_wake",
+        "tank_to_wake_without_slip",
+        "well_to_wake_without_slip",
+        "tank_to_wake_from_green_fuel",
+        "tank_to_wake_without_slip_from_green_fuel",
+    ]
+    WELL_TO_TANK_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    WELL_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_WITHOUT_SLIP_FIELD_NUMBER: _ClassVar[int]
+    WELL_TO_WAKE_WITHOUT_SLIP_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_FROM_GREEN_FUEL_FIELD_NUMBER: _ClassVar[int]
+    TANK_TO_WAKE_WITHOUT_SLIP_FROM_GREEN_FUEL_FIELD_NUMBER: _ClassVar[int]
+    well_to_tank: float
+    tank_to_wake: float
+    well_to_wake: float
+    tank_to_wake_without_slip: float
+    well_to_wake_without_slip: float
+    tank_to_wake_from_green_fuel: float
+    tank_to_wake_without_slip_from_green_fuel: float
+    def __init__(
+        self,
+        well_to_tank: _Optional[float] = ...,
+        tank_to_wake: _Optional[float] = ...,
+        well_to_wake: _Optional[float] = ...,
+        tank_to_wake_without_slip: _Optional[float] = ...,
+        well_to_wake_without_slip: _Optional[float] = ...,
+        tank_to_wake_from_green_fuel: _Optional[float] = ...,
+        tank_to_wake_without_slip_from_green_fuel: _Optional[float] = ...,
+    ) -> None: ...
+
 class ResultPerComponent(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "component_name",
         "multi_fuel_consumption_kg",
         "electric_energy_consumption_mj",
@@ -135,7 +170,8 @@ class ResultPerComponent(_message.Message):
         "switchboard_id",
         "shaftline_id",
         "result_time_series",
-    )
+        "fuel_consumer_type",
+    ]
     COMPONENT_NAME_FIELD_NUMBER: _ClassVar[int]
     MULTI_FUEL_CONSUMPTION_KG_FIELD_NUMBER: _ClassVar[int]
     ELECTRIC_ENERGY_CONSUMPTION_MJ_FIELD_NUMBER: _ClassVar[int]
@@ -150,13 +186,14 @@ class ResultPerComponent(_message.Message):
     SWITCHBOARD_ID_FIELD_NUMBER: _ClassVar[int]
     SHAFTLINE_ID_FIELD_NUMBER: _ClassVar[int]
     RESULT_TIME_SERIES_FIELD_NUMBER: _ClassVar[int]
+    FUEL_CONSUMER_TYPE_FIELD_NUMBER: _ClassVar[int]
     component_name: str
     multi_fuel_consumption_kg: FuelConsumptionScalar
     electric_energy_consumption_mj: float
     mechanical_energy_consumption_mj: float
     energy_stored_mj: float
     running_hours_h: float
-    co2_emissions_kg: float
+    co2_emissions_kg: GHGEmissions
     nox_emissions_kg: float
     component_type: str
     rated_capacity: float
@@ -164,6 +201,7 @@ class ResultPerComponent(_message.Message):
     switchboard_id: int
     shaftline_id: int
     result_time_series: TimeSeriesResultForComponent
+    fuel_consumer_type: str
     def __init__(
         self,
         component_name: _Optional[str] = ...,
@@ -174,7 +212,7 @@ class ResultPerComponent(_message.Message):
         mechanical_energy_consumption_mj: _Optional[float] = ...,
         energy_stored_mj: _Optional[float] = ...,
         running_hours_h: _Optional[float] = ...,
-        co2_emissions_kg: _Optional[float] = ...,
+        co2_emissions_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ...,
         nox_emissions_kg: _Optional[float] = ...,
         component_type: _Optional[str] = ...,
         rated_capacity: _Optional[float] = ...,
@@ -184,10 +222,11 @@ class ResultPerComponent(_message.Message):
         result_time_series: _Optional[
             _Union[TimeSeriesResultForComponent, _Mapping]
         ] = ...,
+        fuel_consumer_type: _Optional[str] = ...,
     ) -> None: ...
 
 class FeemsResult(_message.Message):
-    __slots__ = (
+    __slots__ = [
         "duration_s",
         "multi_fuel_consumption_total_kg",
         "energy_consumption_electric_total_mj",
@@ -204,7 +243,7 @@ class FeemsResult(_message.Message):
         "energy_input_electric_total_mj",
         "energy_consumption_propulsion_total_mj",
         "energy_consumption_auxiliary_total_mj",
-    )
+    ]
     DURATION_S_FIELD_NUMBER: _ClassVar[int]
     MULTI_FUEL_CONSUMPTION_TOTAL_KG_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CONSUMPTION_ELECTRIC_TOTAL_MJ_FIELD_NUMBER: _ClassVar[int]
@@ -230,7 +269,7 @@ class FeemsResult(_message.Message):
     running_hours_genset_total_hr: float
     running_hours_fuel_cell_total_hr: float
     running_hours_pti_pto_total_hr: float
-    co2_emission_total_kg: float
+    co2_emission_total_kg: GHGEmissions
     nox_emission_total_kg: float
     detailed_result: _containers.RepeatedCompositeFieldContainer[ResultPerComponent]
     energy_input_mechanical_total_mj: float
@@ -250,7 +289,7 @@ class FeemsResult(_message.Message):
         running_hours_genset_total_hr: _Optional[float] = ...,
         running_hours_fuel_cell_total_hr: _Optional[float] = ...,
         running_hours_pti_pto_total_hr: _Optional[float] = ...,
-        co2_emission_total_kg: _Optional[float] = ...,
+        co2_emission_total_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ...,
         nox_emission_total_kg: _Optional[float] = ...,
         detailed_result: _Optional[
             _Iterable[_Union[ResultPerComponent, _Mapping]]
@@ -262,7 +301,7 @@ class FeemsResult(_message.Message):
     ) -> None: ...
 
 class FeemsResultForMachinerySystem(_message.Message):
-    __slots__ = ("electric_system", "mechanical_system")
+    __slots__ = ["electric_system", "mechanical_system"]
     ELECTRIC_SYSTEM_FIELD_NUMBER: _ClassVar[int]
     MECHANICAL_SYSTEM_FIELD_NUMBER: _ClassVar[int]
     electric_system: FeemsResult
