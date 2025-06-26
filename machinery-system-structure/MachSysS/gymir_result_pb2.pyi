@@ -136,6 +136,21 @@ class PropulsionPowerInstance(_message.Message):
         auxiliary_power_kw: _Optional[float] = ...,
     ) -> None: ...
 
+class PropulsionPowerInstanceForMultiplePropulsors(_message.Message):
+    __slots__ = ["epoch_s", "propulsion_power_kw", "auxiliary_power_kw"]
+    EPOCH_S_FIELD_NUMBER: _ClassVar[int]
+    PROPULSION_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    AUXILIARY_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    epoch_s: float
+    propulsion_power_kw: _containers.RepeatedScalarFieldContainer[float]
+    auxiliary_power_kw: float
+    def __init__(
+        self,
+        epoch_s: _Optional[float] = ...,
+        propulsion_power_kw: _Optional[_Iterable[float]] = ...,
+        auxiliary_power_kw: _Optional[float] = ...,
+    ) -> None: ...
+
 class OperationProfilePoint(_message.Message):
     __slots__ = ["epoch_s", "speed_kn", "draft_m"]
     EPOCH_S_FIELD_NUMBER: _ClassVar[int]
@@ -172,6 +187,37 @@ class TimeSeriesResult(_message.Message):
         propulsion_power_timeseries: _Optional[
             _Iterable[_Union[PropulsionPowerInstance, _Mapping]]
         ] = ...,
+        auxiliary_power_kw: _Optional[float] = ...,
+        operation_profile: _Optional[
+            _Iterable[_Union[OperationProfilePoint, _Mapping]]
+        ] = ...,
+    ) -> None: ...
+
+class TimeSeriesResultForMultiplePropulsors(_message.Message):
+    __slots__ = [
+        "propulsion_power_timeseries",
+        "propulsor_names",
+        "auxiliary_power_kw",
+        "operation_profile",
+    ]
+    PROPULSION_POWER_TIMESERIES_FIELD_NUMBER: _ClassVar[int]
+    PROPULSOR_NAMES_FIELD_NUMBER: _ClassVar[int]
+    AUXILIARY_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_PROFILE_FIELD_NUMBER: _ClassVar[int]
+    propulsion_power_timeseries: _containers.RepeatedCompositeFieldContainer[
+        PropulsionPowerInstanceForMultiplePropulsors
+    ]
+    propulsor_names: _containers.RepeatedScalarFieldContainer[str]
+    auxiliary_power_kw: float
+    operation_profile: _containers.RepeatedCompositeFieldContainer[
+        OperationProfilePoint
+    ]
+    def __init__(
+        self,
+        propulsion_power_timeseries: _Optional[
+            _Iterable[_Union[PropulsionPowerInstanceForMultiplePropulsors, _Mapping]]
+        ] = ...,
+        propulsor_names: _Optional[_Iterable[str]] = ...,
         auxiliary_power_kw: _Optional[float] = ...,
         operation_profile: _Optional[
             _Iterable[_Union[OperationProfilePoint, _Mapping]]
