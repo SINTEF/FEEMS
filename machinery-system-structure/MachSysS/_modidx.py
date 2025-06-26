@@ -82,6 +82,10 @@ d = {
             ),
         },
         "MachSysS.convert_proto_timeseries": {
+            "MachSysS.convert_proto_timeseries.convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe": (
+                "converttimeseriesresultprototopandas.html#convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe",
+                "MachSysS/convert_proto_timeseries.py",
+            ),
             "MachSysS.convert_proto_timeseries.convert_proto_timeseries_to_pd_dataframe": (
                 "converttimeseriesresultprototopandas.html#convert_proto_timeseries_to_pd_dataframe",
                 "MachSysS/convert_proto_timeseries.py",

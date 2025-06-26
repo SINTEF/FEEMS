@@ -99,6 +99,10 @@ enum FuelType {
   ETHANOL = 7;
   METHANOL = 8;
   LFO = 9;
+  LSFO_CRUDE = 10;
+  LSFO_BLEND = 11;
+  ULSFO = 12;
+  VLSFO = 13; 
 }
 
 enum FuelOrigin {
