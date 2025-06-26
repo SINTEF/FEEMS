@@ -11,7 +11,10 @@ __all__ = [
 from typing import List, Union, Type, TypeVar
 
 import MachSysS.gymir_result_pb2 as proto_gymir
-from MachSysS.convert_proto_timeseries import convert_proto_timeseries_to_pd_dataframe
+from MachSysS.convert_proto_timeseries import (
+    convert_proto_timeseries_to_pd_dataframe,
+    convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe,
+)
 import numpy as np
 import pandas as pd
 from feems.components_model.utility import IntegrationMethod
@@ -95,43 +98,100 @@ class MachineryCalculation:
     def _set_input_load_time_interval_from_propulsion_power_time_series(
         self,
         *,
-        propulsion_power_time_series: pd.Series,
+        propulsion_power_time_series: Union[pd.Series, pd.DataFrame],
         auxiliary_load_kw: Numeric,
         time_is_given_as_interval: bool = False,
     ) -> None:
-        if time_is_given_as_interval:
-            propulsion_power = propulsion_power_time_series.values
-            time_interval_s = propulsion_power_time_series.index.to_numpy()
+        """Set the input load time interval from the propulsion power time series.
+        Args:
+            propulsion_power_time_series (Union[pd.Series, pd.DataFrame]): The propulsion power time series.
+                If it is a DataFrame, it should contain the propulsion power for each propulsion drive.
+            auxiliary_load_kw (Numeric): The auxiliary load in kW. It can be a single value or an array.
+            time_is_given_as_interval (bool): If True, the time series index is given as intervals.
+                Default is False, meaning the index is given as timestamps.
+        """
+        if not isinstance(propulsion_power_time_series, (pd.Series, pd.DataFrame)):
+            raise TypeError(
+                "propulsion_power_time_series must be a pandas Series or DataFrame."
+            )
+        if isinstance(propulsion_power_time_series, pd.Series):
+            if time_is_given_as_interval:
+                propulsion_power = propulsion_power_time_series.values
+                time_interval_s = propulsion_power_time_series.index.to_numpy()
+            else:
+                propulsion_power = propulsion_power_time_series.values[:-1]
+                time_interval_s = np.diff(propulsion_power_time_series.index.to_numpy())
+            number_points = len(propulsion_power)
+            # set power load
+            if self.system_is_not_electric:
+                number_of_propulsors = (
+                    self.system_feems.mechanical_system.no_mechanical_loads
+                )
+            else:
+                number_of_propulsors = len(self.electric_system.propulsion_drives)
+            if self.system_is_not_electric:
+                for propulsor in self.system_feems.mechanical_system.mechanical_loads:
+                    propulsor.set_power_input_from_output(
+                        propulsion_power / number_of_propulsors
+                    )
+            else:
+                for propulsor in self.electric_system.propulsion_drives:
+                    propulsor.set_power_input_from_output(
+                        propulsion_power / number_of_propulsors
+                    )
         else:
-            propulsion_power = propulsion_power_time_series.values[:-1]
-            time_interval_s = np.diff(propulsion_power_time_series.index.to_numpy())
-
-        number_points = len(propulsion_power)
+            if time_is_given_as_interval:
+                time_interval_s = propulsion_power_time_series.index.to_numpy()
+            else:
+                time_interval_s = np.diff(propulsion_power_time_series.index.to_numpy())
+                propulsion_power_time_series = propulsion_power_time_series.iloc[:-1]
+            number_points = len(propulsion_power_time_series)
+            for propulsor_name in propulsion_power_time_series.columns:
+                propulsor = None
+                if self.system_is_not_electric:
+                    for (
+                        each_shaft_line
+                    ) in self.system_feems.mechanical_system.shaft_line:
+                        try:
+                            propulsor = (
+                                each_shaft_line.get_component_by_name_power_type(
+                                    name=propulsor_name,
+                                    power_type=TypePower.POWER_CONSUMER,
+                                )
+                            )
+                        except ValueError:
+                            continue
+                else:
+                    for (
+                        swb_id,
+                        each_switchboard,
+                    ) in self.electric_system.switchboards.items():
+                        try:
+                            propulsor = (
+                                each_switchboard._get_component_by_type_and_name(
+                                    name=propulsor_name,
+                                    power_type=TypePower.POWER_CONSUMER,
+                                )
+                            )
+                        except ValueError:
+                            continue
+                if propulsor is None:
+                    raise ValueError(
+                        f"Propulsor with name {propulsor_name} not found in the system."
+                    )
+                propulsor.set_power_input_from_output(
+                    propulsion_power_time_series[propulsor_name].values
+                )
         auxiliary_load_kw = np.atleast_1d(auxiliary_load_kw)
         if len(auxiliary_load_kw) > 1:
             auxiliary_load_kw = auxiliary_load_kw[:number_points]
         else:
             auxiliary_load_kw = np.repeat(auxiliary_load_kw, number_points)
-        # set power load
-        number_of_propulsors = len(self.electric_system.propulsion_drives)
-        if self.system_is_not_electric:
-            number_of_propulsors = (
-                self.system_feems.mechanical_system.no_mechanical_loads
-            )
         number_of_other_loads = len(self.electric_system.other_load)
         if number_of_other_loads == 0:
             assert np.all(
                 np.atleast_1d(auxiliary_load_kw) == 0
             ), "Auxiliary load is not zero while other loads are not defined in the system."
-        for propulsor in self.electric_system.propulsion_drives:
-            propulsor.set_power_input_from_output(
-                propulsion_power / number_of_propulsors
-            )
-        if self.system_is_not_electric:
-            for propulsor in self.system_feems.mechanical_system.mechanical_loads:
-                propulsor.set_power_input_from_output(
-                    propulsion_power / number_of_propulsors
-                )
         for other_load in self.electric_system.other_load:
             other_load.power_input = auxiliary_load_kw / number_of_other_loads
         self.electric_system.set_time_interval(
@@ -239,7 +299,7 @@ class MachineryCalculation:
     def calculate_machinery_system_output_from_propulsion_power_time_series(
         self,
         *,
-        propulsion_power: pd.Series,
+        propulsion_power: Union[pd.Series, pd.DataFrame],
         auxiliary_power_kw: Numeric,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
@@ -249,7 +309,9 @@ class MachineryCalculation:
         auxiliary power.
 
         Args:
-            propulsion_power(pd.Series): The propulsion power time series.
+            propulsion_power: The propulsion power time series. It can be a pandas Series if the
+                data is the total propulsion power that is equally shared by all propulsion drives,
+                or a pandas DataFrame if the data is given for each propulsion drive separately.
             auxiliary_power_kw(Numeric): The auxiliary power in kW. It can be a single value or
                 a numpy array with the same length as the propulsion power.
             fuel_specified_by(FuelSpecifiedBy): The fuel specified by IMO/EU/USER. Default is IMO.
@@ -258,11 +320,36 @@ class MachineryCalculation:
         Returns:
             The result of the calculation. FEEMSResult or FEEMSResultForMachinerySystem.
         """
+        # Check if the propulsion power is a pandas Series or DataFrame
+        if not isinstance(propulsion_power, (pd.Series, pd.DataFrame)):
+            raise TypeError("propulsion_power must be a pandas Series or DataFrame.")
+        # If it's a DataFrame, ensure column names match the propulsion drives
+        if isinstance(propulsion_power, pd.DataFrame):
+            # Check for electric propulsion system
+            if self.system_is_not_electric:
+                names_for_propulsion_drives = [
+                    drive.name
+                    for drive in self.system_feems.mechanical_system.mechanical_loads
+                ]
+                for name in propulsion_power.columns:
+                    assert (
+                        name in names_for_propulsion_drives
+                    ), f"Column '{name}' not found in mechanical loads."
+            else:
+                names_for_propulsion_drives = [
+                    drive.name for drive in self.electric_system.propulsion_drives
+                ]
+                for name in propulsion_power.columns:
+                    assert (
+                        name in names_for_propulsion_drives
+                    ), f"Column '{name}' not found in propulsion drives."
+        # Check if auxiliary_power_kw is a scalar or an array
         if not np.isscalar(auxiliary_power_kw):
             assert (
                 len(propulsion_power) == len(auxiliary_power_kw)
                 or len(auxiliary_power_kw) == 1
-            ), "The length of the auxiliary power must be 1 or the same as the propulsion power"
+            ), f"The length of the auxiliary power({len(auxiliary_power_kw)}) must be 1 or the same as the propulsion power ({len(propulsion_power)})"
+
         self._set_input_load_time_interval_from_propulsion_power_time_series(
             propulsion_power_time_series=propulsion_power,
             auxiliary_load_kw=auxiliary_power_kw,
@@ -275,7 +362,10 @@ class MachineryCalculation:
     def calculate_machinery_system_output_from_time_series_result(
         self,
         *,
-        time_series: proto_gymir.TimeSeriesResult,
+        time_series: Union[
+            proto_gymir.TimeSeriesResult,
+            proto_gymir.TimeSeriesResultForMultiplePropulsors,
+        ],
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
     ) -> Union[FEEMSResult, FEEMSResultForMachinerySystem]:
@@ -289,11 +379,26 @@ class MachineryCalculation:
         Returns:
             The result of the simulation. FEEMSResult or FEEMSResultForMachinery system.
         """
-        df = convert_proto_timeseries_to_pd_dataframe(time_series)
-        self._set_input_load_time_interval_from_propulsion_power_time_series(
-            propulsion_power_time_series=df["propulsion_power_kw"],
-            auxiliary_load_kw=df["auxiliary_power_kw"].values,
-        )
+        if isinstance(time_series, proto_gymir.TimeSeriesResult):
+            df = convert_proto_timeseries_to_pd_dataframe(time_series)
+            self._set_input_load_time_interval_from_propulsion_power_time_series(
+                propulsion_power_time_series=df["propulsion_power_kw"],
+                auxiliary_load_kw=df["auxiliary_power_kw"].values,
+            )
+        elif isinstance(time_series, proto_gymir.TimeSeriesResultForMultiplePropulsors):
+            df = convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe(
+                time_series
+            )
+            propulsor_names = list(map(lambda each: each, time_series.propulsor_names))
+            self._set_input_load_time_interval_from_propulsion_power_time_series(
+                propulsion_power_time_series=df[propulsor_names],
+                auxiliary_load_kw=df["auxiliary_power_kw"].values,
+            )
+        else:
+            raise TypeError(
+                "time_series must be a TimeSeriesResult or TimeSeriesResultForMultiplePropulsors."
+            )
+
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,

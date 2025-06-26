@@ -537,7 +537,7 @@ class Switchboard(Node):
         """
         component = self._get_component_by_type_and_name(name, power_type)
         if component is not None and not isinstance(component, Genset):
-            component.set_power_input_from_output(power_input)
+            component.set_power_output_from_input(power_input)
             return 1
         else:
             return 0
