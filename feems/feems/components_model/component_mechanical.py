@@ -459,7 +459,7 @@ class MainEngineForMechanicalPropulsion(Component):
     def __init__(
         self,
         name,
-        engine: Union[Engine, EngineDualFuel],
+        engine: Union[Engine, EngineDualFuel, EngineMultiFuel],
         shaft_line_id: int = 1,
         uid: Optional[str] = None,
     ):
@@ -485,6 +485,8 @@ class MainEngineForMechanicalPropulsion(Component):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -502,6 +504,10 @@ class MainEngineForMechanicalPropulsion(Component):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            fuel_type (Optional[TypeFuel], optional): Desired main fuel type when the engine is a
+                multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
+            fuel_origin (Optional[FuelOrigin], optional): Desired main fuel origin when the engine
+                is a multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
 
         Returns:
             EngineRunPoint
@@ -509,6 +515,27 @@ class MainEngineForMechanicalPropulsion(Component):
         if power is None:
             power = self.power_output
         self.engine.power_output = power
+        if isinstance(self.engine, EngineMultiFuel):
+            assert len(self.engine.multi_fuel_characteristics) > 0
+            default_characteristic = self.engine.multi_fuel_characteristics[0]
+            selected_fuel_type = fuel_type or default_characteristic.main_fuel_type
+            selected_fuel_origin = fuel_origin or default_characteristic.main_fuel_origin
+            return self.engine.get_engine_run_point_from_power_out_kw(
+                fuel_type=selected_fuel_type,
+                fuel_origin=selected_fuel_origin,
+                fuel_specified_by=fuel_specified_by,
+                lhv_mj_per_g=lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            )
+        if fuel_type is not None and fuel_type != self.engine.fuel_type:
+            raise ValueError(
+                "fuel_type argument does not match the configured engine fuel type"
+            )
+        if fuel_origin is not None and fuel_origin != self.engine.fuel_origin:
+            raise ValueError(
+                "fuel_origin argument does not match the configured engine fuel origin"
+            )
         return self.engine.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
@@ -551,7 +578,7 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
     def __init__(
         self,
         name: str,
-        engine: Union[Engine, EngineDualFuel],
+        engine: Union[Engine, EngineDualFuel, EngineMultiFuel],
         gearbox: BasicComponent,
         shaft_line_id: int = 1,
         uid: Optional[str] = None,
@@ -571,6 +598,8 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -588,6 +617,10 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            fuel_type (Optional[TypeFuel], optional): Desired main fuel type when the engine is a
+                multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
+            fuel_origin (Optional[FuelOrigin], optional): Desired main fuel origin when the engine
+                is a multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
 
         Returns:
             EngineRunPoint
@@ -597,6 +630,27 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         load_ratio = self.get_load(power)
         eff_gearbox = self.gearbox.get_efficiency_from_load_percentage(load_ratio)
         self.engine.power_output = power / eff_gearbox
+        if isinstance(self.engine, EngineMultiFuel):
+            assert len(self.engine.multi_fuel_characteristics) > 0
+            default_characteristic = self.engine.multi_fuel_characteristics[0]
+            selected_fuel_type = fuel_type or default_characteristic.main_fuel_type
+            selected_fuel_origin = fuel_origin or default_characteristic.main_fuel_origin
+            return self.engine.get_engine_run_point_from_power_out_kw(
+                fuel_type=selected_fuel_type,
+                fuel_origin=selected_fuel_origin,
+                fuel_specified_by=fuel_specified_by,
+                lhv_mj_per_g=lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            )
+        if fuel_type is not None and fuel_type != self.engine.fuel_type:
+            raise ValueError(
+                "fuel_type argument does not match the configured engine fuel type"
+            )
+        if fuel_origin is not None and fuel_origin != self.engine.fuel_origin:
+            raise ValueError(
+                "fuel_origin argument does not match the configured engine fuel origin"
+            )
         return self.engine.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
