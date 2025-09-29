@@ -360,8 +360,6 @@ class EngineMultiFuel(Engine):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
-        alternative_fuel_origin: FuelOrigin = None,
-        alternative_fuel_ratio: float = 0.0,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -397,8 +395,6 @@ class EngineMultiFuel(Engine):
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-            alternative_fuel_origin=alternative_fuel_origin,
-            alternative_fuel_ratio=alternative_fuel_ratio,
         )
 
     def get_engine_object(

@@ -21,8 +21,10 @@ from feems.components_model.component_electric import (
 from feems.components_model.component_mechanical import (
     COGAS,
     Engine,
-    MainEngineWithGearBoxForMechanicalPropulsion,
     EngineDualFuel,
+    EngineMultiFuel,
+    FuelCharacteristics,
+    MainEngineWithGearBoxForMechanicalPropulsion,
 )
 from feems.components_model.node import Node
 from feems.components_model.utility import (
@@ -588,6 +590,96 @@ class TestComponent(TestCase):
         print(engine_run_point)
         print(engine_run_point.fuel_flow_rate_kg_per_s.__dict__)
 
+    def test_engine_multi_fuel(self):
+        rated_power = 1000.0
+        rated_speed = 1000.0
+        power_kw = np.array([rated_power * 0.5])
+
+        main_bsfc_dual = np.array([[0.0, 180.0], [1.0, 180.0]])
+        pilot_bsfc_dual = np.array([[0.0, 10.0], [1.0, 10.0]])
+        diesel_bsfc_single = np.array([[0.0, 210.0], [1.0, 210.0]])
+
+        multi_fuel_characteristics = [
+            FuelCharacteristics(
+                main_fuel_type=TypeFuel.NATURAL_GAS,
+                main_fuel_origin=FuelOrigin.FOSSIL,
+                pilot_fuel_type=TypeFuel.DIESEL,
+                pilot_fuel_origin=FuelOrigin.FOSSIL,
+                bsfc_curve=main_bsfc_dual,
+                bpsfc_curve=pilot_bsfc_dual,
+            ),
+            FuelCharacteristics(
+                main_fuel_type=TypeFuel.DIESEL,
+                main_fuel_origin=FuelOrigin.FOSSIL,
+                pilot_fuel_type=None,
+                pilot_fuel_origin=None,
+                bsfc_curve=diesel_bsfc_single,
+            ),
+        ]
+
+        engine = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="multi-fuel engine",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=multi_fuel_characteristics,
+        )
+
+        expected_load = power_kw / rated_power
+
+        lng_run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
+            fuel_type=TypeFuel.NATURAL_GAS,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+
+        expected_main_bsfc = np.full_like(expected_load, 180.0, dtype=float)
+        expected_main_consumption = expected_main_bsfc * (power_kw / 3600.0) / 1000.0
+        expected_pilot_bsfc = np.full_like(expected_load, 10.0, dtype=float)
+        expected_pilot_consumption = expected_pilot_bsfc * (power_kw / 3600.0) / 1000.0
+
+        np.testing.assert_allclose(lng_run_point.load_ratio, expected_load)
+        np.testing.assert_allclose(lng_run_point.bsfc_g_per_kWh, expected_main_bsfc)
+        self.assertEqual(len(lng_run_point.fuel_flow_rate_kg_per_s.fuels), 2)
+        main_fuel = lng_run_point.fuel_flow_rate_kg_per_s.fuels[0]
+        pilot_fuel = lng_run_point.fuel_flow_rate_kg_per_s.fuels[1]
+        self.assertEqual(main_fuel.fuel_type, TypeFuel.NATURAL_GAS)
+        self.assertEqual(main_fuel.origin, FuelOrigin.FOSSIL)
+        np.testing.assert_allclose(main_fuel.mass_or_mass_fraction, expected_main_consumption)
+        np.testing.assert_allclose(lng_run_point.bpsfc_g_per_kWh, expected_pilot_bsfc)
+        self.assertEqual(pilot_fuel.fuel_type, TypeFuel.DIESEL)
+        self.assertEqual(pilot_fuel.origin, FuelOrigin.FOSSIL)
+        np.testing.assert_allclose(pilot_fuel.mass_or_mass_fraction, expected_pilot_consumption)
+        np.testing.assert_allclose(
+            lng_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            expected_main_consumption + expected_pilot_consumption,
+        )
+
+        diesel_run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+
+        expected_diesel_bsfc = np.full_like(expected_load, 210.0, dtype=float)
+        expected_diesel_consumption = expected_diesel_bsfc * (power_kw / 3600.0) / 1000.0
+
+        np.testing.assert_allclose(diesel_run_point.load_ratio, expected_load)
+        np.testing.assert_allclose(diesel_run_point.bsfc_g_per_kWh, expected_diesel_bsfc)
+        self.assertIsNone(diesel_run_point.bpsfc_g_per_kWh)
+        self.assertEqual(len(diesel_run_point.fuel_flow_rate_kg_per_s.fuels), 1)
+        diesel_fuel = diesel_run_point.fuel_flow_rate_kg_per_s.fuels[0]
+        self.assertEqual(diesel_fuel.fuel_type, TypeFuel.DIESEL)
+        self.assertEqual(diesel_fuel.origin, FuelOrigin.FOSSIL)
+        np.testing.assert_allclose(
+            diesel_fuel.mass_or_mass_fraction,
+            expected_diesel_consumption,
+        )
+        np.testing.assert_allclose(
+            diesel_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            expected_diesel_consumption,
+        )
+
     def test_fuel_cell(self):
         """Test fuel cell"""
         fuel_cell = FuelCell(
@@ -724,3 +816,5 @@ class TestComponent(TestCase):
             res_coges.cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
             res_cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
         )
+
+    
