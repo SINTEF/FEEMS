@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from functools import reduce
-from typing import Dict, Tuple, List, Union, cast, Sequence
+from typing import Dict, Tuple, List, Union, cast, Sequence, Optional
 
 import numpy as np
 import pandas as pd
@@ -30,6 +30,7 @@ from .component_mechanical import (
     EngineRunPoint,
     Engine,
     EngineDualFuel,
+    EngineMultiFuel,
 )
 from .utility import (
     integrate_data,
@@ -42,8 +43,10 @@ from ..exceptions import InputError
 from ..fuel import (
     FuelConsumption,
     FuelByMassFraction,
+    FuelOrigin,
     FuelSpecifiedBy,
     FuelConsumerClassFuelEUMaritime,
+    TypeFuel,
 )
 from ..types_for_feems import (
     FEEMSResult,
@@ -63,6 +66,7 @@ logger = get_logger(__name__)
 PowerSource = Union[
     Engine,
     EngineDualFuel,
+    EngineMultiFuel,
     Genset,
     ElectricMachine,
     FuelCellSystem,
@@ -115,7 +119,42 @@ def get_fuel_emission_energy_balance_for_component(
     integration_method: IntegrationMethod,
     fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
     isSystemMechanical: bool = False,
+    fuel_type: Optional[TypeFuel] = None,
+    fuel_origin: Optional[FuelOrigin] = None,
 ) -> FEEMSResult:
+    def _resolve_fuel_consumer_class(
+        source_component: Union[PowerSource, PowerConsumer],
+        fuel_consumption: FuelConsumption,
+    ) -> Optional[FuelConsumerClassFuelEUMaritime]:
+        engine_candidate: Union[Engine, EngineDualFuel, EngineMultiFuel, None]
+        if isinstance(source_component, Genset):
+            engine_candidate = source_component.aux_engine
+        elif hasattr(source_component, "engine"):
+            engine_candidate = cast(
+                Union[Engine, EngineDualFuel, EngineMultiFuel], getattr(source_component, "engine")
+            )
+        else:
+            engine_candidate = cast(
+                Union[Engine, EngineDualFuel, EngineMultiFuel], source_component
+            )
+
+        if isinstance(engine_candidate, EngineMultiFuel):
+            if not fuel_consumption.fuels:
+                raise ValueError(
+                    "Fuel consumption data is required to resolve fuel consumer class for EngineMultiFuel components."
+                )
+            primary_fuel = fuel_consumption.fuels[0]
+            resolved_engine = engine_candidate.get_engine_object(
+                fuel_type=primary_fuel.fuel_type,
+                fuel_origin=primary_fuel.origin,
+            )
+            return resolved_engine.fuel_consumer_type_fuel_eu_maritime
+
+        if isinstance(engine_candidate, (Engine, EngineDualFuel)):
+            return engine_candidate.fuel_consumer_type_fuel_eu_maritime
+
+        return None
+
     res = FEEMSResult(
         duration_s=0,
         running_hours_genset_total_hr=0,
@@ -137,6 +176,8 @@ def get_fuel_emission_energy_balance_for_component(
     ]:
         engine_run_point = component.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by,
+            fuel_type=fuel_type,
+            fuel_origin=fuel_origin,
         )
         fuel_consumption_kg_per_s = engine_run_point.fuel_flow_rate_kg_per_s
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
@@ -144,9 +185,13 @@ def get_fuel_emission_energy_balance_for_component(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-            fuel_consumer_class=component.fuel_consumer_type_fuel_eu_maritime
-        )
+        fuel_consumer_class = _resolve_fuel_consumer_class(component, fuel_consumption_kg_per_s)
+        if fuel_consumer_class is not None:
+            res.co2_emission_total_kg = (
+                res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+                    fuel_consumer_class=fuel_consumer_class
+                )
+            )
         set_emission(
             engine_out=engine_run_point,
             integration_method=integration_method,
@@ -160,15 +205,23 @@ def get_fuel_emission_energy_balance_for_component(
         genset_run_point = component.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
             power=component.power_output,
             fuel_specified_by=fuel_specified_by,
+            fuel_type=fuel_type,
+            fuel_origin=fuel_origin,
         )
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
             fuel_consumption_kg_per_s=genset_run_point.engine.fuel_flow_rate_kg_per_s,
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-            fuel_consumer_class=component.aux_engine.fuel_consumer_type_fuel_eu_maritime,
+        fuel_consumer_class = _resolve_fuel_consumer_class(
+            component, genset_run_point.engine.fuel_flow_rate_kg_per_s
         )
+        if fuel_consumer_class is not None:
+            res.co2_emission_total_kg = (
+                res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+                    fuel_consumer_class=fuel_consumer_class,
+                )
+            )
 
         if (
             np.isscalar(genset_run_point.genset_load_ratio)
@@ -786,6 +839,8 @@ class Switchboard(Node):
         time_interval_s: TimeIntervalList,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> FEEMSResult:
         """
         Calculates fuel/energy consumption at the shaftline. Power output of the main engines
@@ -832,6 +887,8 @@ class Switchboard(Node):
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
 
             res = res.sum_with_freeze_duration(res_comp)
@@ -894,6 +951,8 @@ class Switchboard(Node):
         time_interval_s: TimeIntervalList,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> FEEMSResult:
         """Similar function as `get_fuel_energy_consumption_running_time` but this version does not
         supply details.
@@ -902,6 +961,8 @@ class Switchboard(Node):
             time_interval_s: time interval for power output data
             integration_method: 'simpson' or 'trapezoid'. 'simpson' is default value
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_type: Optional[TypeFuel] = None
+            fuel_origin: Optional[FuelOrigin] = None
 
         Returns:
             FEEMSResult
@@ -933,6 +994,8 @@ class Switchboard(Node):
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
             res = res.sum_with_freeze_duration(res_component)
 
@@ -1252,6 +1315,8 @@ class ShaftLine(Node):
         time_step: float,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> FEEMSResult:
         """
         Calculate fuel consumption and running hours.
@@ -1261,6 +1326,8 @@ class ShaftLine(Node):
             time_step: time step for the time series in seconds
             integration_method: 'simpson' or 'trapezoid'. 'simpson' is the default method.
             fuel_specified_by: 'IMO' or 'EU'. 'IMO' is the default method.
+            fuel_type: Optional[TypeFuel] = None
+            fuel_origin: Optional[FuelOrigin] = None
 
         Returns: FEEMResult with total fuel consumption [kg], total_mechanical_energy_input [MJ],
             total running hours for engines[hours], CO2 emissions [kg], NOx emissions [kg] and
@@ -1302,6 +1369,8 @@ class ShaftLine(Node):
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
                 isSystemMechanical=True,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
             res = res.sum_with_freeze_duration(res_comp)
             if not (

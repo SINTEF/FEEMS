@@ -1,16 +1,17 @@
 from dataclasses import dataclass
 from functools import reduce
 from operator import itemgetter
-from typing import Union, List, Tuple, Dict, NewType, NamedTuple
+from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set
 
 import numpy as np
 import pandas as pd
-from feems.fuel import FuelSpecifiedBy
+from feems.fuel import FuelSpecifiedBy, FuelOrigin, TypeFuel
 
 from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
+from .components_model.component_mechanical import EngineMultiFuel
 
 from . import get_logger
 from .components_model.component_electric import (
@@ -50,6 +51,28 @@ class FEEMSResultForMachinerySystem(NamedTuple):
     mechanical_system: FEEMSResult
 
 
+class FuelOption(NamedTuple):
+    fuel_type: TypeFuel
+    fuel_origin: FuelOrigin
+
+
+def _extract_multi_fuel_options(engine: object) -> List[FuelOption]:
+    if not isinstance(engine, EngineMultiFuel):
+        return []
+
+    options: List[FuelOption] = []
+    seen: Set[FuelOption] = set()
+    for characteristics in engine.multi_fuel_characteristics:
+        option = FuelOption(
+            fuel_type=characteristics.main_fuel_type,
+            fuel_origin=characteristics.main_fuel_origin,
+        )
+        if option not in seen:
+            options.append(option)
+            seen.add(option)
+    return options
+
+
 class MachinerySystem:
     time_interval_s: float
     integration_method: IntegrationMethod
@@ -73,6 +96,14 @@ class MachinerySystem:
                 raise InputError(msg)
         self.time_interval_s = time_interval_s
         self.integration_method = integration_method
+
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        return {}
+
+    @property
+    def has_multi_fuel_engines(self) -> bool:
+        return any(self.multi_fuel_engine_inventory.values())
 
 
 class ElectricPowerSystem(MachinerySystem):
@@ -209,6 +240,16 @@ class ElectricPowerSystem(MachinerySystem):
         self.no_switchboard = len(self.switchboards)
         self.time_interval_s: TimeIntervalList = []
         self.integration_method: IntegrationMethod = IntegrationMethod.simpson
+
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for component in self.power_sources:
+            if isinstance(component, Genset):
+                options = _extract_multi_fuel_options(component.aux_engine)
+                if options:
+                    inventory[component.name] = list(options)
+        return inventory
 
     def set_status_by_switchboard_id_power_type(
         self, switchboard_id: SwbId, power_type: TypePower, status: np.ndarray
@@ -789,6 +830,16 @@ class MechanicalPropulsionSystem(MachinerySystem):
             )
 
     @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for main_engine in self.main_engines:
+            engine_obj = getattr(main_engine, "engine", None)
+            options = _extract_multi_fuel_options(engine_obj)
+            if options:
+                inventory[main_engine.name] = list(options)
+        return inventory
+
+    @property
     def no_shaft_lines(self) -> int:
         return len(self.shaft_line_id)
 
@@ -1176,6 +1227,15 @@ class HybridPropulsionSystem(MachinerySystem):
         if full_pti_pto_mode_exists:
             self.electric_system.do_power_balance_calculation()
 
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for name, options in self.mechanical_system.multi_fuel_engine_inventory.items():
+            inventory[f"mechanical::{name}"] = list(options)
+        for name, options in self.electric_system.multi_fuel_engine_inventory.items():
+            inventory[f"electric::{name}"] = list(options)
+        return inventory
+
     def get_fuel_energy_consumption_running_time(
         self,
         time_interval_s: float,
@@ -1283,3 +1343,12 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             electric_system=result_elec,
             mechanical_system=result_mech,
         )
+
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for name, options in self.mechanical_system.multi_fuel_engine_inventory.items():
+            inventory[f"mechanical::{name}"] = list(options)
+        for name, options in self.electric_system.multi_fuel_engine_inventory.items():
+            inventory[f"electric::{name}"] = list(options)
+        return inventory

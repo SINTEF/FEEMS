@@ -684,7 +684,10 @@ class Genset(Component):
         ) = self.generator.get_shaft_power_load_from_electric_power(self.power_output)
         if isinstance(self.aux_engine, EngineMultiFuel):
             assert len(self.aux_engine.multi_fuel_characteristics) > 0
-            default_characteristic = self._default_multi_fuel_characteristic or self.aux_engine.multi_fuel_characteristics[0]
+            default_characteristic = (
+                self._default_multi_fuel_characteristic
+                or self.aux_engine.multi_fuel_characteristics[0]
+            )
             selected_fuel_type = fuel_type or default_characteristic.main_fuel_type
             selected_fuel_origin = fuel_origin or default_characteristic.main_fuel_origin
             self.fuel_type = selected_fuel_type

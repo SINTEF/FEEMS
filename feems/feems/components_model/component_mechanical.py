@@ -529,9 +529,7 @@ class MainEngineForMechanicalPropulsion(Component):
                 ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
             )
         if fuel_type is not None and fuel_type != self.engine.fuel_type:
-            raise ValueError(
-                "fuel_type argument does not match the configured engine fuel type"
-            )
+            raise ValueError("fuel_type argument does not match the configured engine fuel type")
         if fuel_origin is not None and fuel_origin != self.engine.fuel_origin:
             raise ValueError(
                 "fuel_origin argument does not match the configured engine fuel origin"
@@ -644,9 +642,7 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
                 ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
             )
         if fuel_type is not None and fuel_type != self.engine.fuel_type:
-            raise ValueError(
-                "fuel_type argument does not match the configured engine fuel type"
-            )
+            raise ValueError("fuel_type argument does not match the configured engine fuel type")
         if fuel_origin is not None and fuel_origin != self.engine.fuel_origin:
             raise ValueError(
                 "fuel_origin argument does not match the configured engine fuel origin"
