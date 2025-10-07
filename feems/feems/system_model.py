@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import reduce
 from operator import itemgetter
-from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set
+from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set, Optional
 
 import numpy as np
 import pandas as pd
@@ -104,6 +104,46 @@ class MachinerySystem:
     @property
     def has_multi_fuel_engines(self) -> bool:
         return any(self.multi_fuel_engine_inventory.values())
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        options: List[FuelOption] = []
+        seen: Set[FuelOption] = set()
+        for engine_options in self.multi_fuel_engine_inventory.values():
+            for option in engine_options:
+                if option not in seen:
+                    options.append(option)
+                    seen.add(option)
+        return options
+
+    def _validate_selected_fuel_option(
+        self, fuel_option: Optional[FuelOption]
+    ) -> Optional[FuelOption]:
+        if fuel_option is None:
+            return None
+
+        inventory = self.multi_fuel_engine_inventory
+        if not inventory:
+            option_repr = f"{fuel_option.fuel_type.name}/{fuel_option.fuel_origin.name}"
+            raise InputError(
+                "Fuel option '{option}' cannot be selected because this system has no multi-fuel engines.".format(
+                    option=option_repr
+                )
+            )
+
+        unsupported_components = [
+            name for name, options in inventory.items() if fuel_option not in options
+        ]
+        if unsupported_components:
+            option_repr = f"{fuel_option.fuel_type.name}/{fuel_option.fuel_origin.name}"
+            raise InputError(
+                "Fuel option '{option}' is not supported by: {components}.".format(
+                    option=option_repr,
+                    components=", ".join(unsupported_components),
+                )
+            )
+
+        return fuel_option
 
 
 class ElectricPowerSystem(MachinerySystem):
@@ -687,7 +727,9 @@ class ElectricPowerSystem(MachinerySystem):
 
     # noinspection DuplicatedCode
     def get_fuel_energy_consumption_running_time(
-        self, fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO
+        self,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -700,6 +742,7 @@ class ElectricPowerSystem(MachinerySystem):
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply to all multi-fuel engines.
 
         Returns:
             FEEMSResult
@@ -711,6 +754,9 @@ class ElectricPowerSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        fuel_type = selected_option.fuel_type if selected_option else None
+        fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult(detail_result=pd.DataFrame())
         if len(self.switchboards) == 0:
             logger.warning("There is no switchboard in the system")
@@ -720,6 +766,8 @@ class ElectricPowerSystem(MachinerySystem):
                 time_interval_s=self.time_interval_s,
                 integration_method=self.integration_method,
                 fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
             result_swb.detail_result["switchboard id"] = switchboard.id
             res = res.sum_with_freeze_duration(result_swb)
@@ -727,7 +775,9 @@ class ElectricPowerSystem(MachinerySystem):
         return res
 
     def get_fuel_energy_consumption_running_time_scalar(
-        self, fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO
+        self,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -740,6 +790,7 @@ class ElectricPowerSystem(MachinerySystem):
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply to all multi-fuel engines.
 
         Returns:
             FEEMSResult
@@ -751,6 +802,9 @@ class ElectricPowerSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        fuel_type = selected_option.fuel_type if selected_option else None
+        fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult()
         for _, switchboard in self.switchboards.items():
             result_swb: FEEMSResult = (
@@ -758,6 +812,8 @@ class ElectricPowerSystem(MachinerySystem):
                     time_interval_s=self.time_interval_s,
                     integration_method=self.integration_method,
                     fuel_specified_by=fuel_specified_by,
+                    fuel_type=fuel_type,
+                    fuel_origin=fuel_origin,
                 )
             )
             res = res.sum_with_freeze_duration(result_swb)
@@ -1117,7 +1173,9 @@ class MechanicalPropulsionSystem(MachinerySystem):
         return True
 
     def get_fuel_energy_consumption_running_time(
-        self, fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO
+        self,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -1127,7 +1185,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
-            fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply to all multi-fuel engines.
 
         Returns:
             FEEMSResult
@@ -1139,6 +1197,9 @@ class MechanicalPropulsionSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        fuel_type = selected_option.fuel_type if selected_option else None
+        fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult(
             energy_consumption_electric_total_mj=0,
             energy_consumption_mechanical_total_mj=0,
@@ -1156,6 +1217,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
                 time_step=self.time_interval_s,
                 integration_method=self.integration_method,
                 fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
             result_shaft_line.detail_result["shaftline id"] = shaft_line.id
             res = res.sum_with_freeze_duration(result_shaft_line)
@@ -1241,6 +1304,7 @@ class HybridPropulsionSystem(MachinerySystem):
         time_interval_s: float,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1249,6 +1313,7 @@ class HybridPropulsionSystem(MachinerySystem):
             time_interval_s: the time interval for input load series in seconds
             integration_method: Integration method, "simpson" or "trapezoid"
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply across both subsystems.
         Returns:
             FEEMSResultForMachinerySystem
         """
@@ -1259,18 +1324,31 @@ class HybridPropulsionSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        mechanical_option = (
+            selected_option
+            if selected_option and selected_option in self.mechanical_system.available_fuel_options
+            else None
+        )
+        electric_option = (
+            selected_option
+            if selected_option and selected_option in self.electric_system.available_fuel_options
+            else None
+        )
         self.mechanical_system.set_time_interval(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
         result_mech = self.mechanical_system.get_fuel_energy_consumption_running_time(
-            fuel_specified_by=fuel_specified_by
+            fuel_specified_by=fuel_specified_by,
+            fuel_option=mechanical_option,
         )
         self.electric_system.set_time_interval(
             time_interval_s=time_interval_s, integration_method=integration_method
         )
         result_elec = self.electric_system.get_fuel_energy_consumption_running_time(
             fuel_specified_by=fuel_specified_by,
+            fuel_option=electric_option,
         )
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
@@ -1307,6 +1385,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
         nox_emission_criteria: int = 2,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1316,6 +1395,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             nox_emission_criteria: IMO NOx emission tier 1, 2, 3
             integration_method: Integration method, "simpson" or "trapezoid"
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply across both subsystems.
         Returns:
             Tuple of FEEMSResult for mechanical system and electric system, respectively
         """
@@ -1326,18 +1406,31 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        mechanical_option = (
+            selected_option
+            if selected_option and selected_option in self.mechanical_system.available_fuel_options
+            else None
+        )
+        electric_option = (
+            selected_option
+            if selected_option and selected_option in self.electric_system.available_fuel_options
+            else None
+        )
         self.mechanical_system.set_time_interval(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
         result_mech = self.mechanical_system.get_fuel_energy_consumption_running_time(
-            fuel_specified_by=fuel_specified_by
+            fuel_specified_by=fuel_specified_by,
+            fuel_option=mechanical_option,
         )
         self.electric_system.set_time_interval(
             time_interval_s=time_interval_s, integration_method=integration_method
         )
         result_elec = self.electric_system.get_fuel_energy_consumption_running_time(
-            fuel_specified_by=fuel_specified_by
+            fuel_specified_by=fuel_specified_by,
+            fuel_option=electric_option,
         )
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
