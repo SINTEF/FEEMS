@@ -9,7 +9,7 @@ __all__ = [
     "convert_proto_electric_machine_to_feems",
     "convert_proto_fuel_cell_system_to_feems",
     "convert_emission_curve_to_feems",
-    "convert_nox_calculation_method",
+    "get_nox_calculation_method",
     "convert_proto_engine_to_feems",
     "convert_proto_cogas_to_feems",
     "convert_proto_genset_to_feems",
@@ -58,7 +58,12 @@ from feems.components_model.component_electric import (
     COGES,
 )
 from feems.components_model.component_electric import SerialSystemElectric, Genset
-from feems.components_model.component_mechanical import COGAS, EngineDualFuel
+from feems.components_model.component_mechanical import (
+    COGAS,
+    EngineDualFuel,
+    EngineMultiFuel,
+    FuelCharacteristics,
+)
 from feems.fuel import FuelOrigin, TypeFuel
 from feems.system_model import (
     ElectricPowerSystem,
@@ -198,7 +203,7 @@ def convert_emission_curve_to_feems(
     )
 
 
-def convert_nox_calculation_method(
+def get_nox_calculation_method(
     proto_comp: Union[proto.Engine, proto.COGAS],
 ) -> NOxCalculationMethod:
     """Converts protobuf nox calculation type to feems nox calculation method"""
@@ -209,8 +214,17 @@ def convert_nox_calculation_method(
     else:
         raise TypeError("The component should be either an engine or COGAS")
     if proto_comp.nox_calculation_method is not None:
-        name = proto.Engine.NOxCalculationMethod.Name(proto_comp.nox_calculation_method)
-        nox_calculation_method = NOxCalculationMethod[name]
+        nox_calculation_method = convert_nox_calculation_method(
+            proto_comp.nox_calculation_method
+        )
+    return nox_calculation_method
+
+
+def convert_nox_calculation_method(
+    nox_calculation_method: proto.Engine.NOxCalculationMethod,
+) -> NOxCalculationMethod:
+    name = proto.Engine.NOxCalculationMethod.Name(nox_calculation_method)
+    nox_calculation_method = NOxCalculationMethod[name]
     return nox_calculation_method
 
 
@@ -219,7 +233,7 @@ def convert_proto_engine_to_feems(
     type_engine: TypeComponent = TypeComponent.AUXILIARY_ENGINE,
 ) -> Engine:
     """Converts protobuf engine message to feems engine component"""
-    nox_calculation_method = convert_nox_calculation_method(proto_engine)
+    nox_calculation_method = get_nox_calculation_method(proto_engine)
     emission_curves = (
         [
             convert_emission_curve_to_feems(emission_curve)
@@ -263,11 +277,56 @@ def convert_proto_engine_to_feems(
     )
 
 
+def convert_proto_multifuel_engine_to_feems(
+    proto_engine: proto.MultiFuelEngine,
+    type_engine: TypeComponent = TypeComponent.AUXILIARY_ENGINE,
+) -> EngineMultiFuel:
+    """Converts protobuf multifuel engine message to feems multifuel engine component"""
+    multi_fuel_characteristics = []
+    for fuel_mode in proto_engine.fuel_modes:
+        fuel_characteristics = FuelCharacteristics(
+            nox_calculation_method=convert_nox_calculation_method(
+                fuel_mode.nox_calculation_method
+            ),
+            main_fuel_type=TypeFuel(fuel_mode.main_fuel.fuel_type),
+            main_fuel_origin=FuelOrigin(fuel_mode.main_fuel.fuel_origin),
+            bsfc_curve=convert_proto_efficiency_bsfc_power_to_np_array(
+                fuel_mode.main_bsfc
+            ),
+            engine_cycle_type=EngineCycleType(fuel_mode.engine_cycle_type),
+        )
+        if fuel_mode.HasField("pilot_fuel"):
+            fuel_characteristics.pilot_fuel_type = TypeFuel(
+                fuel_mode.pilot_fuel.fuel_type
+            )
+            fuel_characteristics.pilot_fuel_origin = FuelOrigin(
+                fuel_mode.pilot_fuel.fuel_origin
+            )
+            fuel_characteristics.bspfc_curve = (
+                convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.pilot_bsfc)
+            )
+        if len(fuel_mode.emission_curves) > 0:
+            fuel_characteristics.emission_curves = [
+                convert_emission_curve_to_feems(emission_curve)
+                for emission_curve in fuel_mode.emission_curves
+            ]
+        multi_fuel_characteristics.append(fuel_characteristics)
+
+    return EngineMultiFuel(
+        type_=type_engine,
+        name=proto_engine.name,
+        rated_power=proto_engine.rated_power_kw,
+        rated_speed=proto_engine.rated_speed_rpm,
+        multi_fuel_characteristics=multi_fuel_characteristics,
+        uid=proto_engine.uid if len(proto_engine.uid) > _MIN_LENGTH_UID else None,
+    )
+
+
 def convert_proto_cogas_to_feems(
     proto_cogas: proto.COGAS,
 ) -> Engine:
     """Converts protobuf COGAS message to feems COGAS component"""
-    nox_calculation_method = convert_nox_calculation_method(proto_cogas)
+    nox_calculation_method = get_nox_calculation_method(proto_cogas)
     emission_curves = (
         [
             convert_emission_curve_to_feems(emission_curve)
@@ -301,7 +360,17 @@ def convert_proto_genset_to_feems(
     subsystem: proto.Subsystem, switchboard_id: int
 ) -> Genset:
     """Converts protobuf subsystem message to feems component"""
-    engine = convert_proto_engine_to_feems(proto_engine=subsystem.engine)
+    if subsystem.HasField("engine"):
+        engine = convert_proto_engine_to_feems(proto_engine=subsystem.engine)
+    elif subsystem.HasField("multi_fuel_engine"):
+        engine = convert_proto_multifuel_engine_to_feems(
+            proto_engine=subsystem.multi_fuel_engine,
+            type_engine=TypeComponent.AUXILIARY_ENGINE,
+        )
+    else:
+        raise ValueError(
+            "The genset engine is not properly defined. Engine field is missing."
+        )
     generator = convert_proto_electric_machine_to_feems(
         proto_component=subsystem.electric_machine,
         component_type=TypeComponent.SYNCHRONOUS_MACHINE,
@@ -627,13 +696,24 @@ def convert_proto_shaftline_to_feems(
         if sub_system.component_type == proto.Subsystem.ComponentType.MAIN_ENGINE:
             if sub_system.engine.name == "":
                 sub_system.engine.name = sub_system.name
+            if sub_system.HasField("engine"):
+                engine = convert_proto_engine_to_feems(
+                    proto_engine=sub_system.engine,
+                    type_engine=TypeComponent.MAIN_ENGINE,
+                )
+            elif sub_system.HasField("multi_fuel_engine"):
+                engine = convert_proto_multifuel_engine_to_feems(
+                    proto_engine=sub_system.multi_fuel_engine,
+                    type_engine=TypeComponent.MAIN_ENGINE,
+                )
+            else:
+                raise ValueError(
+                    "The main engine is not properly defined. Engine field is missing."
+                )
             components.append(
                 MainEngineForMechanicalPropulsion(
                     name=sub_system.name,
-                    engine=convert_proto_engine_to_feems(
-                        proto_engine=sub_system.engine,
-                        type_engine=TypeComponent.MAIN_ENGINE,
-                    ),
+                    engine=engine,
                     shaft_line_id=shaft_line_id,
                     uid=(
                         sub_system.uid
@@ -646,13 +726,26 @@ def convert_proto_shaftline_to_feems(
             sub_system.component_type
             == proto.Subsystem.ComponentType.MAIN_ENGINE_WITH_GEARBOX
         ):
+            if sub_system.engine.name == "":
+                sub_system.engine.name = sub_system.name
+            if sub_system.HasField("engine"):
+                engine = convert_proto_engine_to_feems(
+                    proto_engine=sub_system.engine,
+                    type_engine=TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
+                )
+            elif sub_system.HasField("multi_fuel_engine"):
+                engine = convert_proto_multifuel_engine_to_feems(
+                    proto_engine=sub_system.multi_fuel_engine,
+                    type_engine=TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
+                )
+            else:
+                raise ValueError(
+                    "The main engine is not properly defined. Engine field is missing."
+                )
             components.append(
                 MainEngineWithGearBoxForMechanicalPropulsion(
                     name=sub_system.name,
-                    engine=convert_proto_engine_to_feems(
-                        proto_engine=sub_system.engine,
-                        type_engine=TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
-                    ),
+                    engine=engine,
                     gearbox=BasicComponent(
                         type_=TypeComponent.GEARBOX,
                         name=sub_system.gear.name,

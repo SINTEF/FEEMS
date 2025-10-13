@@ -748,6 +748,7 @@ class Subsystem(_message.Message):
         "ramp_down_rate_limit_percent_per_second",
         "base_load_order",
         "uid",
+        "multi_fuel_engine",
     ]
 
     class PowerType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -851,6 +852,7 @@ class Subsystem(_message.Message):
     RAMP_DOWN_RATE_LIMIT_PERCENT_PER_SECOND_FIELD_NUMBER: _ClassVar[int]
     BASE_LOAD_ORDER_FIELD_NUMBER: _ClassVar[int]
     UID_FIELD_NUMBER: _ClassVar[int]
+    MULTI_FUEL_ENGINE_FIELD_NUMBER: _ClassVar[int]
     gear: Gear
     engine: Engine
     electric_machine: ElectricMachine
@@ -873,6 +875,7 @@ class Subsystem(_message.Message):
     ramp_down_rate_limit_percent_per_second: float
     base_load_order: int
     uid: str
+    multi_fuel_engine: MultiFuelEngine
     def __init__(
         self,
         gear: _Optional[_Union[Gear, _Mapping]] = ...,
@@ -897,6 +900,7 @@ class Subsystem(_message.Message):
         ramp_down_rate_limit_percent_per_second: _Optional[float] = ...,
         base_load_order: _Optional[int] = ...,
         uid: _Optional[str] = ...,
+        multi_fuel_engine: _Optional[_Union[MultiFuelEngine, _Mapping]] = ...,
     ) -> None: ...
 
 class Switchboard(_message.Message):
@@ -998,4 +1002,89 @@ class MachinerySystem(_message.Message):
         electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ...,
         maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ...,
         average_base_load_percentage: _Optional[float] = ...,
+    ) -> None: ...
+
+class MultiFuelEngine(_message.Message):
+    __slots__ = [
+        "name",
+        "rated_power_kw",
+        "rated_speed_rpm",
+        "fuel_modes",
+        "order_from_switchboard_or_shaftline",
+        "unit_price_usd",
+        "start_delay_s",
+        "turn_off_power_kw",
+        "uid",
+    ]
+
+    class FuelMode(_message.Message):
+        __slots__ = [
+            "main_fuel",
+            "main_bsfc",
+            "pilot_fuel",
+            "pilot_bsfc",
+            "emission_curves",
+            "engine_cycle_type",
+            "nox_calculation_method",
+        ]
+        MAIN_FUEL_FIELD_NUMBER: _ClassVar[int]
+        MAIN_BSFC_FIELD_NUMBER: _ClassVar[int]
+        PILOT_FUEL_FIELD_NUMBER: _ClassVar[int]
+        PILOT_BSFC_FIELD_NUMBER: _ClassVar[int]
+        EMISSION_CURVES_FIELD_NUMBER: _ClassVar[int]
+        ENGINE_CYCLE_TYPE_FIELD_NUMBER: _ClassVar[int]
+        NOX_CALCULATION_METHOD_FIELD_NUMBER: _ClassVar[int]
+        main_fuel: Fuel
+        main_bsfc: BSFC
+        pilot_fuel: Fuel
+        pilot_bsfc: BSFC
+        emission_curves: _containers.RepeatedCompositeFieldContainer[EmissionCurve]
+        engine_cycle_type: Engine.EngineCycleType
+        nox_calculation_method: Engine.NOxCalculationMethod
+        def __init__(
+            self,
+            main_fuel: _Optional[_Union[Fuel, _Mapping]] = ...,
+            main_bsfc: _Optional[_Union[BSFC, _Mapping]] = ...,
+            pilot_fuel: _Optional[_Union[Fuel, _Mapping]] = ...,
+            pilot_bsfc: _Optional[_Union[BSFC, _Mapping]] = ...,
+            emission_curves: _Optional[
+                _Iterable[_Union[EmissionCurve, _Mapping]]
+            ] = ...,
+            engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ...,
+            nox_calculation_method: _Optional[
+                _Union[Engine.NOxCalculationMethod, str]
+            ] = ...,
+        ) -> None: ...
+
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]
+    FUEL_MODES_FIELD_NUMBER: _ClassVar[int]
+    ORDER_FROM_SWITCHBOARD_OR_SHAFTLINE_FIELD_NUMBER: _ClassVar[int]
+    UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
+    TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    rated_power_kw: float
+    rated_speed_rpm: float
+    fuel_modes: _containers.RepeatedCompositeFieldContainer[MultiFuelEngine.FuelMode]
+    order_from_switchboard_or_shaftline: int
+    unit_price_usd: float
+    start_delay_s: float
+    turn_off_power_kw: float
+    uid: str
+    def __init__(
+        self,
+        name: _Optional[str] = ...,
+        rated_power_kw: _Optional[float] = ...,
+        rated_speed_rpm: _Optional[float] = ...,
+        fuel_modes: _Optional[
+            _Iterable[_Union[MultiFuelEngine.FuelMode, _Mapping]]
+        ] = ...,
+        order_from_switchboard_or_shaftline: _Optional[int] = ...,
+        unit_price_usd: _Optional[float] = ...,
+        start_delay_s: _Optional[float] = ...,
+        turn_off_power_kw: _Optional[float] = ...,
+        uid: _Optional[str] = ...,
     ) -> None: ...

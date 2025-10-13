@@ -311,7 +311,7 @@ def create_multi_fuel_characteristics_sample() -> List[FuelCharacteristics]:
             pilot_fuel_type=TypeFuel.DIESEL,
             pilot_fuel_origin=FuelOrigin.FOSSIL,
             bsfc_curve=np.array([[0.0, 180.0], [1.0, 180.0]], dtype=float),
-            bpsfc_curve=np.array([[0.0, 10.0], [1.0, 10.0]], dtype=float),
+            bspfc_curve=np.array([[0.0, 10.0], [1.0, 10.0]], dtype=float),
         ),
         FuelCharacteristics(
             main_fuel_type=TypeFuel.DIESEL,

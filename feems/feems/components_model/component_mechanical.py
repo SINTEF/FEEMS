@@ -47,7 +47,7 @@ class EngineRunPoint:
     fuel_flow_rate_kg_per_s: FuelConsumption
     bsfc_g_per_kWh: np.ndarray
     emissions_g_per_s: Dict[EmissionType, np.ndarray]
-    bpsfc_g_per_kWh: np.ndarray = None
+    bspfc_g_per_kWh: np.ndarray = None
 
 
 T = TypeVar("T", float, np.ndarray)
@@ -291,8 +291,8 @@ class EngineDualFuel(Engine):
             power_kw=power_kw,
             fuel_specified_by=fuel_specified_by,
         )
-        bpsfc = self.specific_pilot_fuel_consumption_interp(engine_run_point.load_ratio)
-        pilot_fuel_cons_kg_per_s = bpsfc * power_kw / 1000 / 3600
+        bspfc = self.specific_pilot_fuel_consumption_interp(engine_run_point.load_ratio)
+        pilot_fuel_cons_kg_per_s = bspfc * power_kw / 1000 / 3600
         engine_run_point.fuel_flow_rate_kg_per_s.fuels.append(
             Fuel(
                 fuel_type=self.pilot_fuel_type,
@@ -304,7 +304,7 @@ class EngineDualFuel(Engine):
                 mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
             )
         )
-        engine_run_point.bpsfc_g_per_kWh = bpsfc
+        engine_run_point.bspfc_g_per_kWh = bspfc
         return engine_run_point
 
 
@@ -317,10 +317,10 @@ class FuelCharacteristics:
     nox_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_2
     main_fuel_type: TypeFuel = TypeFuel.DIESEL
     main_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL
-    pilot_fuel_type: TypeFuel = TypeFuel.DIESEL
-    pilot_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL
+    pilot_fuel_type: TypeFuel = None
+    pilot_fuel_origin: FuelOrigin = None
     bsfc_curve: np.ndarray = None
-    bpsfc_curve: np.ndarray = None
+    bspfc_curve: np.ndarray = None
     emission_curves: List[EmissionCurve] = None
     engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL
 
@@ -432,7 +432,7 @@ class EngineMultiFuel(Engine):
                 bsfc_curve=fuel_characteristics.bsfc_curve,
                 fuel_type=fuel_characteristics.main_fuel_type,
                 fuel_origin=fuel_characteristics.main_fuel_origin,
-                bspfc_curve=fuel_characteristics.bpsfc_curve,
+                bspfc_curve=fuel_characteristics.bspfc_curve,
                 pilot_fuel_type=fuel_characteristics.pilot_fuel_type,
                 pilot_fuel_origin=fuel_characteristics.pilot_fuel_origin,
                 emissions_curves=fuel_characteristics.emission_curves,

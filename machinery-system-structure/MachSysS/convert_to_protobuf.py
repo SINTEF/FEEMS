@@ -36,7 +36,11 @@ from typing import cast, Union, List
 
 from feems.components_model.component_base import BasicComponent
 from feems.types_for_feems import TypeComponent, NOxCalculationMethod, EmissionCurve
-from feems.components_model.component_mechanical import COGAS, EngineDualFuel
+from feems.components_model.component_mechanical import (
+    COGAS,
+    EngineDualFuel,
+    EngineMultiFuel,
+)
 from feems.components_model.component_electric import (
     COGES,
     ElectricComponent,
@@ -105,20 +109,25 @@ def convert_bsfc_curve_to_protobuf(
     component: Union[Engine, EngineDualFuel], for_pilot_fuel: bool = False
 ) -> proto.BSFC:
     """Convert bsfc value or curve in the component to protobuf message"""
-    bsfc = proto.BSFC()
+
     bsfc_points = (
         component.specific_fuel_consumption_points
         if not for_pilot_fuel
         else component.specific_pilot_fuel_consumption_points
     )
-    if len(bsfc_points) == 1:
-        bsfc.value = bsfc_points[0]
+
+    return convert_bsfc_array_value_to_protobuf(np.array(bsfc_points))
+
+
+def convert_bsfc_array_value_to_protobuf(bsfc_array: np.array) -> proto.BSFC:
+    bsfc = proto.BSFC()
+    if np.isscalar(bsfc_array):
+        bsfc.value = bsfc_array
+    elif len(bsfc_array) == 1:
+        bsfc.value = bsfc_array[0]
     else:
         bsfc.curve.curve.points.extend(
-            [
-                proto.Point(x=each_point[0], y=each_point[1])
-                for each_point in bsfc_points
-            ]
+            [proto.Point(x=each_point[0], y=each_point[1]) for each_point in bsfc_array]
         )
         bsfc.curve.x_label = "power load"
         bsfc.curve.y_label = "bsfc"
@@ -307,6 +316,54 @@ def convert_engine_component_to_protobuf(
     return engine
 
 
+def convert_multi_fuel_engine_to_protobuf(
+    engine_feems: EngineMultiFuel,
+    order_from_shaftline_or_switchboard: int = 1,
+) -> proto.MultiFuelEngine:
+    """Convert multi-fuel engine component of FEEMS to protobuf message"""
+    fuel_modes: List[proto.MultiFuelEngine.FuelMode] = []
+    for fuel_mode in engine_feems.multi_fuel_characteristics:
+        engine_for_fuel_mode = engine_feems.get_engine_object(
+            fuel_type=fuel_mode.main_fuel_type,
+            fuel_origin=fuel_mode.main_fuel_origin,
+        )
+        fuel_modes.append(
+            proto.MultiFuelEngine.FuelMode(
+                main_fuel=proto.Fuel(
+                    fuel_type=fuel_mode.main_fuel_type.value,
+                    fuel_origin=fuel_mode.main_fuel_origin.value,
+                ),
+                main_bsfc=convert_bsfc_array_value_to_protobuf(fuel_mode.bsfc_curve),
+                emission_curves=convert_emission_curves_to_protobuf(
+                    fuel_mode.emission_curves
+                ),
+                nox_calculation_method=convert_nox_calculation_method_to_protobuf(
+                    fuel_mode.nox_calculation_method
+                ),
+                engine_cycle_type=fuel_mode.engine_cycle_type.value,
+            )
+        )
+        if fuel_mode.pilot_fuel_type is not None:
+            fuel_modes[-1].pilot_fuel.CopyFrom(
+                proto.Fuel(
+                    fuel_type=fuel_mode.pilot_fuel_type.value,
+                    fuel_origin=fuel_mode.pilot_fuel_origin.value,
+                )
+            )
+            fuel_modes[-1].pilot_bsfc.CopyFrom(
+                convert_bsfc_array_value_to_protobuf(fuel_mode.bspfc_curve)
+            )
+
+    return proto.MultiFuelEngine(
+        name=engine_feems.name,
+        rated_power_kw=engine_feems.rated_power,
+        rated_speed_rpm=engine_feems.rated_speed,
+        fuel_modes=fuel_modes,
+        order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
+        uid=engine_feems.uid,
+    )
+
+
 def convert_cogas_component_to_protobuf(
     component: COGAS,
     order_from_shaftline_or_switchboard: int = 1,
@@ -401,12 +458,28 @@ def convert_switchboard_to_protobuf(
                     component=component.generator,
                 )
             )
-            subsystem.engine.CopyFrom(
-                convert_engine_component_to_protobuf(
-                    engine_feems=component.aux_engine,
-                    order_from_shaftline_or_switchboard=2,
+            if (
+                type(component.aux_engine) is Engine
+                or type(component.aux_engine) is EngineDualFuel
+            ):
+                subsystem.engine.CopyFrom(
+                    convert_engine_component_to_protobuf(
+                        engine_feems=component.aux_engine,
+                        order_from_shaftline_or_switchboard=2,
+                    )
                 )
-            )
+            elif type(component.aux_engine) is EngineMultiFuel:
+                subsystem.multi_fuel_engine.CopyFrom(
+                    convert_multi_fuel_engine_to_protobuf(
+                        engine_feems=component.aux_engine,
+                        order_from_shaftline_or_switchboard=2,
+                    )
+                )
+            else:
+                raise TypeError(
+                    f"The auxiliary engine in the genset {component.name} is of type "
+                    f"{type(component.aux_engine)}, which is not supported for conversion."
+                )
         elif component.type == TypeComponent.OTHER_LOAD:
             subsystem.other_load.CopyFrom(
                 convert_electric_component_to_protobuf(component=component)
@@ -489,11 +562,28 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
         )
         if component.type == TypeComponent.MAIN_ENGINE:
             component = cast(MainEngineForMechanicalPropulsion, component)
-            subsystem.engine.CopyFrom(
-                convert_engine_component_to_protobuf(
-                    engine_feems=component.engine, order_from_shaftline_or_switchboard=1
+            if (
+                type(component.engine) is Engine
+                or type(component.engine) is EngineDualFuel
+            ):
+                subsystem.engine.CopyFrom(
+                    convert_engine_component_to_protobuf(
+                        engine_feems=component.engine,
+                        order_from_shaftline_or_switchboard=1,
+                    )
                 )
-            )
+            elif type(component.engine) is EngineMultiFuel:
+                subsystem.multi_fuel_engine.CopyFrom(
+                    convert_multi_fuel_engine_to_protobuf(
+                        engine_feems=component.engine,
+                        order_from_shaftline_or_switchboard=1,
+                    )
+                )
+            else:
+                raise TypeError(
+                    f"The main engine in the shaft line {shaftline_feems.id} is of type "
+                    f"{type(component.engine)}, which is not supported for conversion."
+                )
         elif component.type == TypeComponent.MAIN_ENGINE_WITH_GEARBOX:
             if gear_proto is not None:
                 raise ValueError(
@@ -502,12 +592,25 @@ def convert_shaftline_to_protobuf(shaftline_feems: ShaftLine) -> proto.ShaftLine
                     f"component."
                 )
             component = cast(MainEngineWithGearBoxForMechanicalPropulsion, component)
-            subsystem.engine.CopyFrom(
-                convert_engine_component_to_protobuf(
-                    engine_feems=component.main_engine,
-                    order_from_shaftline_or_switchboard=2,
+            if isinstance(component.engine, (Engine, EngineDualFuel)):
+                subsystem.engine.CopyFrom(
+                    convert_engine_component_to_protobuf(
+                        engine_feems=component.engine,
+                        order_from_shaftline_or_switchboard=1,
+                    )
                 )
-            )
+            elif isinstance(component.engine, EngineMultiFuel):
+                subsystem.multi_fuel_engine.CopyFrom(
+                    convert_multi_fuel_engine_to_protobuf(
+                        engine_feems=component.engine,
+                        order_from_shaftline_or_switchboard=1,
+                    )
+                )
+            else:
+                raise TypeError(
+                    f"The main engine in the shaft line {shaftline_feems.id} is of type "
+                    f"{type(component.engine)}, which is not supported for conversion."
+                )
             subsystem.gear.CopyFrom(
                 proto.Gear(
                     name=component.gearbox.name,

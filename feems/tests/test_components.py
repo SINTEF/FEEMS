@@ -585,7 +585,7 @@ class TestComponent(TestCase):
             engine_run_point.fuel_flow_rate_kg_per_s.fuels[0].mass_or_mass_fraction,
             natual_gas_consumption_kg_per_s,
         )
-        diesel_consumption_kg_per_s = engine_run_point.bpsfc_g_per_kWh * power / 3600 / 1000
+        diesel_consumption_kg_per_s = engine_run_point.bspfc_g_per_kWh * power / 3600 / 1000
         assert np.allclose(
             engine_run_point.fuel_flow_rate_kg_per_s.fuels[1].mass_or_mass_fraction,
             diesel_consumption_kg_per_s,
@@ -609,7 +609,7 @@ class TestComponent(TestCase):
                 pilot_fuel_type=TypeFuel.DIESEL,
                 pilot_fuel_origin=FuelOrigin.FOSSIL,
                 bsfc_curve=main_bsfc_dual,
-                bpsfc_curve=pilot_bsfc_dual,
+                bspfc_curve=pilot_bsfc_dual,
             ),
             FuelCharacteristics(
                 main_fuel_type=TypeFuel.DIESEL,
@@ -649,7 +649,7 @@ class TestComponent(TestCase):
         self.assertEqual(main_fuel.fuel_type, TypeFuel.NATURAL_GAS)
         self.assertEqual(main_fuel.origin, FuelOrigin.FOSSIL)
         np.testing.assert_allclose(main_fuel.mass_or_mass_fraction, expected_main_consumption)
-        np.testing.assert_allclose(lng_run_point.bpsfc_g_per_kWh, expected_pilot_bsfc)
+        np.testing.assert_allclose(lng_run_point.bspfc_g_per_kWh, expected_pilot_bsfc)
         self.assertEqual(pilot_fuel.fuel_type, TypeFuel.DIESEL)
         self.assertEqual(pilot_fuel.origin, FuelOrigin.FOSSIL)
         np.testing.assert_allclose(pilot_fuel.mass_or_mass_fraction, expected_pilot_consumption)
@@ -669,7 +669,7 @@ class TestComponent(TestCase):
 
         np.testing.assert_allclose(diesel_run_point.load_ratio, expected_load)
         np.testing.assert_allclose(diesel_run_point.bsfc_g_per_kWh, expected_diesel_bsfc)
-        self.assertIsNone(diesel_run_point.bpsfc_g_per_kWh)
+        self.assertIsNone(diesel_run_point.bspfc_g_per_kWh)
         self.assertEqual(len(diesel_run_point.fuel_flow_rate_kg_per_s.fuels), 1)
         diesel_fuel = diesel_run_point.fuel_flow_rate_kg_per_s.fuels[0]
         self.assertEqual(diesel_fuel.fuel_type, TypeFuel.DIESEL)
