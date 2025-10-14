@@ -47,7 +47,7 @@ class EngineRunPoint:
     fuel_flow_rate_kg_per_s: FuelConsumption
     bsfc_g_per_kWh: np.ndarray
     emissions_g_per_s: Dict[EmissionType, np.ndarray]
-    bpsfc_g_per_kWh: np.ndarray = None
+    bspfc_g_per_kWh: np.ndarray = None
 
 
 T = TypeVar("T", float, np.ndarray)
@@ -291,8 +291,8 @@ class EngineDualFuel(Engine):
             power_kw=power_kw,
             fuel_specified_by=fuel_specified_by,
         )
-        bpsfc = self.specific_pilot_fuel_consumption_interp(engine_run_point.load_ratio)
-        pilot_fuel_cons_kg_per_s = bpsfc * power_kw / 1000 / 3600
+        bspfc = self.specific_pilot_fuel_consumption_interp(engine_run_point.load_ratio)
+        pilot_fuel_cons_kg_per_s = bspfc * power_kw / 1000 / 3600
         engine_run_point.fuel_flow_rate_kg_per_s.fuels.append(
             Fuel(
                 fuel_type=self.pilot_fuel_type,
@@ -304,7 +304,7 @@ class EngineDualFuel(Engine):
                 mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
             )
         )
-        engine_run_point.bpsfc_g_per_kWh = bpsfc
+        engine_run_point.bspfc_g_per_kWh = bspfc
         return engine_run_point
 
 
@@ -317,10 +317,10 @@ class FuelCharacteristics:
     nox_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_2
     main_fuel_type: TypeFuel = TypeFuel.DIESEL
     main_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL
-    pilot_fuel_type: TypeFuel = TypeFuel.DIESEL
-    pilot_fuel_origin: FuelOrigin = FuelOrigin.FOSSIL
+    pilot_fuel_type: TypeFuel = None
+    pilot_fuel_origin: FuelOrigin = None
     bsfc_curve: np.ndarray = None
-    bpsfc_curve: np.ndarray = None
+    bspfc_curve: np.ndarray = None
     emission_curves: List[EmissionCurve] = None
     engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL
 
@@ -349,19 +349,77 @@ class EngineMultiFuel(Engine):
             raise ValueError("Multi-fuel characteristics must be provided for EngineMultiFuel.")
         if len(self.multi_fuel_characteristics) == 0:
             raise ValueError("Multi-fuel characteristics must not be empty for EngineMultiFuel.")
+        self.set_fuel_in_use()
         self.uid = uid
+
+    def set_fuel_in_use(self, fuel_type: TypeFuel = None, fuel_origin: FuelOrigin = None) -> None:
+        """
+        Set the fuel characteristics in use based on the fuel type and origin. If not provided,
+        it will use the first fuel characteristics in the list.
+        Args:
+            fuel_type (TypeFuel): Fuel type. Optional. Defaults to None, which means the first fuel type in the list.
+            fuel_origin (FuelOrigin): Fuel origin. Optional. Defaults to None, which means the first fuel origin in the list.
+        """
+        if fuel_type is None or fuel_origin is None:
+            self.fuel_in_use = self.multi_fuel_characteristics[0]
+            return
+        fuel_characteristics = next(
+            (
+                fc
+                for fc in self.multi_fuel_characteristics
+                if fc.main_fuel_type == fuel_type and fc.main_fuel_origin == fuel_origin
+            ),
+            None,
+        )
+        if fuel_characteristics is None:
+            raise ValueError(
+                f"Fuel characteristics for fuel type {fuel_type} and origin {fuel_origin} not found."
+            )
+        self.fuel_in_use = fuel_characteristics
+
+    @property
+    def engine_in_use(self) -> Engine:
+        """
+        Get the engine object based on the fuel characteristics in use.
+        """
+        if self.fuel_in_use.pilot_fuel_type is not None:
+            return EngineDualFuel(
+                type_=self.type,
+                name=self.name,
+                rated_power=self.rated_power,
+                rated_speed=self.rated_speed,
+                bsfc_curve=self.fuel_in_use.bsfc_curve,
+                fuel_type=self.fuel_in_use.main_fuel_type,
+                fuel_origin=self.fuel_in_use.main_fuel_origin,
+                bspfc_curve=self.fuel_in_use.bspfc_curve,
+                pilot_fuel_type=self.fuel_in_use.pilot_fuel_type,
+                pilot_fuel_origin=self.fuel_in_use.pilot_fuel_origin,
+                emissions_curves=self.fuel_in_use.emission_curves,
+                engine_cycle_type=self.fuel_in_use.engine_cycle_type,
+            )
+        return Engine(
+            type_=self.type,
+            name=self.name,
+            rated_power=self.rated_power,
+            rated_speed=self.rated_speed,
+            bsfc_curve=self.fuel_in_use.bsfc_curve,
+            fuel_type=self.fuel_in_use.main_fuel_type,
+            fuel_origin=self.fuel_in_use.main_fuel_origin,
+            emissions_curves=self.fuel_in_use.emission_curves,
+            engine_cycle_type=self.fuel_in_use.engine_cycle_type,
+        )
+
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        return self.engine_in_use.fuel_consumer_type_fuel_eu_maritime
 
     def get_engine_run_point_from_power_out_kw(
         self,
         power_kw: np.ndarray = None,
-        fuel_type: TypeFuel = TypeFuel.DIESEL,
-        fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
-        alternative_fuel_origin: FuelOrigin = None,
-        alternative_fuel_ratio: float = 0.0,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -387,18 +445,12 @@ class EngineMultiFuel(Engine):
         """
         if power_kw is None:
             power_kw = self.power_output
-        engine = self.get_engine_object(
-            fuel_type=fuel_type,
-            fuel_origin=fuel_origin,
-        )
-        return engine.get_engine_run_point_from_power_out_kw(
+        return self.engine_in_use.get_engine_run_point_from_power_out_kw(
             power_kw=power_kw,
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-            alternative_fuel_origin=alternative_fuel_origin,
-            alternative_fuel_ratio=alternative_fuel_ratio,
         )
 
     def get_engine_object(
@@ -427,32 +479,6 @@ class EngineMultiFuel(Engine):
             raise ValueError(
                 f"Fuel characteristics for fuel type {fuel_type} and origin {fuel_origin} not found."
             )
-        if fuel_characteristics.pilot_fuel_type is not None:
-            return EngineDualFuel(
-                type_=self.type,
-                name=self.name,
-                rated_power=self.rated_power,
-                rated_speed=self.rated_speed,
-                bsfc_curve=fuel_characteristics.bsfc_curve,
-                fuel_type=fuel_characteristics.main_fuel_type,
-                fuel_origin=fuel_characteristics.main_fuel_origin,
-                bspfc_curve=fuel_characteristics.bpsfc_curve,
-                pilot_fuel_type=fuel_characteristics.pilot_fuel_type,
-                pilot_fuel_origin=fuel_characteristics.pilot_fuel_origin,
-                emissions_curves=fuel_characteristics.emission_curves,
-                engine_cycle_type=fuel_characteristics.engine_cycle_type,
-            )
-        return Engine(
-            type_=self.type,
-            name=self.name,
-            rated_power=self.rated_power,
-            rated_speed=self.rated_speed,
-            bsfc_curve=fuel_characteristics.bsfc_curve,
-            fuel_type=fuel_characteristics.main_fuel_type,
-            fuel_origin=fuel_characteristics.main_fuel_origin,
-            emissions_curves=fuel_characteristics.emission_curves,
-            engine_cycle_type=fuel_characteristics.engine_cycle_type,
-        )
 
 
 class MainEngineForMechanicalPropulsion(Component):
@@ -463,7 +489,7 @@ class MainEngineForMechanicalPropulsion(Component):
     def __init__(
         self,
         name,
-        engine: Union[Engine, EngineDualFuel],
+        engine: Union[Engine, EngineDualFuel, EngineMultiFuel],
         shaft_line_id: int = 1,
         uid: Optional[str] = None,
     ):
@@ -489,6 +515,8 @@ class MainEngineForMechanicalPropulsion(Component):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -506,6 +534,10 @@ class MainEngineForMechanicalPropulsion(Component):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            fuel_type (Optional[TypeFuel], optional): Desired main fuel type when the engine is a
+                multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
+            fuel_origin (Optional[FuelOrigin], optional): Desired main fuel origin when the engine
+                is a multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
 
         Returns:
             EngineRunPoint
@@ -513,6 +545,17 @@ class MainEngineForMechanicalPropulsion(Component):
         if power is None:
             power = self.power_output
         self.engine.power_output = power
+        if type(self.engine) is EngineMultiFuel:
+            self.engine.set_fuel_in_use(fuel_type=fuel_type, fuel_origin=fuel_origin)
+        else:
+            if fuel_type is not None and fuel_type != self.engine.fuel_type:
+                raise ValueError(
+                    "fuel_type argument does not match the configured engine fuel type"
+                )
+            if fuel_origin is not None and fuel_origin != self.engine.fuel_origin:
+                raise ValueError(
+                    "fuel_origin argument does not match the configured engine fuel origin"
+                )
         return self.engine.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,
@@ -555,7 +598,7 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
     def __init__(
         self,
         name: str,
-        engine: Union[Engine, EngineDualFuel],
+        engine: Union[Engine, EngineDualFuel, EngineMultiFuel],
         gearbox: BasicComponent,
         shaft_line_id: int = 1,
         uid: Optional[str] = None,
@@ -575,6 +618,8 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -592,6 +637,10 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            fuel_type (Optional[TypeFuel], optional): Desired main fuel type when the engine is a
+                multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
+            fuel_origin (Optional[FuelOrigin], optional): Desired main fuel origin when the engine
+                is a multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
 
         Returns:
             EngineRunPoint
@@ -601,6 +650,17 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         load_ratio = self.get_load(power)
         eff_gearbox = self.gearbox.get_efficiency_from_load_percentage(load_ratio)
         self.engine.power_output = power / eff_gearbox
+        if type(self.engine) is EngineMultiFuel:
+            self.engine.set_fuel_in_use(fuel_type=fuel_type, fuel_origin=fuel_origin)
+        else:
+            if fuel_type is not None and fuel_type != self.engine.fuel_type:
+                raise ValueError(
+                    "fuel_type argument does not match the configured engine fuel type"
+                )
+            if fuel_origin is not None and fuel_origin != self.engine.fuel_origin:
+                raise ValueError(
+                    "fuel_origin argument does not match the configured engine fuel origin"
+                )
         return self.engine.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by,
             lhv_mj_per_g=lhv_mj_per_g,

@@ -1,5 +1,5 @@
 import random
-from typing import List, Union, NamedTuple
+from typing import List, Union, NamedTuple, Optional
 
 from feems.fuel import FuelOrigin, TypeFuel
 import numpy as np
@@ -19,7 +19,12 @@ from feems.components_model.component_electric import (
     Battery,
     PTIPTO,
 )
-from feems.components_model.component_mechanical import COGAS, Engine
+from feems.components_model.component_mechanical import (
+    COGAS,
+    Engine,
+    EngineMultiFuel,
+    FuelCharacteristics,
+)
 from feems.components_model.node import Switchboard
 from feems.exceptions import ConfigurationError
 from feems.types_for_feems import (
@@ -298,10 +303,49 @@ def create_a_propulsion_drive(
             pass
 
 
-def create_engine_component(name, rated_power_max, rated_speed_max, bsfc_curve=None) -> Engine:
+def create_multi_fuel_characteristics_sample() -> List[FuelCharacteristics]:
+    return [
+        FuelCharacteristics(
+            main_fuel_type=TypeFuel.NATURAL_GAS,
+            main_fuel_origin=FuelOrigin.FOSSIL,
+            pilot_fuel_type=TypeFuel.DIESEL,
+            pilot_fuel_origin=FuelOrigin.FOSSIL,
+            bsfc_curve=np.array([[0.0, 180.0], [1.0, 180.0]], dtype=float),
+            bspfc_curve=np.array([[0.0, 10.0], [1.0, 10.0]], dtype=float),
+        ),
+        FuelCharacteristics(
+            main_fuel_type=TypeFuel.DIESEL,
+            main_fuel_origin=FuelOrigin.FOSSIL,
+            pilot_fuel_type=None,
+            pilot_fuel_origin=None,
+            bsfc_curve=np.array([[0.0, 210.0], [1.0, 210.0]], dtype=float),
+        ),
+    ]
+
+
+def create_engine_component(
+    name,
+    rated_power_max,
+    rated_speed_max,
+    bsfc_curve=None,
+    *,
+    multi_fuel_characteristics: Optional[List[FuelCharacteristics]] = None,
+    engine_type: TypeComponent = TypeComponent.MAIN_ENGINE,
+    fuel_type: TypeFuel = TypeFuel.DIESEL,
+    fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+) -> Union[Engine, EngineMultiFuel]:
     # Create an engine component with a arbitrary bsfc curve
     rated_power = rated_power_max * np.random.rand()
     rated_speed = rated_speed_max * np.random.rand()
+    if multi_fuel_characteristics is not None:
+        return EngineMultiFuel(
+            type_=engine_type,
+            name=name,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=multi_fuel_characteristics,
+        )
+
     if bsfc_curve is None:
         bsfc_curve = np.append(
             np.reshape(np.arange(0.1, 1.1, 0.1), (-1, 1)),
@@ -310,12 +354,14 @@ def create_engine_component(name, rated_power_max, rated_speed_max, bsfc_curve=N
         )
         logger.warning("Efficiency of engine is not supplied, using random monotonic curve")
     return Engine(
-        type_=TypeComponent.MAIN_ENGINE,
+        type_=engine_type,
         name=name,
         rated_power=rated_power,
         rated_speed=rated_speed,
         bsfc_curve=bsfc_curve,
         nox_calculation_method=NOxCalculationMethod.TIER_2,
+        fuel_type=fuel_type,
+        fuel_origin=fuel_origin,
     )
 
 

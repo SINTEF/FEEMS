@@ -315,6 +315,7 @@ message Subsystem {
   double ramp_down_rate_limit_percent_per_second = 20;
   uint32 base_load_order = 21; // The order of the power source in the base load calculation. 1 is the primary base load, 2 is the secondary base load, etc.
   string uid = 22;
+  MultiFuelEngine multi_fuel_engine = 23;
 }
 
 message Switchboard {
@@ -355,3 +356,25 @@ message MachinerySystem {
   double maximum_allowed_fuel_cell_load_percentage = 7;
   double average_base_load_percentage = 8;
 }
+
+message MultiFuelEngine {
+  message FuelMode {
+    Fuel main_fuel = 1;
+    BSFC main_bsfc = 2;
+    optional Fuel pilot_fuel = 3;
+    optional BSFC pilot_bsfc = 4;
+    repeated EmissionCurve emission_curves = 5;
+    Engine.EngineCycleType engine_cycle_type = 6;
+    Engine.NOxCalculationMethod nox_calculation_method = 7;
+  }
+  string name = 1;
+  double rated_power_kw = 2;
+  double rated_speed_rpm = 3;
+  repeated FuelMode fuel_modes = 4;
+  uint32 order_from_switchboard_or_shaftline = 5;
+  double unit_price_usd = 8;
+  double start_delay_s = 9;
+  double turn_off_power_kw = 10;
+  string uid = 11;
+}
+

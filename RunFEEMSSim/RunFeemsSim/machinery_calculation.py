@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 # %% ../00_machinery_calculation.ipynb 3
-from typing import List, Union, Type, TypeVar
+from typing import List, Optional, Union, Type, TypeVar
 
 import MachSysS.gymir_result_pb2 as proto_gymir
 from MachSysS.convert_proto_timeseries import (
@@ -20,6 +20,7 @@ import pandas as pd
 from feems.components_model.utility import IntegrationMethod
 from feems.system_model import (
     ElectricPowerSystem,
+    FuelOption,
     HybridPropulsionSystem,
     MechanicalPropulsionSystemWithElectricPowerSystem,
     FEEMSResultForMachinerySystem,
@@ -227,12 +228,15 @@ class MachineryCalculation:
         self,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
+        fuel_option: Optional[FuelOption] = None,
     ) -> Union[FEEMSResult, FEEMSResultForMachinerySystem]:
         """Run the simulation and return the result.
 
         Args:
             fuel_specified_by(FuelSpecifiedBy): The fuel specified by IMO/EU/USER. Default is IMO.
             ignore_power_balance(bool): If True, the power balance calculation will be ignored.
+            fuel_option(FuelOption): The fuel option to be used in the simulation. If None, the
+                default fuel option in the system will be used.
 
         Returns:
             The result of the simulation. FEEMSResult or FEEMSResultForMachinery system.
@@ -243,10 +247,12 @@ class MachineryCalculation:
                     time_interval_s=self.system_feems.mechanical_system.time_interval_s,
                     integration_method=IntegrationMethod.sum_with_time,
                     fuel_specified_by=fuel_specified_by,
+                    fuel_option=fuel_option,
                 )
             else:
                 return self.system_feems.get_fuel_energy_consumption_running_time(
-                    fuel_specified_by=fuel_specified_by
+                    fuel_specified_by=fuel_specified_by,
+                    fuel_option=fuel_option,
                 )
 
         power_kw_per_switchboard = (
@@ -265,11 +271,13 @@ class MachineryCalculation:
                 time_interval_s=self.system_feems.mechanical_system.time_interval_s,
                 integration_method=IntegrationMethod.sum_with_time,
                 fuel_specified_by=fuel_specified_by,
+                fuel_option=fuel_option,
             )
         else:
             self.system_feems.do_power_balance_calculation()
             return self.system_feems.get_fuel_energy_consumption_running_time(
-                fuel_specified_by=fuel_specified_by
+                fuel_specified_by=fuel_specified_by,
+                fuel_option=fuel_option,
             )
 
     def calculate_machinery_system_output_from_gymir_result(
@@ -278,6 +286,7 @@ class MachineryCalculation:
         gymir_result: proto_gymir.GymirResult,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
+        fuel_option: Optional[FuelOption] = None,
     ) -> Union[FEEMSResult, FEEMSResultForMachinerySystem]:
         """
         Calculate the machinery system output from a Gymir result.
@@ -286,6 +295,8 @@ class MachineryCalculation:
             gymir_result(GymirResult): Gymir result given as protobuf message.
             fuel_specified_by(FuelSpecifiedBy): The fuel specified by IMO/EU/USER. Default is IMO.
             ignore_power_balance(bool): If True, the power balance calculation will be ignored.
+            fuel_option(FuelOption): The fuel option to be used in the simulation. If None, the
+                default fuel option in the system will be used.
 
         Returns:
             The result of the calculation. FEEMSResult or FEEMSResultForMachinerySystem.
@@ -294,6 +305,7 @@ class MachineryCalculation:
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
+            fuel_option=fuel_option,
         )
 
     def calculate_machinery_system_output_from_propulsion_power_time_series(
@@ -303,6 +315,7 @@ class MachineryCalculation:
         auxiliary_power_kw: Numeric,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
+        fuel_option: Optional[FuelOption] = None,
     ) -> Union[FEEMSResult, FEEMSResultForMachinerySystem]:
         """
         Calculate the machinery system output from a time series of the propulsion power and
@@ -316,6 +329,8 @@ class MachineryCalculation:
                 a numpy array with the same length as the propulsion power.
             fuel_specified_by(FuelSpecifiedBy): The fuel specified by IMO/EU/USER. Default is IMO.
             ignore_power_balance(bool): If True, the power balance calculation will be ignored.
+            fuel_option(FuelOption): The fuel option to be used in the simulation. If None, the
+                default fuel option in the system will be used.
 
         Returns:
             The result of the calculation. FEEMSResult or FEEMSResultForMachinerySystem.
@@ -357,6 +372,7 @@ class MachineryCalculation:
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
+            fuel_option=fuel_option,
         )
 
     def calculate_machinery_system_output_from_time_series_result(
@@ -368,6 +384,7 @@ class MachineryCalculation:
         ],
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
+        fuel_option: Optional[FuelOption] = None,
     ) -> Union[FEEMSResult, FEEMSResultForMachinerySystem]:
         """
         Calculate the machinery system output from statistics of the propulsion power.
@@ -375,6 +392,8 @@ class MachineryCalculation:
             time_series(TimeSeriesResult): Time series result given as protobuf message.
             fuel_specified_by(FuelSpecifiedBy): The fuel specified by IMO/EU/USER. Default is IMO.
             ignore_power_balance(bool): If True, the power balance calculation will be ignored.
+            fuel_option(FuelOption): The fuel option to be used in the simulation. If None, the
+                default fuel option in the system will be used.
 
         Returns:
             The result of the simulation. FEEMSResult or FEEMSResultForMachinery system.
@@ -402,6 +421,7 @@ class MachineryCalculation:
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
+            fuel_option=fuel_option,
         )
 
     def calculate_machinery_system_output_from_statistics(
@@ -412,6 +432,7 @@ class MachineryCalculation:
         auxiliary_power_kw: Numeric,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         ignore_power_balance: bool = False,
+        fuel_option: Optional[FuelOption] = None,
     ) -> Union[FEEMSResult, FEEMSResultForMachinerySystem]:
         """
         Calculate the machinery system output from statistics of the propulsion power.
@@ -424,6 +445,8 @@ class MachineryCalculation:
                 possible to give a single value for all modes.
             fuel_specified_by(FuelSpecifiedBy): The fuel specified by IMO/EU/USER. Default is IMO.
             ignore_power_balance(bool): If True, the power balance calculation will be ignored.
+            fuel_option(FuelOption): The fuel option to be used in the simulation. If None, the
+                default fuel option in the system will be used.
 
         Returns:
             The result of the simulation. FEEMSResult or FEEMSResultForMachinery system.
@@ -443,4 +466,5 @@ class MachineryCalculation:
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
+            fuel_option=fuel_option,
         )

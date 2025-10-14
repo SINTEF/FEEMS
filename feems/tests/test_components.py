@@ -1,6 +1,6 @@
 import os
 import random
-from typing import cast
+from typing import List, cast
 from unittest import TestCase
 
 import numpy as np
@@ -21,13 +21,17 @@ from feems.components_model.component_electric import (
 from feems.components_model.component_mechanical import (
     COGAS,
     Engine,
-    MainEngineWithGearBoxForMechanicalPropulsion,
     EngineDualFuel,
+    EngineMultiFuel,
+    FuelCharacteristics,
+    MainEngineForMechanicalPropulsion,
+    MainEngineWithGearBoxForMechanicalPropulsion,
 )
-from feems.components_model.node import Node
+from feems.components_model.node import Node, get_fuel_emission_energy_balance_for_component
 from feems.components_model.utility import (
     get_efficiency_curve_from_points,
     get_efficiency_curve_from_dataframe,
+    IntegrationMethod,
 )
 from feems.fuel import FuelByMassFraction, TypeFuel, Fuel, FuelSpecifiedBy, FuelOrigin
 from feems.types_for_feems import EmissionType, Speed_rpm, NOxCalculationMethod, SwbId
@@ -41,6 +45,7 @@ from tests.utility import (
     create_engine_component,
     ELECTRIC_MACHINE_EFF_CURVE,
     create_electric_components_for_switchboard,
+    create_multi_fuel_characteristics_sample,
 )
 from feems.constant import nox_factor_imo_medium_speed_g_hWh
 
@@ -580,13 +585,596 @@ class TestComponent(TestCase):
             engine_run_point.fuel_flow_rate_kg_per_s.fuels[0].mass_or_mass_fraction,
             natual_gas_consumption_kg_per_s,
         )
-        diesel_consumption_kg_per_s = engine_run_point.bpsfc_g_per_kWh * power / 3600 / 1000
+        diesel_consumption_kg_per_s = engine_run_point.bspfc_g_per_kWh * power / 3600 / 1000
         assert np.allclose(
             engine_run_point.fuel_flow_rate_kg_per_s.fuels[1].mass_or_mass_fraction,
             diesel_consumption_kg_per_s,
         )
         print(engine_run_point)
         print(engine_run_point.fuel_flow_rate_kg_per_s.__dict__)
+
+    def test_engine_multi_fuel(self):
+        rated_power = 1000.0
+        rated_speed = 1000.0
+        power_kw = np.array([rated_power * 0.5])
+
+        main_bsfc_dual = np.array([[0.0, 180.0], [1.0, 180.0]])
+        pilot_bsfc_dual = np.array([[0.0, 10.0], [1.0, 10.0]])
+        diesel_bsfc_single = np.array([[0.0, 210.0], [1.0, 210.0]])
+
+        multi_fuel_characteristics = [
+            FuelCharacteristics(
+                main_fuel_type=TypeFuel.NATURAL_GAS,
+                main_fuel_origin=FuelOrigin.FOSSIL,
+                pilot_fuel_type=TypeFuel.DIESEL,
+                pilot_fuel_origin=FuelOrigin.FOSSIL,
+                bsfc_curve=main_bsfc_dual,
+                bspfc_curve=pilot_bsfc_dual,
+            ),
+            FuelCharacteristics(
+                main_fuel_type=TypeFuel.DIESEL,
+                main_fuel_origin=FuelOrigin.FOSSIL,
+                pilot_fuel_type=None,
+                pilot_fuel_origin=None,
+                bsfc_curve=diesel_bsfc_single,
+            ),
+        ]
+
+        engine = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="multi-fuel engine",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=multi_fuel_characteristics,
+        )
+
+        expected_load = power_kw / rated_power
+        engine.set_fuel_in_use(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
+
+        lng_run_point = engine.get_engine_run_point_from_power_out_kw(power_kw=power_kw)
+
+        expected_main_bsfc = np.full_like(expected_load, 180.0, dtype=float)
+        expected_main_consumption = expected_main_bsfc * (power_kw / 3600.0) / 1000.0
+        expected_pilot_bsfc = np.full_like(expected_load, 10.0, dtype=float)
+        expected_pilot_consumption = expected_pilot_bsfc * (power_kw / 3600.0) / 1000.0
+
+        np.testing.assert_allclose(lng_run_point.load_ratio, expected_load)
+        np.testing.assert_allclose(lng_run_point.bsfc_g_per_kWh, expected_main_bsfc)
+        self.assertEqual(len(lng_run_point.fuel_flow_rate_kg_per_s.fuels), 2)
+        main_fuel = lng_run_point.fuel_flow_rate_kg_per_s.fuels[0]
+        pilot_fuel = lng_run_point.fuel_flow_rate_kg_per_s.fuels[1]
+        self.assertEqual(main_fuel.fuel_type, TypeFuel.NATURAL_GAS)
+        self.assertEqual(main_fuel.origin, FuelOrigin.FOSSIL)
+        np.testing.assert_allclose(main_fuel.mass_or_mass_fraction, expected_main_consumption)
+        np.testing.assert_allclose(lng_run_point.bspfc_g_per_kWh, expected_pilot_bsfc)
+        self.assertEqual(pilot_fuel.fuel_type, TypeFuel.DIESEL)
+        self.assertEqual(pilot_fuel.origin, FuelOrigin.FOSSIL)
+        np.testing.assert_allclose(pilot_fuel.mass_or_mass_fraction, expected_pilot_consumption)
+        np.testing.assert_allclose(
+            lng_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            expected_main_consumption + expected_pilot_consumption,
+        )
+
+        engine.set_fuel_in_use(fuel_type=TypeFuel.DIESEL, fuel_origin=FuelOrigin.FOSSIL)
+        diesel_run_point = engine.get_engine_run_point_from_power_out_kw(power_kw=power_kw)
+
+        expected_diesel_bsfc = np.full_like(expected_load, 210.0, dtype=float)
+        expected_diesel_consumption = expected_diesel_bsfc * (power_kw / 3600.0) / 1000.0
+
+        np.testing.assert_allclose(diesel_run_point.load_ratio, expected_load)
+        np.testing.assert_allclose(diesel_run_point.bsfc_g_per_kWh, expected_diesel_bsfc)
+        self.assertIsNone(diesel_run_point.bspfc_g_per_kWh)
+        self.assertEqual(len(diesel_run_point.fuel_flow_rate_kg_per_s.fuels), 1)
+        diesel_fuel = diesel_run_point.fuel_flow_rate_kg_per_s.fuels[0]
+        self.assertEqual(diesel_fuel.fuel_type, TypeFuel.DIESEL)
+        self.assertEqual(diesel_fuel.origin, FuelOrigin.FOSSIL)
+        np.testing.assert_allclose(
+            diesel_fuel.mass_or_mass_fraction,
+            expected_diesel_consumption,
+        )
+        np.testing.assert_allclose(
+            diesel_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            expected_diesel_consumption,
+        )
+
+    def test_main_engine_mechanical_with_engine_multi_fuel(self):
+        rated_power = 1200.0
+        rated_speed = 750.0
+        power_kw = np.array([rated_power * 0.6])
+
+        engine_for_component = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="multi",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+        engine_for_expected = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="multi-expected",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+
+        component = MainEngineForMechanicalPropulsion(
+            name="main engine",
+            engine=engine_for_component,
+        )
+
+        # Default fuel selection should use the first entry (natural gas)
+        default_run_point = component.get_engine_run_point_from_power_out_kw(power=power_kw)
+        self.assertEqual(
+            default_run_point.fuel_flow_rate_kg_per_s.fuels[0].fuel_type,
+            TypeFuel.NATURAL_GAS,
+        )
+
+        engine_for_expected.set_fuel_in_use(
+            fuel_type=TypeFuel.NATURAL_GAS,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        default_expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
+        )
+        np.testing.assert_allclose(default_run_point.load_ratio, default_expected.load_ratio)
+        np.testing.assert_allclose(
+            default_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            default_expected.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+        )
+
+        # Explicit fuel choice should be honoured
+        diesel_run_point = component.get_engine_run_point_from_power_out_kw(
+            power=power_kw,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        engine_for_expected.set_fuel_in_use(
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        diesel_expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
+        )
+        np.testing.assert_allclose(diesel_run_point.load_ratio, diesel_expected.load_ratio)
+        np.testing.assert_allclose(
+            diesel_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            diesel_expected.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+        )
+
+    def test_main_engine_with_gearbox_multi_fuel_support(self):
+        rated_power = 1500.0
+        rated_speed = 900.0
+        power_kw = np.array([rated_power * 0.4])
+        gearbox_eff_curve = np.array([[0.0, 0.95], [1.0, 0.95]])
+
+        engine_for_component = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="gear-multi",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+        engine_for_expected = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="gear-multi-expected",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+
+        gearbox = BasicComponent(
+            type_=TypeComponent.GEARBOX,
+            name="gearbox",
+            power_type=TypePower.POWER_TRANSMISSION,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            eff_curve=gearbox_eff_curve,
+        )
+
+        component = MainEngineWithGearBoxForMechanicalPropulsion(
+            name="main engine gearbox",
+            engine=engine_for_component,
+            gearbox=gearbox,
+        )
+
+        run_point = component.get_engine_run_point_from_power_out_kw(
+            power=power_kw,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+
+        load_ratio = component.get_load(power_kw)
+        gearbox_eff = gearbox.get_efficiency_from_load_percentage(load_ratio)
+        engine_for_expected.set_fuel_in_use(
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw / gearbox_eff,
+        )
+
+        np.testing.assert_allclose(run_point.load_ratio, expected.load_ratio)
+        np.testing.assert_allclose(
+            run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            expected.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+        )
+
+    def test_main_engine_mechanical_single_fuel_mismatch_raises(self):
+        rated_power = 800.0
+        rated_speed = 600.0
+        bsfc_curve = np.array([[0.0, 200.0], [1.0, 200.0]])
+        engine = Engine(
+            type_=TypeComponent.MAIN_ENGINE,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            bsfc_curve=bsfc_curve,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        component = MainEngineForMechanicalPropulsion(name="single", engine=engine)
+        with self.assertRaises(ValueError):
+            component.get_engine_run_point_from_power_out_kw(
+                power=np.array([rated_power * 0.5]),
+                fuel_type=TypeFuel.NATURAL_GAS,
+                fuel_origin=FuelOrigin.FOSSIL,
+            )
+
+    def test_main_engine_with_gearbox_single_fuel_mismatch_raises(self):
+        rated_power = 900.0
+        rated_speed = 700.0
+        bsfc_curve = np.array([[0.0, 210.0], [1.0, 210.0]])
+        engine = Engine(
+            type_=TypeComponent.MAIN_ENGINE,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            bsfc_curve=bsfc_curve,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        gearbox = BasicComponent(
+            type_=TypeComponent.GEARBOX,
+            name="gearbox",
+            power_type=TypePower.POWER_TRANSMISSION,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            eff_curve=np.array([1.0]),
+        )
+        component = MainEngineWithGearBoxForMechanicalPropulsion(
+            name="gear-single",
+            engine=engine,
+            gearbox=gearbox,
+        )
+        with self.assertRaises(ValueError):
+            component.get_engine_run_point_from_power_out_kw(
+                power=np.array([rated_power * 0.4]),
+                fuel_type=TypeFuel.NATURAL_GAS,
+                fuel_origin=FuelOrigin.FOSSIL,
+            )
+
+    def test_genset_multi_fuel_support(self):
+        rated_power = 1000.0
+        rated_speed = 900.0
+        power_electric = np.array([rated_power * 0.5])
+
+        aux_engine_component = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="aux-multi",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+        aux_engine_expected = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="aux-multi-expected",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+
+        generator_component = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator multi",
+            rated_power=rated_power * 0.9,
+            rated_speed=rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        generator_expected = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator expected",
+            rated_power=rated_power * 0.9,
+            rated_speed=rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+
+        genset = Genset("genset multi", aux_engine_component, generator_component)
+
+        result_default = genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+            power=power_electric
+        )
+        self.assertEqual(
+            result_default.engine.fuel_flow_rate_kg_per_s.fuels[0].fuel_type,
+            TypeFuel.NATURAL_GAS,
+        )
+        shaft_power_expected, _ = generator_expected.get_shaft_power_load_from_electric_power(
+            power_electric
+        )
+        aux_engine_expected.set_fuel_in_use(
+            fuel_type=TypeFuel.NATURAL_GAS,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected_default = aux_engine_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=shaft_power_expected,
+        )
+        np.testing.assert_allclose(
+            result_default.engine.load_ratio,
+            expected_default.load_ratio,
+        )
+        for result_fuel, expected_fuel in zip(
+            result_default.engine.fuel_flow_rate_kg_per_s.fuels,
+            expected_default.fuel_flow_rate_kg_per_s.fuels,
+        ):
+            np.testing.assert_allclose(
+                result_fuel.mass_or_mass_fraction,
+                expected_fuel.mass_or_mass_fraction,
+            )
+
+        result_diesel = genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+            power=power_electric,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        aux_engine_expected.set_fuel_in_use(
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected_diesel = aux_engine_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=shaft_power_expected,
+        )
+        np.testing.assert_allclose(
+            result_diesel.engine.load_ratio,
+            expected_diesel.load_ratio,
+        )
+        np.testing.assert_allclose(
+            result_diesel.engine.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+            expected_diesel.fuel_flow_rate_kg_per_s.total_fuel_consumption,
+        )
+
+    def test_genset_single_fuel_mismatch_raises(self):
+        rated_power = 950.0
+        rated_speed = 720.0
+        bsfc_curve = np.array([[0.0, 205.0], [1.0, 205.0]])
+        aux_engine = Engine(
+            type_=TypeComponent.MAIN_ENGINE,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            bsfc_curve=bsfc_curve,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator single",
+            rated_power=rated_power * 0.9,
+            rated_speed=rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        genset = Genset("genset single", aux_engine, generator)
+        with self.assertRaises(ValueError):
+            genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+                power=np.array([rated_power * 0.4]),
+                fuel_type=TypeFuel.NATURAL_GAS,
+                fuel_origin=FuelOrigin.FOSSIL,
+            )
+
+    def test_energy_balance_main_engine_with_engine_multi_fuel(self):
+        rated_power = 1200.0
+        rated_speed = 750.0
+        power = np.array([rated_power * 0.6])
+        main_engine_component = MainEngineForMechanicalPropulsion(
+            name="main-multi",
+            engine=EngineMultiFuel(
+                type_=TypeComponent.MAIN_ENGINE,
+                name="multi",
+                rated_power=rated_power,
+                rated_speed=rated_speed,
+                multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+            ),
+        )
+        main_engine_component.power_output = power
+        time_interval_s = np.array([3600.0])
+
+        result = get_fuel_emission_energy_balance_for_component(
+            component=main_engine_component,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+
+        expected_run_point = main_engine_component.get_engine_run_point_from_power_out_kw()
+        expected_total = (
+            expected_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption * time_interval_s[0]
+        )
+
+        self.assertIsNotNone(result.multi_fuel_consumption_total_kg)
+        self.assertGreaterEqual(
+            result.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            0,
+        )
+        np.testing.assert_allclose(
+            result.multi_fuel_consumption_total_kg.total_fuel_consumption,
+            expected_total,
+        )
+        self.assertEqual(
+            result.multi_fuel_consumption_total_kg.fuels[0].fuel_type,
+            TypeFuel.NATURAL_GAS,
+        )
+
+    def test_energy_balance_genset_with_engine_multi_fuel(self):
+        rated_power = 800.0
+        rated_speed = 720.0
+        power = np.array([rated_power * 0.5])
+        aux_engine_multi = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="genset-multi",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator",
+            rated_power=rated_power * 0.9,
+            rated_speed=rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        genset = Genset("genset-multi", aux_engine_multi, generator)
+        genset.power_output = power
+        time_interval_s = np.array([3600.0])
+
+        result = get_fuel_emission_energy_balance_for_component(
+            component=genset,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+
+        expected_run_point = genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+            power=power
+        )
+        expected_total = (
+            expected_run_point.engine.fuel_flow_rate_kg_per_s.total_fuel_consumption
+            * time_interval_s[0]
+        )
+
+        self.assertIsNotNone(result.multi_fuel_consumption_total_kg)
+        self.assertGreaterEqual(
+            result.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            0,
+        )
+        np.testing.assert_allclose(
+            result.multi_fuel_consumption_total_kg.total_fuel_consumption,
+            expected_total,
+        )
+        self.assertEqual(
+            result.multi_fuel_consumption_total_kg.fuels[0].fuel_type,
+            TypeFuel.NATURAL_GAS,
+        )
+
+    def test_energy_balance_main_engine_with_multi_fuel_explicit_selection(self):
+        rated_power = 1500.0
+        rated_speed = 780.0
+        power = np.array([rated_power * 0.55])
+        main_engine_component = MainEngineForMechanicalPropulsion(
+            name="main-multi-select",
+            engine=EngineMultiFuel(
+                type_=TypeComponent.MAIN_ENGINE,
+                name="multi-select",
+                rated_power=rated_power,
+                rated_speed=rated_speed,
+                multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+            ),
+        )
+        main_engine_component.power_output = power
+        time_interval_s = np.array([3600.0])
+
+        result = get_fuel_emission_energy_balance_for_component(
+            component=main_engine_component,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+
+        expected_run_point = main_engine_component.get_engine_run_point_from_power_out_kw(
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected_total = (
+            expected_run_point.fuel_flow_rate_kg_per_s.total_fuel_consumption * time_interval_s[0]
+        )
+
+        np.testing.assert_allclose(
+            result.multi_fuel_consumption_total_kg.total_fuel_consumption,
+            expected_total,
+        )
+        self.assertEqual(
+            result.multi_fuel_consumption_total_kg.fuels[0].fuel_type,
+            TypeFuel.DIESEL,
+        )
+        self.assertEqual(
+            result.multi_fuel_consumption_total_kg.fuels[0].origin,
+            FuelOrigin.FOSSIL,
+        )
+
+    def test_energy_balance_genset_with_multi_fuel_explicit_selection(self):
+        rated_power = 950.0
+        rated_speed = 800.0
+        power = np.array([rated_power * 0.45])
+        aux_engine_multi = EngineMultiFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="genset-multi-select",
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+        )
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator-select",
+            rated_power=rated_power * 0.9,
+            rated_speed=rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        genset = Genset("genset-multi-select", aux_engine_multi, generator)
+        genset.power_output = power
+        time_interval_s = np.array([3600.0])
+
+        result = get_fuel_emission_energy_balance_for_component(
+            component=genset,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+
+        expected_run_point = genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+            power=power,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected_total = (
+            expected_run_point.engine.fuel_flow_rate_kg_per_s.total_fuel_consumption
+            * time_interval_s[0]
+        )
+
+        np.testing.assert_allclose(
+            result.multi_fuel_consumption_total_kg.total_fuel_consumption,
+            expected_total,
+        )
+        self.assertEqual(
+            result.multi_fuel_consumption_total_kg.fuels[0].fuel_type,
+            TypeFuel.DIESEL,
+        )
+        self.assertEqual(
+            result.multi_fuel_consumption_total_kg.fuels[0].origin,
+            FuelOrigin.FOSSIL,
+        )
 
     def test_fuel_cell(self):
         """Test fuel cell"""

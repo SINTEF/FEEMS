@@ -1,16 +1,19 @@
 import copy
 import pprint
 import random
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from unittest import TestCase
 
 from feems.components_model.component_electric import (
     COGES,
     ElectricMachine,
     SerialSystemElectric,
+    Genset,
+    PTIPTO,
 )
 from feems.components_model.component_mechanical import COGAS
-from feems.fuel import Fuel, FuelConsumption
+from feems.exceptions import InputError
+from feems.fuel import Fuel, FuelConsumption, FuelOrigin, TypeFuel, FuelSpecifiedBy
 import numpy as np
 
 from feems.components_model import (
@@ -21,9 +24,18 @@ from feems.components_model import (
     ElectricComponent,
     BatterySystem,
     Battery,
+    MechanicalComponent,
 )
 from feems.components_model.utility import IntegrationMethod
-from feems.system_model import ElectricPowerSystem, BusId, MechanicalPropulsionSystem
+from feems.system_model import (
+    ElectricPowerSystem,
+    BusId,
+    MechanicalPropulsionSystem,
+    HybridPropulsionSystem,
+    MechanicalPropulsionSystemWithElectricPowerSystem,
+    FuelOption,
+    FEEMSResultForMachinerySystem,
+)
 from feems.types_for_feems import (
     SwbId,
     TypeComponent,
@@ -33,6 +45,7 @@ from feems.types_for_feems import (
     FEEMSResult,
     NOxCalculationMethod,
     EmissionType,
+    EngineCycleType,
 )
 
 # import os
@@ -42,6 +55,8 @@ from tests.utility import (
     create_a_propulsion_drive,
     create_cogas_system,
     create_genset_component,
+    create_engine_component,
+    create_multi_fuel_characteristics_sample,
 )
 
 random.seed(10)
@@ -1212,3 +1227,286 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
 
     def test_power_balance_and_fuel_calculation(self):
         pass
+
+
+class TestMultiFuelInventory(TestCase):
+    def setUp(self) -> None:
+        self.expected_options = [
+            FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL),
+            FuelOption(fuel_type=TypeFuel.DIESEL, fuel_origin=FuelOrigin.FOSSIL),
+        ]
+        self.genset_name = "multi-fuel genset"
+        self.main_engine_name = "multi-fuel main engine"
+
+    def _build_multi_fuel_genset(self, switchboard_id: int = 1):
+        engine = create_engine_component(
+            name=f"{self.genset_name} engine",
+            rated_power_max=1500,
+            rated_speed_max=900,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+            engine_type=TypeComponent.MAIN_ENGINE,
+        )
+        default_characteristic = engine.multi_fuel_characteristics[0]
+        engine.fuel_type = default_characteristic.main_fuel_type
+        engine.fuel_origin = default_characteristic.main_fuel_origin
+        engine.engine_cycle_type = EngineCycleType.DIESEL
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name=f"{self.genset_name} generator",
+            rated_power=Power_kW(1500),
+            rated_speed=Speed_rpm(750),
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=switchboard_id,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        return Genset(
+            name=self.genset_name,
+            aux_engine=engine,
+            generator=generator,
+        )
+
+    def _build_mechanical_system(
+        self, pti_pto: Optional[PTIPTO] = None
+    ) -> MechanicalPropulsionSystem:
+        engine = create_engine_component(
+            name=f"{self.main_engine_name} engine",
+            rated_power_max=2000,
+            rated_speed_max=900,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+            engine_type=TypeComponent.MAIN_ENGINE,
+        )
+        default_characteristic = engine.multi_fuel_characteristics[0]
+        engine.fuel_type = default_characteristic.main_fuel_type
+        engine.fuel_origin = default_characteristic.main_fuel_origin
+        engine.engine_cycle_type = EngineCycleType.DIESEL
+        main_engine = MainEngineWithGearBoxForMechanicalPropulsion(
+            self.main_engine_name,
+            engine,
+            BasicComponent(
+                type_=TypeComponent.GEARBOX,
+                power_type=TypePower.POWER_TRANSMISSION,
+                name="gearbox",
+                rated_power=Power_kW(2000),
+                rated_speed=Speed_rpm(500),
+                eff_curve=np.array([1.0]),
+            ),
+        )
+        propeller = MechanicalPropulsionComponent(
+            type_=TypeComponent.PROPELLER_LOAD,
+            power_type=TypePower.POWER_CONSUMER,
+            name="propeller",
+            rated_power=Power_kW(1500),
+            eff_curve=np.array([1.0]),
+            rated_speed=Speed_rpm(150),
+            shaft_line_id=main_engine.shaft_line_id,
+        )
+        components: List[MechanicalComponent] = [main_engine, propeller]
+        if pti_pto is not None:
+            components.append(pti_pto)
+        return MechanicalPropulsionSystem("mechanical", components)
+
+    def test_electric_system_inventory_reports_multi_fuel_options(self):
+        genset = self._build_multi_fuel_genset()
+        system = ElectricPowerSystem("electric", [genset], [])
+        inventory = system.multi_fuel_engine_inventory
+
+        self.assertTrue(system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {self.genset_name: self.expected_options},
+        )
+        self.assertEqual(system.available_fuel_options, self.expected_options)
+
+    def test_mechanical_system_inventory_reports_multi_fuel_options(self):
+        system = self._build_mechanical_system()
+        inventory = system.multi_fuel_engine_inventory
+
+        self.assertTrue(system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {self.main_engine_name: self.expected_options},
+        )
+        self.assertEqual(system.available_fuel_options, self.expected_options)
+
+    def test_hybrid_system_inventory_combines_electric_and_mechanical(self):
+        pti_pto = create_a_pti_pto(
+            name="PTI/PTO",
+            rated_power=Power_kW(800),
+            rated_speed=Speed_rpm(500),
+            switchboard_id=1,
+            shaft_line_id=1,
+        )
+        electric_system = ElectricPowerSystem(
+            "electric",
+            [self._build_multi_fuel_genset(), pti_pto],
+            [],
+        )
+        mechanical_system = self._build_mechanical_system(pti_pto=pti_pto)
+        hybrid_system = HybridPropulsionSystem("hybrid", electric_system, mechanical_system)
+
+        inventory = hybrid_system.multi_fuel_engine_inventory
+        self.assertTrue(hybrid_system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {
+                f"mechanical::{self.main_engine_name}": self.expected_options,
+                f"electric::{self.genset_name}": self.expected_options,
+            },
+        )
+        self.assertEqual(hybrid_system.available_fuel_options, self.expected_options)
+
+    def test_mechanical_system_with_electric_power_inventory_combines_sources(self):
+        pti_pto = create_a_pti_pto(
+            name="PTI/PTO",
+            rated_power=Power_kW(800),
+            rated_speed=Speed_rpm(500),
+            switchboard_id=1,
+            shaft_line_id=1,
+        )
+        electric_system = ElectricPowerSystem(
+            "electric",
+            [self._build_multi_fuel_genset(), pti_pto],
+            [],
+        )
+        mechanical_system = self._build_mechanical_system(pti_pto=pti_pto)
+        combined_system = MechanicalPropulsionSystemWithElectricPowerSystem(
+            "combined",
+            electric_system,
+            mechanical_system,
+        )
+
+        inventory = combined_system.multi_fuel_engine_inventory
+        self.assertTrue(combined_system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {
+                f"mechanical::{self.main_engine_name}": self.expected_options,
+                f"electric::{self.genset_name}": self.expected_options,
+            },
+        )
+        self.assertEqual(combined_system.available_fuel_options, self.expected_options)
+
+    def test_system_without_multi_fuel_engines_reports_false(self):
+        genset = create_genset_component(
+            name="single-fuel genset",
+            rated_power=Power_kW(1200),
+            rated_speed=Speed_rpm(750),
+            switchboard_id=1,
+        )
+        system = ElectricPowerSystem("single", [genset], [])
+
+        self.assertFalse(system.has_multi_fuel_engines)
+        self.assertEqual(system.multi_fuel_engine_inventory, {})
+        self.assertEqual(system.available_fuel_options, [])
+
+    def test_electric_system_accepts_supported_fuel_option(self):
+        genset = self._build_multi_fuel_genset()
+        system = ElectricPowerSystem("electric", [genset], [])
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+
+        result = system.get_fuel_energy_consumption_running_time(
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            fuel_option=self.expected_options[0],
+        )
+
+        self.assertIsInstance(result, FEEMSResult)
+
+    def test_electric_system_rejects_unsupported_fuel_option(self):
+        genset = self._build_multi_fuel_genset()
+        system = ElectricPowerSystem("electric", [genset], [])
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+
+        unsupported = FuelOption(
+            fuel_type=self.expected_options[0].fuel_type,
+            fuel_origin=FuelOrigin.BIO,
+        )
+
+        with self.assertRaises(InputError):
+            system.get_fuel_energy_consumption_running_time(
+                fuel_specified_by=FuelSpecifiedBy.IMO,
+                fuel_option=unsupported,
+            )
+
+    def test_mechanical_system_rejects_option_when_not_available(self):
+        system = self._build_mechanical_system()
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+
+        unsupported = FuelOption(
+            fuel_type=self.expected_options[0].fuel_type,
+            fuel_origin=FuelOrigin.BIO,
+        )
+
+        with self.assertRaises(InputError):
+            system.get_fuel_energy_consumption_running_time(
+                fuel_specified_by=FuelSpecifiedBy.IMO,
+                fuel_option=unsupported,
+            )
+
+    def test_hybrid_requires_option_supported_by_all_multi_fuel_engines(self):
+        pti_pto = create_a_pti_pto(
+            name="PTI/PTO",
+            rated_power=Power_kW(800),
+            rated_speed=Speed_rpm(500),
+            switchboard_id=1,
+            shaft_line_id=1,
+        )
+        limited_characteristics = create_multi_fuel_characteristics_sample()[:1]
+        genset_engine = create_engine_component(
+            name=f"{self.genset_name} limited engine",
+            rated_power_max=1500,
+            rated_speed_max=900,
+            multi_fuel_characteristics=limited_characteristics,
+            engine_type=TypeComponent.MAIN_ENGINE,
+        )
+        default_limited_characteristic = limited_characteristics[0]
+        genset_engine.fuel_type = default_limited_characteristic.main_fuel_type
+        genset_engine.fuel_origin = default_limited_characteristic.main_fuel_origin
+        genset_engine.engine_cycle_type = EngineCycleType.DIESEL
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name=f"{self.genset_name} limited generator",
+            rated_power=Power_kW(1500),
+            rated_speed=Speed_rpm(750),
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=1,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        limited_genset = Genset(
+            name=f"{self.genset_name} limited",
+            aux_engine=genset_engine,
+            generator=generator,
+        )
+        electric_system = ElectricPowerSystem(
+            "electric",
+            [limited_genset, pti_pto],
+            [],
+        )
+        mechanical_system = self._build_mechanical_system(pti_pto=pti_pto)
+        hybrid_system = HybridPropulsionSystem("hybrid", electric_system, mechanical_system)
+
+        hybrid_system.mechanical_system.set_time_interval(
+            time_interval_s=1,
+            integration_method=IntegrationMethod.simpson,
+        )
+        hybrid_system.electric_system.set_time_interval(
+            time_interval_s=1,
+            integration_method=IntegrationMethod.simpson,
+        )
+
+        incompatible_option = self.expected_options[1]
+        with self.assertRaises(InputError):
+            hybrid_system.get_fuel_energy_consumption_running_time(
+                time_interval_s=1,
+                integration_method=IntegrationMethod.simpson,
+                fuel_specified_by=FuelSpecifiedBy.IMO,
+                fuel_option=incompatible_option,
+            )
+
+        compatible_option = self.expected_options[0]
+        result = hybrid_system.get_fuel_energy_consumption_running_time(
+            time_interval_s=1,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            fuel_option=compatible_option,
+        )
+        self.assertIsInstance(result, FEEMSResultForMachinerySystem)

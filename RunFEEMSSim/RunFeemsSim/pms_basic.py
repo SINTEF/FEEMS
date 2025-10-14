@@ -198,8 +198,12 @@ class PmsLoadTableSimulationInterface(SimulationInterface):
             self._n_power_sources == number_power_sources
         ), f"The electric_power_system.power_sources count is different from {self._n_power_sources}"
         for i, source in enumerate(electric_power_system.power_sources):
-            source.status = on_pattern_per_datapoint[:, i]
+            source.status = on_pattern_per_datapoint[:, i].astype(bool)
             source.load_sharing_mode = equal_load_sharing_vector
         for component in chain(electric_power_system.energy_storage):
-            component.status = off_vector
+            component.status = off_vector.astype(bool)
             component.load_sharing_mode = equal_load_sharing_vector
+        for component in chain(electric_power_system.pti_pto):
+            component.status = off_vector.astype(bool)
+            component.load_sharing_mode = equal_load_sharing_vector
+            component.full_pti_mode = off_vector.astype(bool)
