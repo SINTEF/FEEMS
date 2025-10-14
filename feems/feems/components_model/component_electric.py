@@ -611,14 +611,13 @@ class Genset(Component):
         )
         self.aux_engine = aux_engine
         self._default_multi_fuel_characteristic: Optional[FuelCharacteristics] = None
-        if isinstance(aux_engine, EngineMultiFuel):
+        if type(aux_engine) is EngineMultiFuel:
             if len(aux_engine.multi_fuel_characteristics) == 0:
                 raise ValueError(
                     "Multi-fuel characteristics must not be empty for EngineMultiFuel genset engine."
                 )
-            self._default_multi_fuel_characteristic = aux_engine.multi_fuel_characteristics[0]
-            self.fuel_type = self._default_multi_fuel_characteristic.main_fuel_type
-            self.fuel_origin = self._default_multi_fuel_characteristic.main_fuel_origin
+            self.fuel_type = aux_engine.fuel_in_use.main_fuel_type
+            self.fuel_origin = aux_engine.fuel_in_use.main_fuel_origin
         else:
             self.fuel_type = aux_engine.fuel_type
             self.fuel_origin = aux_engine.fuel_origin
@@ -682,24 +681,10 @@ class Genset(Component):
             self.aux_engine.power_output,
             load_ratio_generator,
         ) = self.generator.get_shaft_power_load_from_electric_power(self.power_output)
-        if isinstance(self.aux_engine, EngineMultiFuel):
-            assert len(self.aux_engine.multi_fuel_characteristics) > 0
-            default_characteristic = (
-                self._default_multi_fuel_characteristic
-                or self.aux_engine.multi_fuel_characteristics[0]
-            )
-            selected_fuel_type = fuel_type or default_characteristic.main_fuel_type
-            selected_fuel_origin = fuel_origin or default_characteristic.main_fuel_origin
-            self.fuel_type = selected_fuel_type
-            self.fuel_origin = selected_fuel_origin
-            engine_run_point = self.aux_engine.get_engine_run_point_from_power_out_kw(
-                fuel_type=selected_fuel_type,
-                fuel_origin=selected_fuel_origin,
-                fuel_specified_by=fuel_specified_by,
-                lhv_mj_per_g=lhv_mj_per_g,
-                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
-                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-            )
+        if type(self.aux_engine) is EngineMultiFuel:
+            self.aux_engine.set_fuel_in_use(fuel_type=fuel_type, fuel_origin=fuel_origin)
+            self.fuel_type = self.aux_engine.fuel_in_use.main_fuel_type
+            self.fuel_origin = self.aux_engine.fuel_in_use.main_fuel_origin
         else:
             if fuel_type is not None and fuel_type != self.aux_engine.fuel_type:
                 raise ValueError(
@@ -709,12 +694,12 @@ class Genset(Component):
                 raise ValueError(
                     "fuel_origin argument does not match the configured genset engine fuel origin"
                 )
-            engine_run_point = self.aux_engine.get_engine_run_point_from_power_out_kw(
-                fuel_specified_by=fuel_specified_by,
-                lhv_mj_per_g=lhv_mj_per_g,
-                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
-                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-            )
+        engine_run_point = self.aux_engine.get_engine_run_point_from_power_out_kw(
+            fuel_specified_by=fuel_specified_by,
+            lhv_mj_per_g=lhv_mj_per_g,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+            ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+        )
         return GensetRunPoint(genset_load_ratio=load_ratio_generator, engine=engine_run_point)
 
 

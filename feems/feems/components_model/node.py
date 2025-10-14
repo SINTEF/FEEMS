@@ -144,11 +144,10 @@ def get_fuel_emission_energy_balance_for_component(
                     "Fuel consumption data is required to resolve fuel consumer class for EngineMultiFuel components."
                 )
             primary_fuel = fuel_consumption.fuels[0]
-            resolved_engine = engine_candidate.get_engine_object(
-                fuel_type=primary_fuel.fuel_type,
-                fuel_origin=primary_fuel.origin,
+            engine_candidate.set_fuel_in_use(
+                fuel_type=primary_fuel.fuel_type, fuel_origin=primary_fuel.origin
             )
-            return resolved_engine.fuel_consumer_type_fuel_eu_maritime
+            return engine_candidate.engine_in_use.fuel_consumer_type_fuel_eu_maritime
 
         if isinstance(engine_candidate, (Engine, EngineDualFuel)):
             return engine_candidate.fuel_consumer_type_fuel_eu_maritime
@@ -1375,7 +1374,6 @@ class ShaftLine(Node):
             res = res.sum_with_freeze_duration(res_comp)
             if not (
                 isinstance(component, MainEngineForMechanicalPropulsion)
-                or isinstance(component, MainEngineWithGearBoxForMechanicalPropulsion)
                 or isinstance(component, PTIPTO)
             ):
                 continue
@@ -1393,7 +1391,6 @@ class ShaftLine(Node):
                     )
                     / 1000
                 )
-
             # Add the calculation to the result_dataframe
             data_to_add = [
                 *res_comp.to_list_for_mechanical_component(),

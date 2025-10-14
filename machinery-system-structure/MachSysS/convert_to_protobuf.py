@@ -323,10 +323,6 @@ def convert_multi_fuel_engine_to_protobuf(
     """Convert multi-fuel engine component of FEEMS to protobuf message"""
     fuel_modes: List[proto.MultiFuelEngine.FuelMode] = []
     for fuel_mode in engine_feems.multi_fuel_characteristics:
-        engine_for_fuel_mode = engine_feems.get_engine_object(
-            fuel_type=fuel_mode.main_fuel_type,
-            fuel_origin=fuel_mode.main_fuel_origin,
-        )
         fuel_modes.append(
             proto.MultiFuelEngine.FuelMode(
                 main_fuel=proto.Fuel(

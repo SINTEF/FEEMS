@@ -629,12 +629,9 @@ class TestComponent(TestCase):
         )
 
         expected_load = power_kw / rated_power
+        engine.set_fuel_in_use(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
 
-        lng_run_point = engine.get_engine_run_point_from_power_out_kw(
-            power_kw=power_kw,
-            fuel_type=TypeFuel.NATURAL_GAS,
-            fuel_origin=FuelOrigin.FOSSIL,
-        )
+        lng_run_point = engine.get_engine_run_point_from_power_out_kw(power_kw=power_kw)
 
         expected_main_bsfc = np.full_like(expected_load, 180.0, dtype=float)
         expected_main_consumption = expected_main_bsfc * (power_kw / 3600.0) / 1000.0
@@ -658,11 +655,8 @@ class TestComponent(TestCase):
             expected_main_consumption + expected_pilot_consumption,
         )
 
-        diesel_run_point = engine.get_engine_run_point_from_power_out_kw(
-            power_kw=power_kw,
-            fuel_type=TypeFuel.DIESEL,
-            fuel_origin=FuelOrigin.FOSSIL,
-        )
+        engine.set_fuel_in_use(fuel_type=TypeFuel.DIESEL, fuel_origin=FuelOrigin.FOSSIL)
+        diesel_run_point = engine.get_engine_run_point_from_power_out_kw(power_kw=power_kw)
 
         expected_diesel_bsfc = np.full_like(expected_load, 210.0, dtype=float)
         expected_diesel_consumption = expected_diesel_bsfc * (power_kw / 3600.0) / 1000.0
@@ -715,10 +709,12 @@ class TestComponent(TestCase):
             TypeFuel.NATURAL_GAS,
         )
 
-        default_expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
-            power_kw=power_kw,
+        engine_for_expected.set_fuel_in_use(
             fuel_type=TypeFuel.NATURAL_GAS,
             fuel_origin=FuelOrigin.FOSSIL,
+        )
+        default_expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
         )
         np.testing.assert_allclose(default_run_point.load_ratio, default_expected.load_ratio)
         np.testing.assert_allclose(
@@ -732,10 +728,12 @@ class TestComponent(TestCase):
             fuel_type=TypeFuel.DIESEL,
             fuel_origin=FuelOrigin.FOSSIL,
         )
-        diesel_expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
-            power_kw=power_kw,
+        engine_for_expected.set_fuel_in_use(
             fuel_type=TypeFuel.DIESEL,
             fuel_origin=FuelOrigin.FOSSIL,
+        )
+        diesel_expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw,
         )
         np.testing.assert_allclose(diesel_run_point.load_ratio, diesel_expected.load_ratio)
         np.testing.assert_allclose(
@@ -787,10 +785,12 @@ class TestComponent(TestCase):
 
         load_ratio = component.get_load(power_kw)
         gearbox_eff = gearbox.get_efficiency_from_load_percentage(load_ratio)
-        expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
-            power_kw=power_kw / gearbox_eff,
+        engine_for_expected.set_fuel_in_use(
             fuel_type=TypeFuel.DIESEL,
             fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected = engine_for_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=power_kw / gearbox_eff,
         )
 
         np.testing.assert_allclose(run_point.load_ratio, expected.load_ratio)
@@ -904,10 +904,12 @@ class TestComponent(TestCase):
         shaft_power_expected, _ = generator_expected.get_shaft_power_load_from_electric_power(
             power_electric
         )
-        expected_default = aux_engine_expected.get_engine_run_point_from_power_out_kw(
-            power_kw=shaft_power_expected,
+        aux_engine_expected.set_fuel_in_use(
             fuel_type=TypeFuel.NATURAL_GAS,
             fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected_default = aux_engine_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=shaft_power_expected,
         )
         np.testing.assert_allclose(
             result_default.engine.load_ratio,
@@ -927,10 +929,12 @@ class TestComponent(TestCase):
             fuel_type=TypeFuel.DIESEL,
             fuel_origin=FuelOrigin.FOSSIL,
         )
-        expected_diesel = aux_engine_expected.get_engine_run_point_from_power_out_kw(
-            power_kw=shaft_power_expected,
+        aux_engine_expected.set_fuel_in_use(
             fuel_type=TypeFuel.DIESEL,
             fuel_origin=FuelOrigin.FOSSIL,
+        )
+        expected_diesel = aux_engine_expected.get_engine_run_point_from_power_out_kw(
+            power_kw=shaft_power_expected,
         )
         np.testing.assert_allclose(
             result_diesel.engine.load_ratio,
