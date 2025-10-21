@@ -3,6 +3,7 @@
 from functools import cache
 import os
 import warnings
+import logging
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import Any, Dict, Union, Optional, List
@@ -10,6 +11,8 @@ from typing import Any, Dict, Union, Optional, List
 import pandas as pd
 import numpy as np
 
+
+logger = logging.getLogger(__name__)
 
 @unique
 class TypeFuel(Enum):
@@ -521,8 +524,8 @@ def _resolve_fuel_alias(
     organization: str, origin: FuelOrigin, fuel_type: TypeFuel, *, max_hops: int = 5
 ) -> tuple[str, FuelOrigin, TypeFuel, list[tuple[str, FuelOrigin, TypeFuel]]]:
     """
-    Löst Aliasse rekursiv auf und verhindert Zyklen.
-    Gibt (org, origin, fuel_type, pfad) zurück, wobei pfad alle durchlaufenen Knoten enthält.
+    Resolves aliases recursively and prevents cycles.
+    Returns (org, origin, fuel_type, path), where path contains all visited nodes.
     """
     seen: set[tuple[str, FuelOrigin, TypeFuel]] = set()
     path: list[tuple[str, FuelOrigin, TypeFuel]] = []
@@ -556,8 +559,7 @@ def get_prescribed_factors(
 
     # 1) Original query
     fuel_data = _try_query(organization, origin, fuel_type)
-
-    # 2) Alias-Fallback, falls leer
+    # 2) Alias fallback, if no rows found
     alias_used = False
     alias_path: list[tuple[str, FuelOrigin, TypeFuel]] = []
     resolved_org, resolved_origin, resolved_type = organization, origin, fuel_type
@@ -574,7 +576,7 @@ def get_prescribed_factors(
         if alias_used:
             fuel_data = _try_query(resolved_org, resolved_origin, resolved_type)
 
-    # 3) Falls immer noch leer: sauberer Fehler mit Hinweis auf Alias-Versuch
+    # 3) If still empty, raise a clear error referencing the alias attempt
     if len(fuel_data) == 0:
         base_msg = f"No factor for {organization=}, {origin=}, {fuel_type=} found."
         if alias_path:
@@ -584,7 +586,7 @@ def get_prescribed_factors(
             base_msg += f" Alias resolution path: {path_str}."
         raise ValueError(base_msg + " Please extend alias table _FUEL_ALIAS_MAP or check CSV.")
 
-    # 4) Extrahieren & zurückgeben (wie bisher)
+    # 4) Extract and return the values (as before)
     lhv_mj_per_g = fuel_data["LCV"].values[0]
     ghg_emission_factor_well_to_tank_gco2eq_per_mj = fuel_data["CO2_WtT"].values[0]
 
@@ -601,9 +603,8 @@ def get_prescribed_factors(
         for _, each_data in fuel_data.iterrows()
     ]
 
-    # (Optional) Debug-Info: alias-used könnte man loggen, ohne API zu brechen
-    # logging.debug("get_prescribed_factors: alias_used=%s, resolved=(%s, %s, %s)",
-    #               alias_used, resolved_org, resolved_origin, resolved_type)
+    logger.info("get_prescribed_factors: alias_used=%s, resolved=(%s, %s, %s)",
+                  alias_used, resolved_org, resolved_origin, resolved_type)
 
     return PrescribedFactors(
         lhv_mj_per_g,
