@@ -14,6 +14,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 @unique
 class TypeFuel(Enum):
     DIESEL = 0
@@ -603,8 +604,13 @@ def get_prescribed_factors(
         for _, each_data in fuel_data.iterrows()
     ]
 
-    logger.info("get_prescribed_factors: alias_used=%s, resolved=(%s, %s, %s)",
-                  alias_used, resolved_org, resolved_origin, resolved_type)
+    logger.info(
+        "get_prescribed_factors: alias_used=%s, resolved=(%s, %s, %s)",
+        alias_used,
+        resolved_org,
+        resolved_origin,
+        resolved_type,
+    )
 
     return PrescribedFactors(
         lhv_mj_per_g,
