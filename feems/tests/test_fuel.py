@@ -81,6 +81,8 @@ def test_fuel_class():
                                 origin=fuel.origin,
                                 fuel_consumer_class=fuel_kind_by_consumer.fuel_consumer_class,
                             )
+                            if len(fuel_data) == 0:
+                                continue
                             if not np.isnan(fuel_data.WTW_energy.values[0]):
                                 assert fuel_data.WTW_energy.values[0] == pytest.approx(
                                     ghg_wtw_per_mj

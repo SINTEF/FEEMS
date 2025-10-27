@@ -3,12 +3,16 @@
 from functools import cache
 import os
 import warnings
+import logging
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import Any, Dict, Union, Optional, List
 
 import pandas as pd
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
 
 
 @unique
@@ -117,6 +121,87 @@ _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING = {
     FuelConsumerClassFuelEUMaritime.LNG_DIESEL: "LNG diesel (slow speed)",
     FuelConsumerClassFuelEUMaritime.LNG_LBSI: "LBSI",
     FuelConsumerClassFuelEUMaritime.FUEL_CELL: "Fuel Cells",
+}
+
+_FUEL_ALIAS_MAP: dict[tuple[str, FuelOrigin, TypeFuel], tuple[str, FuelOrigin, TypeFuel]] = {
+    # Carbon-based fossil fuels to for origin BIO and RFNBO --> DIESEL
+    ("eu", FuelOrigin.BIO, TypeFuel.HFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.LSFO_CRUDE): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.LSFO_BLEND): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.ULSFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.VLSFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.LFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.HFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_CRUDE): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_BLEND): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.ULSFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.VLSFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.BIO, TypeFuel.HFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.LSFO_CRUDE): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.LSFO_BLEND): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.ULSFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.VLSFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.LFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.HFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_CRUDE): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_BLEND): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.ULSFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.VLSFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    # Ammonia and Hydrogen have no bio origin --> fall back to fossil
+    ("eu", FuelOrigin.BIO, TypeFuel.AMMONIA): ("eu", FuelOrigin.FOSSIL, TypeFuel.AMMONIA),
+    ("eu", FuelOrigin.BIO, TypeFuel.HYDROGEN): ("eu", FuelOrigin.FOSSIL, TypeFuel.HYDROGEN),
+    ("imo", FuelOrigin.BIO, TypeFuel.AMMONIA): ("imo", FuelOrigin.FOSSIL, TypeFuel.AMMONIA),
+    ("imo", FuelOrigin.BIO, TypeFuel.HYDROGEN): ("imo", FuelOrigin.FOSSIL, TypeFuel.HYDROGEN),
 }
 
 
@@ -436,25 +521,80 @@ class PrescribedFactors:
     ghg_emission_factor_tank_to_wake: List[GhgEmissionFactorTankToWake]
 
 
+def _resolve_fuel_alias(
+    organization: str, origin: FuelOrigin, fuel_type: TypeFuel, *, max_hops: int = 5
+) -> tuple[str, FuelOrigin, TypeFuel, list[tuple[str, FuelOrigin, TypeFuel]]]:
+    """
+    Resolves aliases recursively and prevents cycles.
+    Returns (org, origin, fuel_type, path), where path contains all visited nodes.
+    """
+    seen: set[tuple[str, FuelOrigin, TypeFuel]] = set()
+    path: list[tuple[str, FuelOrigin, TypeFuel]] = []
+    current = (organization, origin, fuel_type)
+
+    for _ in range(max_hops):
+        path.append(current)
+        if current in seen:
+            break
+        seen.add(current)
+        if current not in _FUEL_ALIAS_MAP:
+            return (*current, path)
+        current = _FUEL_ALIAS_MAP[current]
+
+    return (*current, path)
+
+
 @cache
 def get_prescribed_factors(
     *, organization: str = "eu", origin: FuelOrigin, fuel_type: TypeFuel
 ) -> PrescribedFactors:
-    """Get the GHG emission factors for fuel specified by EU Maritime Fuel"""
-    fuel_class = _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING[origin]
-    fuel_type_eu = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[fuel_type]
-    fuel_data = _DF_GHG_FACTORS_DICTIONARY[organization].query(
-        f"pathway_name == '{fuel_type_eu}' and fuel_class == '{fuel_class}'"
-    )
-    if len(fuel_data) == 0:
-        raise ValueError(f"The fuel type {fuel_type} and origin {origin} is not available.")
-    lhv_mj_per_g = fuel_data["LCV"].values[0]
+    """Get the GHG emission factors for fuel specified by EU Maritime Fuel or IMO, inkl. Alias-Fallbacks."""
 
+    def _try_query(org: str, orig: FuelOrigin, ftype: TypeFuel):
+        fuel_class = _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING[orig]
+        fuel_type_name = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[ftype]
+        df = _DF_GHG_FACTORS_DICTIONARY[org].query(
+            f"pathway_name == '{fuel_type_name}' and fuel_class == '{fuel_class}'"
+        )
+        return df
+
+    # 1) Original query
+    fuel_data = _try_query(organization, origin, fuel_type)
+    # 2) Alias fallback, if no rows found
+    alias_used = False
+    alias_path: list[tuple[str, FuelOrigin, TypeFuel]] = []
+    resolved_org, resolved_origin, resolved_type = organization, origin, fuel_type
+
+    if len(fuel_data) == 0:
+        resolved_org, resolved_origin, resolved_type, alias_path = _resolve_fuel_alias(
+            organization, origin, fuel_type
+        )
+        alias_used = (resolved_org, resolved_origin, resolved_type) != (
+            organization,
+            origin,
+            fuel_type,
+        )
+        if alias_used:
+            fuel_data = _try_query(resolved_org, resolved_origin, resolved_type)
+
+    # 3) If still empty, raise a clear error referencing the alias attempt
+    if len(fuel_data) == 0:
+        base_msg = f"No factor for {organization=}, {origin=}, {fuel_type=} found."
+        if alias_path:
+            path_str = " → ".join(
+                [f"({org}, {orig.name}, {ft.name})" for org, orig, ft in alias_path]
+            )
+            base_msg += f" Alias resolution path: {path_str}."
+        raise ValueError(base_msg + " Please extend alias table _FUEL_ALIAS_MAP or check CSV.")
+
+    # 4) Extract and return the values (as before)
+    lhv_mj_per_g = fuel_data["LCV"].values[0]
     ghg_emission_factor_well_to_tank_gco2eq_per_mj = fuel_data["CO2_WtT"].values[0]
+
     ghg_emission_factor_tank_to_wake = [
         GhgEmissionFactorTankToWake(
             fuel_consumer_class=(
-                each_data["fuel_consumer_unit_class"] if organization == "eu" else None
+                each_data["fuel_consumer_unit_class"] if resolved_org == "eu" else None
             ),
             co2_factor_gco2_per_gfuel=each_data["Cf_CO2"],
             ch4_factor_gch4_per_gfuel=each_data["Cf_CH4"],
@@ -463,6 +603,15 @@ def get_prescribed_factors(
         )
         for _, each_data in fuel_data.iterrows()
     ]
+
+    logger.info(
+        "get_prescribed_factors: alias_used=%s, resolved=(%s, %s, %s)",
+        alias_used,
+        resolved_org,
+        resolved_origin,
+        resolved_type,
+    )
+
     return PrescribedFactors(
         lhv_mj_per_g,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj,

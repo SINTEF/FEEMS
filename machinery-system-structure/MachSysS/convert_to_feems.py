@@ -694,14 +694,16 @@ def convert_proto_shaftline_to_feems(
     components = []
     for sub_system in shaftline.subsystems:
         if sub_system.component_type == proto.Subsystem.ComponentType.MAIN_ENGINE:
-            if sub_system.engine.name == "":
-                sub_system.engine.name = sub_system.name
             if sub_system.HasField("engine"):
+                if sub_system.engine.name == "":
+                    sub_system.engine.name = sub_system.name
                 engine = convert_proto_engine_to_feems(
                     proto_engine=sub_system.engine,
                     type_engine=TypeComponent.MAIN_ENGINE,
                 )
             elif sub_system.HasField("multi_fuel_engine"):
+                if sub_system.multi_fuel_engine.name == "":
+                    sub_system.multi_fuel_engine.name = sub_system.name
                 engine = convert_proto_multifuel_engine_to_feems(
                     proto_engine=sub_system.multi_fuel_engine,
                     type_engine=TypeComponent.MAIN_ENGINE,
