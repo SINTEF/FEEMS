@@ -11,7 +11,7 @@ from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
-from .components_model.component_mechanical import EngineMultiFuel
+from .components_model.component_mechanical import EngineMultiFuel, Engine
 
 from . import get_logger
 from .components_model.component_electric import (
@@ -107,14 +107,7 @@ class MachinerySystem:
 
     @property
     def available_fuel_options(self) -> List[FuelOption]:
-        options: List[FuelOption] = []
-        seen: Set[FuelOption] = set()
-        for engine_options in self.multi_fuel_engine_inventory.values():
-            for option in engine_options:
-                if option not in seen:
-                    options.append(option)
-                    seen.add(option)
-        return options
+        return []
 
     def _validate_selected_fuel_option(
         self, fuel_option: Optional[FuelOption]
@@ -290,6 +283,52 @@ class ElectricPowerSystem(MachinerySystem):
                 if options:
                     inventory[component.name] = list(options)
         return inventory
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        options: List[FuelOption] = []
+        seen: Set[FuelOption] = set()
+        for engine_options in self.multi_fuel_engine_inventory.values():
+            for option in engine_options:
+                if option not in seen:
+                    options.append(option)
+                    seen.add(option)
+        # Check all the power sources that use fuel but are not multi-fuel engines
+        for component in self.power_sources:
+            if isinstance(component, Genset):
+                if isinstance(component.aux_engine, EngineMultiFuel):
+                    continue
+                fuel_option = FuelOption(
+                    fuel_type=component.aux_engine.fuel_type,
+                    fuel_origin=component.aux_engine.fuel_origin,
+                )
+                if fuel_option not in seen:
+                    options.append(fuel_option)
+                    seen.add(fuel_option)
+                if hasattr(component.aux_engine, "pilot_fuel_type"):
+                    fuel_option = FuelOption(
+                        fuel_type=component.aux_engine.pilot_fuel_type,
+                        fuel_origin=component.aux_engine.pilot_fuel_origin,
+                    )
+                    if fuel_option not in seen:
+                        options.append(fuel_option)
+                        seen.add(fuel_option)
+            elif isinstance(component, FuelCellSystem):
+                fuel_option = FuelOption(
+                    fuel_type=component.fuel_cell.fuel_type,
+                    fuel_origin=component.fuel_cell.fuel_origin,
+                )
+            elif isinstance(component, COGES):
+                fuel_option = FuelOption(
+                    fuel_type=component.cogas.fuel_type,
+                    fuel_origin=component.cogas.fuel_origin,
+                )
+            else:
+                continue
+            if fuel_option not in seen:
+                options.append(fuel_option)
+                seen.add(fuel_option)
+        return options
 
     def set_status_by_switchboard_id_power_type(
         self, switchboard_id: SwbId, power_type: TypePower, status: np.ndarray
@@ -896,6 +935,37 @@ class MechanicalPropulsionSystem(MachinerySystem):
         return inventory
 
     @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        options: List[FuelOption] = []
+        seen: Set[FuelOption] = set()
+        for engine_options in self.multi_fuel_engine_inventory.values():
+            for option in engine_options:
+                if option not in seen:
+                    options.append(option)
+                    seen.add(option)
+        for main_engine in self.main_engines:
+            engine_obj: Optional[Union[Engine, EngineMultiFuel]] = getattr(
+                main_engine, "engine", None
+            )
+            if engine_obj is None or isinstance(engine_obj, EngineMultiFuel):
+                continue
+            fuel_option = FuelOption(
+                fuel_type=engine_obj.fuel_type, fuel_origin=engine_obj.fuel_origin
+            )
+            if fuel_option not in seen:
+                options.append(fuel_option)
+                seen.add(fuel_option)
+            if hasattr(engine_obj, "pilot_fuel_type"):
+                fuel_option = FuelOption(
+                    fuel_type=engine_obj.pilot_fuel_type,
+                    fuel_origin=engine_obj.pilot_fuel_origin,
+                )
+                if fuel_option not in seen:
+                    options.append(fuel_option)
+                    seen.add(fuel_option)
+        return options
+
+    @property
     def no_shaft_lines(self) -> int:
         return len(self.shaft_line_id)
 
@@ -1299,6 +1369,17 @@ class HybridPropulsionSystem(MachinerySystem):
             inventory[f"electric::{name}"] = list(options)
         return inventory
 
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        # Combine available fuel options from both systems
+        options: List[FuelOption] = self.mechanical_system.available_fuel_options.copy()
+        seen: Set[FuelOption] = set(options)
+        for option in self.electric_system.available_fuel_options:
+            if option not in seen:
+                options.append(option)
+                seen.add(option)
+        return options
+
     def get_fuel_energy_consumption_running_time(
         self,
         time_interval_s: float,
@@ -1445,3 +1526,14 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
         for name, options in self.electric_system.multi_fuel_engine_inventory.items():
             inventory[f"electric::{name}"] = list(options)
         return inventory
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        # Combine available fuel options from both systems
+        options: List[FuelOption] = self.mechanical_system.available_fuel_options.copy()
+        seen: Set[FuelOption] = set(options)
+        for option in self.electric_system.available_fuel_options:
+            if option not in seen:
+                options.append(option)
+                seen.add(option)
+        return options
