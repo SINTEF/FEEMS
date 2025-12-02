@@ -1,16 +1,17 @@
 from dataclasses import dataclass
 from functools import reduce
 from operator import itemgetter
-from typing import Union, List, Tuple, Dict, NewType, NamedTuple
+from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set, Optional
 
 import numpy as np
 import pandas as pd
-from feems.fuel import FuelSpecifiedBy
+from feems.fuel import FuelSpecifiedBy, FuelOrigin, TypeFuel
 
 from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
+from .components_model.component_mechanical import EngineMultiFuel, Engine
 
 from . import get_logger
 from .components_model.component_electric import (
@@ -50,6 +51,28 @@ class FEEMSResultForMachinerySystem(NamedTuple):
     mechanical_system: FEEMSResult
 
 
+class FuelOption(NamedTuple):
+    fuel_type: TypeFuel
+    fuel_origin: FuelOrigin
+
+
+def _extract_multi_fuel_options(engine: object) -> List[FuelOption]:
+    if not isinstance(engine, EngineMultiFuel):
+        return []
+
+    options: List[FuelOption] = []
+    seen: Set[FuelOption] = set()
+    for characteristics in engine.multi_fuel_characteristics:
+        option = FuelOption(
+            fuel_type=characteristics.main_fuel_type,
+            fuel_origin=characteristics.main_fuel_origin,
+        )
+        if option not in seen:
+            options.append(option)
+            seen.add(option)
+    return options
+
+
 class MachinerySystem:
     time_interval_s: float
     integration_method: IntegrationMethod
@@ -74,6 +97,47 @@ class MachinerySystem:
         self.time_interval_s = time_interval_s
         self.integration_method = integration_method
 
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        return {}
+
+    @property
+    def has_multi_fuel_engines(self) -> bool:
+        return any(self.multi_fuel_engine_inventory.values())
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        return []
+
+    def _validate_selected_fuel_option(
+        self, fuel_option: Optional[FuelOption]
+    ) -> Optional[FuelOption]:
+        if fuel_option is None:
+            return None
+
+        inventory = self.multi_fuel_engine_inventory
+        if not inventory:
+            option_repr = f"{fuel_option.fuel_type.name}/{fuel_option.fuel_origin.name}"
+            raise InputError(
+                "Fuel option '{option}' cannot be selected because this system has no multi-fuel engines.".format(
+                    option=option_repr
+                )
+            )
+
+        unsupported_components = [
+            name for name, options in inventory.items() if fuel_option not in options
+        ]
+        if unsupported_components:
+            option_repr = f"{fuel_option.fuel_type.name}/{fuel_option.fuel_origin.name}"
+            raise InputError(
+                "Fuel option '{option}' is not supported by: {components}.".format(
+                    option=option_repr,
+                    components=", ".join(unsupported_components),
+                )
+            )
+
+        return fuel_option
+
 
 class ElectricPowerSystem(MachinerySystem):
     def __init__(
@@ -89,9 +153,7 @@ class ElectricPowerSystem(MachinerySystem):
         self.power_sources: List[
             Union[ElectricComponent, Genset, SerialSystemElectric, ElectricMachine]
         ] = []
-        self.propulsion_drives: List[Union[ElectricComponent, SerialSystemElectric]] = (
-            []
-        )
+        self.propulsion_drives: List[Union[ElectricComponent, SerialSystemElectric]] = []
         self.pti_pto: List[PTIPTO] = []
         self.energy_storage: List[EnergyStorageComponent] = []
         self.other_load: List[Union[ElectricComponent, SerialSystemElectric]] = []
@@ -104,9 +166,7 @@ class ElectricPowerSystem(MachinerySystem):
         #: Categorize the components
         for component in power_plant_components:
             if component.power_type == TypePower.POWER_SOURCE:
-                if isinstance(
-                    component, (ElectricMachine, Genset, FuelCellSystem, COGES)
-                ):
+                if isinstance(component, (ElectricMachine, Genset, FuelCellSystem, COGES)):
                     self.power_sources.append(component)
                     power_source2switchboard.append(component.switchboard_id)
                     component2switchboard.append(component.switchboard_id)
@@ -151,22 +211,14 @@ class ElectricPowerSystem(MachinerySystem):
                     )
                 component2switchboard.append(component.switchboard_id)
             else:
-                raise TypeError(
-                    f"Component - {component.name} - does have a proper type."
-                )
+                raise TypeError(f"Component - {component.name} - does have a proper type.")
 
         #: Create a list of Switchboard objects based on the switchboard information given
-        switchboard_id_from_power_sources = list(
-            dict.fromkeys(power_source2switchboard).keys()
-        )
-        switchboard_id_from_energy_storage = list(
-            dict.fromkeys(energy_storage2switchboard).keys()
-        )
+        switchboard_id_from_power_sources = list(dict.fromkeys(power_source2switchboard).keys())
+        switchboard_id_from_energy_storage = list(dict.fromkeys(energy_storage2switchboard).keys())
         switchboard_id_from_power_sources.sort()
         switchboard_id_from_energy_storage.sort()
-        self.switchboard_id: List[SwbId] = list(
-            dict.fromkeys(component2switchboard).keys()
-        )
+        self.switchboard_id: List[SwbId] = list(dict.fromkeys(component2switchboard).keys())
         self.switchboard_id.sort()
         for swb_id in self.switchboard_id:
             if (
@@ -222,6 +274,62 @@ class ElectricPowerSystem(MachinerySystem):
         self.time_interval_s: TimeIntervalList = []
         self.integration_method: IntegrationMethod = IntegrationMethod.simpson
 
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for component in self.power_sources:
+            if isinstance(component, Genset):
+                options = _extract_multi_fuel_options(component.aux_engine)
+                if options:
+                    inventory[component.name] = list(options)
+        return inventory
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        options: List[FuelOption] = []
+        seen: Set[FuelOption] = set()
+        for engine_options in self.multi_fuel_engine_inventory.values():
+            for option in engine_options:
+                if option not in seen:
+                    options.append(option)
+                    seen.add(option)
+        # Check all the power sources that use fuel but are not multi-fuel engines
+        for component in self.power_sources:
+            if isinstance(component, Genset):
+                if isinstance(component.aux_engine, EngineMultiFuel):
+                    continue
+                fuel_option = FuelOption(
+                    fuel_type=component.aux_engine.fuel_type,
+                    fuel_origin=component.aux_engine.fuel_origin,
+                )
+                if fuel_option not in seen:
+                    options.append(fuel_option)
+                    seen.add(fuel_option)
+                if hasattr(component.aux_engine, "pilot_fuel_type"):
+                    fuel_option = FuelOption(
+                        fuel_type=component.aux_engine.pilot_fuel_type,
+                        fuel_origin=component.aux_engine.pilot_fuel_origin,
+                    )
+                    if fuel_option not in seen:
+                        options.append(fuel_option)
+                        seen.add(fuel_option)
+            elif isinstance(component, FuelCellSystem):
+                fuel_option = FuelOption(
+                    fuel_type=component.fuel_cell.fuel_type,
+                    fuel_origin=component.fuel_cell.fuel_origin,
+                )
+            elif isinstance(component, COGES):
+                fuel_option = FuelOption(
+                    fuel_type=component.cogas.fuel_type,
+                    fuel_origin=component.cogas.fuel_origin,
+                )
+            else:
+                continue
+            if fuel_option not in seen:
+                options.append(fuel_option)
+                seen.add(fuel_option)
+        return options
+
     def set_status_by_switchboard_id_power_type(
         self, switchboard_id: SwbId, power_type: TypePower, status: np.ndarray
     ) -> None:
@@ -235,9 +343,7 @@ class ElectricPowerSystem(MachinerySystem):
         power_type: TypePower,
         load_sharing_mode: np.ndarray,
     ) -> None:
-        self.switchboards[
-            switchboard_id
-        ].set_load_sharing_mode_components_by_power_type(
+        self.switchboards[switchboard_id].set_load_sharing_mode_components_by_power_type(
             type_=power_type, load_sharing_mode=load_sharing_mode
         )
 
@@ -394,14 +500,10 @@ class ElectricPowerSystem(MachinerySystem):
             ).sum()
         sum_power_out_rated_bus = {}
         for index, _ in enumerate(self.switchboards):
-            sum_power_out_rated_bus[BusId(index + 1)] = np.zeros(
-                self.no_bus_configuration_change
-            )
+            sum_power_out_rated_bus[BusId(index + 1)] = np.zeros(self.no_bus_configuration_change)
         for i, switchboard2bus in enumerate(self.switchboard2bus):
             for swb_id, bus_id in switchboard2bus.items():
-                sum_power_out_rated_bus[bus_id][i] += sum_power_out_rated_switchboards[
-                    swb_id
-                ]
+                sum_power_out_rated_bus[bus_id][i] += sum_power_out_rated_switchboards[swb_id]
         return sum_power_out_rated_bus
 
     def _get_sum_buses(
@@ -441,13 +543,13 @@ class ElectricPowerSystem(MachinerySystem):
                     TypeValueBus.LOAD_KW_SOURCES,
                     TypeValueBus.POWER_AVAIL_POWER_SOURCES_SYMMETRIC,
                 ]
-                is_component_of_power_type = self.switchboards[
-                    swb_id
-                ].component_by_power_type[power_type.value]
+                is_component_of_power_type = self.switchboards[swb_id].component_by_power_type[
+                    power_type.value
+                ]
                 if is_which_value_load_or_power_avail or is_component_of_power_type:
-                    sum_buses[bus_id][index_start:index_end] += sum_switchboards[
-                        swb_id
-                    ][index_start:index_end]
+                    sum_buses[bus_id][index_start:index_end] += sum_switchboards[swb_id][
+                        index_start:index_end
+                    ]
 
         return sum_buses
 
@@ -473,13 +575,9 @@ class ElectricPowerSystem(MachinerySystem):
             else:
                 if switchboard.component_by_power_type[power_type.value]:
                     if which_value == TypeValueBus.POWER_IN_BY_POWER_TYPE:
-                        sum_temp = switchboard.get_sum_power_input_by_power_type(
-                            power_type
-                        )
+                        sum_temp = switchboard.get_sum_power_input_by_power_type(power_type)
                     elif which_value == TypeValueBus.POWER_OUT_BY_POWER_TYPE:
-                        sum_temp = switchboard.get_sum_power_output_by_power_type(
-                            power_type
-                        )
+                        sum_temp = switchboard.get_sum_power_output_by_power_type(power_type)
                     else:
                         raise TypeError("The value name specified is not valid")
             if sum_temp is not None:
@@ -507,32 +605,22 @@ class ElectricPowerSystem(MachinerySystem):
 
         return sum_switchboards
 
-    def get_sum_power_in_buses_by_power_type(
-        self, type_: TypePower
-    ) -> Dict[BusId, np.ndarray]:
-        return self._get_sum_buses(
-            TypeValueBus.POWER_IN_BY_POWER_TYPE, power_type=type_
-        )
+    def get_sum_power_in_buses_by_power_type(self, type_: TypePower) -> Dict[BusId, np.ndarray]:
+        return self._get_sum_buses(TypeValueBus.POWER_IN_BY_POWER_TYPE, power_type=type_)
 
     def get_sum_power_output_buses_by_power_type(
         self, type_: TypePower
     ) -> Dict[BusId, np.ndarray]:
-        return self._get_sum_buses(
-            TypeValueBus.POWER_OUT_BY_POWER_TYPE, power_type=type_
-        )
+        return self._get_sum_buses(TypeValueBus.POWER_OUT_BY_POWER_TYPE, power_type=type_)
 
     def get_sum_load_kw_sources_symmetric_buses(self) -> Dict[BusId, np.ndarray]:
-        return self._get_sum_buses(
-            TypeValueBus.LOAD_KW_SOURCES, power_type=TypePower.POWER_SOURCE
-        )
+        return self._get_sum_buses(TypeValueBus.LOAD_KW_SOURCES, power_type=TypePower.POWER_SOURCE)
 
     def get_sum_consumption_kw_sources_switchboard(self) -> Dict[SwbId, np.ndarray]:
         sum_switchboards: Dict[SwbId, np.ndarray] = {}
         len_sum = set()
         for swb_id, switchboard in self.switchboards.items():
-            sum_temp = switchboard.get_sum_power_input_by_power_type(
-                TypePower.POWER_CONSUMER
-            )
+            sum_temp = switchboard.get_sum_power_input_by_power_type(TypePower.POWER_CONSUMER)
             sum_switchboards[swb_id] = sum_temp
             len_sum.add(len(sum_temp))
 
@@ -573,10 +661,8 @@ class ElectricPowerSystem(MachinerySystem):
                 raise InputError(msg)
 
         for swb_id, swb in self.switchboards.items():
-            load_sharing_mode_energy_storage = (
-                swb.get_load_sharing_mode_components_by_power_type(
-                    TypePower.ENERGY_STORAGE
-                )
+            load_sharing_mode_energy_storage = swb.get_load_sharing_mode_components_by_power_type(
+                TypePower.ENERGY_STORAGE
             )
             if load_sharing_mode_energy_storage:
                 if number_points != load_sharing_mode_energy_storage[0].size:
@@ -588,21 +674,15 @@ class ElectricPowerSystem(MachinerySystem):
                     logger.error(msg)
                     raise InputError(msg)
 
-            for i, load_sharing_mode_each in enumerate(
-                load_sharing_mode_energy_storage
-            ):
+            for i, load_sharing_mode_each in enumerate(load_sharing_mode_energy_storage):
                 if load_sharing_mode_each.sum() == 0:
                     swb.set_power_load_component_from_power_input_by_type_and_name(
-                        name=swb.name_component_by_power_type[
-                            TypePower.ENERGY_STORAGE.value
-                        ][i],
+                        name=swb.name_component_by_power_type[TypePower.ENERGY_STORAGE.value][i],
                         power_type=TypePower.ENERGY_STORAGE,
                         power_input=np.zeros(number_points),
                     )
                 else:
-                    component = swb.component_by_power_type[
-                        TypePower.ENERGY_STORAGE.value
-                    ][i]
+                    component = swb.component_by_power_type[TypePower.ENERGY_STORAGE.value][i]
                     if component.power_input.size != number_points:
                         msg = (
                             f"The dimension of the power input of the energy storage "
@@ -612,8 +692,8 @@ class ElectricPowerSystem(MachinerySystem):
                         logger.error(msg)
                         raise InputError(msg)
 
-            load_sharing_mode_pti_pto = (
-                swb.get_load_sharing_mode_components_by_power_type(TypePower.PTI_PTO)
+            load_sharing_mode_pti_pto = swb.get_load_sharing_mode_components_by_power_type(
+                TypePower.PTI_PTO
             )
             if load_sharing_mode_pti_pto:
                 if number_points != load_sharing_mode_pti_pto[0].size:
@@ -627,9 +707,7 @@ class ElectricPowerSystem(MachinerySystem):
             for i, load_sharing_mode_each in enumerate(load_sharing_mode_pti_pto):
                 if load_sharing_mode_each.sum() == 0:
                     swb.set_power_load_component_from_power_input_by_type_and_name(
-                        name=swb.name_component_by_power_type[TypePower.PTI_PTO.value][
-                            i
-                        ],
+                        name=swb.name_component_by_power_type[TypePower.PTI_PTO.value][i],
                         power_type=TypePower.PTI_PTO,
                         power_input=np.zeros(number_points),
                     )
@@ -651,9 +729,7 @@ class ElectricPowerSystem(MachinerySystem):
         """
         self.validate_inputs_before_power_balance_calculation()
 
-        sum_load_kw_sources_symmetric_buses = (
-            self.get_sum_load_kw_sources_symmetric_buses()
-        )
+        sum_load_kw_sources_symmetric_buses = self.get_sum_load_kw_sources_symmetric_buses()
         sum_power_avail_power_sources_symmetric_buses = (
             self.get_sum_power_avail_power_sources_symmetric_buses()
         )
@@ -683,16 +759,16 @@ class ElectricPowerSystem(MachinerySystem):
                     else no_points
                 )
                 bus_id = switchboard2bus[switchboard.id]
-                load_switchboard_symmetric_power_source[index_start:index_end] = (
-                    load_buses[bus_id][index_start:index_end]
-                )
-            switchboard.set_power_out_power_sources(
-                load_switchboard_symmetric_power_source
-            )
+                load_switchboard_symmetric_power_source[index_start:index_end] = load_buses[
+                    bus_id
+                ][index_start:index_end]
+            switchboard.set_power_out_power_sources(load_switchboard_symmetric_power_source)
 
     # noinspection DuplicatedCode
     def get_fuel_energy_consumption_running_time(
-        self, fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO
+        self,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -705,6 +781,7 @@ class ElectricPowerSystem(MachinerySystem):
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply to all multi-fuel engines.
 
         Returns:
             FEEMSResult
@@ -716,17 +793,20 @@ class ElectricPowerSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        fuel_type = selected_option.fuel_type if selected_option else None
+        fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult(detail_result=pd.DataFrame())
         if len(self.switchboards) == 0:
             logger.warning("There is no switchboard in the system")
             return FEEMSResult(duration_s=0)
         for _, switchboard in self.switchboards.items():
-            result_swb: FEEMSResult = (
-                switchboard.get_fuel_energy_consumption_running_time(
-                    time_interval_s=self.time_interval_s,
-                    integration_method=self.integration_method,
-                    fuel_specified_by=fuel_specified_by,
-                )
+            result_swb: FEEMSResult = switchboard.get_fuel_energy_consumption_running_time(
+                time_interval_s=self.time_interval_s,
+                integration_method=self.integration_method,
+                fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
             result_swb.detail_result["switchboard id"] = switchboard.id
             res = res.sum_with_freeze_duration(result_swb)
@@ -734,7 +814,9 @@ class ElectricPowerSystem(MachinerySystem):
         return res
 
     def get_fuel_energy_consumption_running_time_scalar(
-        self, fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO
+        self,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -747,6 +829,7 @@ class ElectricPowerSystem(MachinerySystem):
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply to all multi-fuel engines.
 
         Returns:
             FEEMSResult
@@ -758,6 +841,9 @@ class ElectricPowerSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        fuel_type = selected_option.fuel_type if selected_option else None
+        fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult()
         for _, switchboard in self.switchboards.items():
             result_swb: FEEMSResult = (
@@ -765,6 +851,8 @@ class ElectricPowerSystem(MachinerySystem):
                     time_interval_s=self.time_interval_s,
                     integration_method=self.integration_method,
                     fuel_specified_by=fuel_specified_by,
+                    fuel_type=fuel_type,
+                    fuel_origin=fuel_origin,
                 )
             )
             res = res.sum_with_freeze_duration(result_swb)
@@ -811,9 +899,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
             if component.shaft_line_id not in self.component_by_shaft_line_id.keys():
                 self.component_by_shaft_line_id[component.shaft_line_id] = [component]
             else:
-                self.component_by_shaft_line_id[component.shaft_line_id].append(
-                    component
-                )
+                self.component_by_shaft_line_id[component.shaft_line_id].append(component)
             if component.type in [
                 TypeComponent.MAIN_ENGINE,
                 TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
@@ -839,6 +925,47 @@ class MechanicalPropulsionSystem(MachinerySystem):
             )
 
     @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for main_engine in self.main_engines:
+            engine_obj = getattr(main_engine, "engine", None)
+            options = _extract_multi_fuel_options(engine_obj)
+            if options:
+                inventory[main_engine.name] = list(options)
+        return inventory
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        options: List[FuelOption] = []
+        seen: Set[FuelOption] = set()
+        for engine_options in self.multi_fuel_engine_inventory.values():
+            for option in engine_options:
+                if option not in seen:
+                    options.append(option)
+                    seen.add(option)
+        for main_engine in self.main_engines:
+            engine_obj: Optional[Union[Engine, EngineMultiFuel]] = getattr(
+                main_engine, "engine", None
+            )
+            if engine_obj is None or isinstance(engine_obj, EngineMultiFuel):
+                continue
+            fuel_option = FuelOption(
+                fuel_type=engine_obj.fuel_type, fuel_origin=engine_obj.fuel_origin
+            )
+            if fuel_option not in seen:
+                options.append(fuel_option)
+                seen.add(fuel_option)
+            if hasattr(engine_obj, "pilot_fuel_type"):
+                fuel_option = FuelOption(
+                    fuel_type=engine_obj.pilot_fuel_type,
+                    fuel_origin=engine_obj.pilot_fuel_origin,
+                )
+                if fuel_option not in seen:
+                    options.append(fuel_option)
+                    seen.add(fuel_option)
+        return options
+
+    @property
     def no_shaft_lines(self) -> int:
         return len(self.shaft_line_id)
 
@@ -858,9 +985,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
         self, name: str, shaft_line_id: int, power_type: TypePower
     ) -> MechanicalComponent:
         index_shaft_line = self.shaft_line_id.index(shaft_line_id)
-        return self.shaft_line[index_shaft_line].get_component_by_name_power_type(
-            name, power_type
-        )
+        return self.shaft_line[index_shaft_line].get_component_by_name_power_type(name, power_type)
 
     def set_power_consumer_load_by_value_for_given_name_shaft_line_id(
         self, name: str, shaft_line_id: int, power_input: np.ndarray
@@ -1037,8 +1162,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
                 "for the mechanical loads or PTI/PTOs."
             )
             err_msg = reduce(
-                lambda acc, component: acc
-                + f"\n\t{component.name}: {component.power_input.size}",
+                lambda acc, component: acc + f"\n\t{component.name}: {component.power_input.size}",
                 components,
                 err_msg,
             )
@@ -1086,9 +1210,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
                     return False
 
         # Check the size of the full pti mode of the pti_ptos
-        number_points_full_pti = [
-            pti_pto.full_pti_mode.size for pti_pto in self.pti_ptos
-        ]
+        number_points_full_pti = [pti_pto.full_pti_mode.size for pti_pto in self.pti_ptos]
         if len(set(number_points_full_pti)) > 1:
             err_msg = (
                 f"There are mismatches in the number of points of the full pti mode "
@@ -1112,8 +1234,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
                     f"inputs of consumers ({number_points})."
                 )
                 err_msg = reduce(
-                    lambda acc, comp: acc
-                    + f"\n\t{comp.name}: {comp.full_pti_mode.size}",
+                    lambda acc, comp: acc + f"\n\t{comp.name}: {comp.full_pti_mode.size}",
                     self.pti_ptos,
                     err_msg,
                 )
@@ -1122,7 +1243,9 @@ class MechanicalPropulsionSystem(MachinerySystem):
         return True
 
     def get_fuel_energy_consumption_running_time(
-        self, fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO
+        self,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -1132,7 +1255,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
-            fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply to all multi-fuel engines.
 
         Returns:
             FEEMSResult
@@ -1144,6 +1267,9 @@ class MechanicalPropulsionSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        fuel_type = selected_option.fuel_type if selected_option else None
+        fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult(
             energy_consumption_electric_total_mj=0,
             energy_consumption_mechanical_total_mj=0,
@@ -1157,12 +1283,12 @@ class MechanicalPropulsionSystem(MachinerySystem):
             logger.warning("There is no switchboard in the system")
             return FEEMSResult(duration_s=0)
         for shaft_line in self.shaft_line:
-            result_shaft_line: FEEMSResult = (
-                shaft_line.get_fuel_calculation_running_hours(
-                    time_step=self.time_interval_s,
-                    integration_method=self.integration_method,
-                    fuel_specified_by=fuel_specified_by,
-                )
+            result_shaft_line: FEEMSResult = shaft_line.get_fuel_calculation_running_hours(
+                time_step=self.time_interval_s,
+                integration_method=self.integration_method,
+                fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
             )
             result_shaft_line.detail_result["shaftline id"] = shaft_line.id
             res = res.sum_with_freeze_duration(result_shaft_line)
@@ -1234,11 +1360,32 @@ class HybridPropulsionSystem(MachinerySystem):
         if full_pti_pto_mode_exists:
             self.electric_system.do_power_balance_calculation()
 
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for name, options in self.mechanical_system.multi_fuel_engine_inventory.items():
+            inventory[f"mechanical::{name}"] = list(options)
+        for name, options in self.electric_system.multi_fuel_engine_inventory.items():
+            inventory[f"electric::{name}"] = list(options)
+        return inventory
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        # Combine available fuel options from both systems
+        options: List[FuelOption] = self.mechanical_system.available_fuel_options.copy()
+        seen: Set[FuelOption] = set(options)
+        for option in self.electric_system.available_fuel_options:
+            if option not in seen:
+                options.append(option)
+                seen.add(option)
+        return options
+
     def get_fuel_energy_consumption_running_time(
         self,
         time_interval_s: float,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1247,6 +1394,7 @@ class HybridPropulsionSystem(MachinerySystem):
             time_interval_s: the time interval for input load series in seconds
             integration_method: Integration method, "simpson" or "trapezoid"
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply across both subsystems.
         Returns:
             FEEMSResultForMachinerySystem
         """
@@ -1257,18 +1405,31 @@ class HybridPropulsionSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        mechanical_option = (
+            selected_option
+            if selected_option and selected_option in self.mechanical_system.available_fuel_options
+            else None
+        )
+        electric_option = (
+            selected_option
+            if selected_option and selected_option in self.electric_system.available_fuel_options
+            else None
+        )
         self.mechanical_system.set_time_interval(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
         result_mech = self.mechanical_system.get_fuel_energy_consumption_running_time(
-            fuel_specified_by=fuel_specified_by
+            fuel_specified_by=fuel_specified_by,
+            fuel_option=mechanical_option,
         )
         self.electric_system.set_time_interval(
             time_interval_s=time_interval_s, integration_method=integration_method
         )
         result_elec = self.electric_system.get_fuel_energy_consumption_running_time(
             fuel_specified_by=fuel_specified_by,
+            fuel_option=electric_option,
         )
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
@@ -1305,6 +1466,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
         nox_emission_criteria: int = 2,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1314,6 +1476,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             nox_emission_criteria: IMO NOx emission tier 1, 2, 3
             integration_method: Integration method, "simpson" or "trapezoid"
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_option: Optional fuel selection to apply across both subsystems.
         Returns:
             Tuple of FEEMSResult for mechanical system and electric system, respectively
         """
@@ -1324,20 +1487,53 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             raise NotImplementedError(
                 f"Fuel specified by {fuel_specified_by.name} is not implemented"
             )
+        selected_option = self._validate_selected_fuel_option(fuel_option)
+        mechanical_option = (
+            selected_option
+            if selected_option and selected_option in self.mechanical_system.available_fuel_options
+            else None
+        )
+        electric_option = (
+            selected_option
+            if selected_option and selected_option in self.electric_system.available_fuel_options
+            else None
+        )
         self.mechanical_system.set_time_interval(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
         result_mech = self.mechanical_system.get_fuel_energy_consumption_running_time(
-            fuel_specified_by=fuel_specified_by
+            fuel_specified_by=fuel_specified_by,
+            fuel_option=mechanical_option,
         )
         self.electric_system.set_time_interval(
             time_interval_s=time_interval_s, integration_method=integration_method
         )
         result_elec = self.electric_system.get_fuel_energy_consumption_running_time(
-            fuel_specified_by=fuel_specified_by
+            fuel_specified_by=fuel_specified_by,
+            fuel_option=electric_option,
         )
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
             mechanical_system=result_mech,
         )
+
+    @property
+    def multi_fuel_engine_inventory(self) -> Dict[str, List[FuelOption]]:
+        inventory: Dict[str, List[FuelOption]] = {}
+        for name, options in self.mechanical_system.multi_fuel_engine_inventory.items():
+            inventory[f"mechanical::{name}"] = list(options)
+        for name, options in self.electric_system.multi_fuel_engine_inventory.items():
+            inventory[f"electric::{name}"] = list(options)
+        return inventory
+
+    @property
+    def available_fuel_options(self) -> List[FuelOption]:
+        # Combine available fuel options from both systems
+        options: List[FuelOption] = self.mechanical_system.available_fuel_options.copy()
+        seen: Set[FuelOption] = set(options)
+        for option in self.electric_system.available_fuel_options:
+            if option not in seen:
+                options.append(option)
+                seen.add(option)
+        return options

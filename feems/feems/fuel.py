@@ -3,12 +3,16 @@
 from functools import cache
 import os
 import warnings
+import logging
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import Any, Dict, Union, Optional, List
 
 import pandas as pd
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
 
 
 @unique
@@ -23,6 +27,10 @@ class TypeFuel(Enum):
     ETHANOL = 7
     METHANOL = 8
     LFO = 9
+    LSFO_CRUDE = 10
+    LSFO_BLEND = 11
+    ULSFO = 12
+    VLSFO = 13
 
 
 @unique
@@ -33,9 +41,10 @@ class FuelOrigin(Enum):
     RENEWABLE_NON_BIO = 3
 
 
+# Constants for GWP100 values from IPCC AR6 (2024, IPCC SIXTH ASSESSMENT REPORT (AR6) “CLIMATE CHANGE 2023”)
 _GWP100_CO2 = 1
-_GWP100_CH4 = 25
-_GWP100_N2O = 298
+_GWP100_CH4 = 27
+_GWP100_N2O = 273
 
 
 _PATH_TO_FUELEU_MARITIME_GHG_FACTORS = os.path.join(
@@ -65,7 +74,7 @@ for path in [_PATH_TO_FUELEU_MARITIME_GHG_FACTORS, _PATH_TO_IMO_GHG_FACTORS]:
 
 _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING = {
     FuelOrigin.FOSSIL: "Fossil",
-    FuelOrigin.BIO: "Bio",
+    FuelOrigin.BIO: "BIO",
     FuelOrigin.RENEWABLE_NON_BIO: "RFNBO",
 }
 
@@ -81,6 +90,10 @@ _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING = {
     TypeFuel.ETHANOL: "Ethanol",
     TypeFuel.METHANOL: "Methanol",
     TypeFuel.LFO: "LFO",
+    TypeFuel.LSFO_CRUDE: "LSFO (Crude)",
+    TypeFuel.LSFO_BLEND: "LSFO (Blend)",
+    TypeFuel.ULSFO: "ULSFO",
+    TypeFuel.VLSFO: "VLSFO",
 }
 
 
@@ -108,6 +121,87 @@ _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING = {
     FuelConsumerClassFuelEUMaritime.LNG_DIESEL: "LNG diesel (slow speed)",
     FuelConsumerClassFuelEUMaritime.LNG_LBSI: "LBSI",
     FuelConsumerClassFuelEUMaritime.FUEL_CELL: "Fuel Cells",
+}
+
+_FUEL_ALIAS_MAP: dict[tuple[str, FuelOrigin, TypeFuel], tuple[str, FuelOrigin, TypeFuel]] = {
+    # Carbon-based fossil fuels to for origin BIO and RFNBO --> DIESEL
+    ("eu", FuelOrigin.BIO, TypeFuel.HFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.LSFO_CRUDE): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.LSFO_BLEND): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.ULSFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.VLSFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.BIO, TypeFuel.LFO): ("eu", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.HFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_CRUDE): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_BLEND): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.ULSFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.VLSFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("eu", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LFO): (
+        "eu",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.BIO, TypeFuel.HFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.LSFO_CRUDE): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.LSFO_BLEND): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.ULSFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.VLSFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.BIO, TypeFuel.LFO): ("imo", FuelOrigin.BIO, TypeFuel.DIESEL),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.HFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_CRUDE): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LSFO_BLEND): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.ULSFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.VLSFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    ("imo", FuelOrigin.RENEWABLE_NON_BIO, TypeFuel.LFO): (
+        "imo",
+        FuelOrigin.RENEWABLE_NON_BIO,
+        TypeFuel.DIESEL,
+    ),
+    # Ammonia and Hydrogen have no bio origin --> fall back to fossil
+    ("eu", FuelOrigin.BIO, TypeFuel.AMMONIA): ("eu", FuelOrigin.FOSSIL, TypeFuel.AMMONIA),
+    ("eu", FuelOrigin.BIO, TypeFuel.HYDROGEN): ("eu", FuelOrigin.FOSSIL, TypeFuel.HYDROGEN),
+    ("imo", FuelOrigin.BIO, TypeFuel.AMMONIA): ("imo", FuelOrigin.FOSSIL, TypeFuel.AMMONIA),
+    ("imo", FuelOrigin.BIO, TypeFuel.HYDROGEN): ("imo", FuelOrigin.FOSSIL, TypeFuel.HYDROGEN),
 }
 
 
@@ -155,6 +249,117 @@ class GhgEmissionFactorTankToWake:
         ) + self.c_slip_percent / 100 * _GWP100_CH4
 
 
+@dataclass
+class GHGEmissions:
+    tank_to_wake_kg_or_gco2eq_per_gfuel: Union[float, np.ndarray] = 0.0
+    well_to_tank_kg_or_gco2eq_per_gfuel: Union[float, np.ndarray] = 0.0
+    tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip: Union[float, np.ndarray] = 0.0
+    tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel: Union[float, np.ndarray] = 0.0
+    tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel: Union[float, np.ndarray] = (
+        0.0
+    )
+
+    @property
+    def well_to_wake_kg_or_gco2eq_per_gfuel(self):
+        return self.tank_to_wake_kg_or_gco2eq_per_gfuel + self.well_to_tank_kg_or_gco2eq_per_gfuel
+
+    @property
+    def well_to_wake_without_slip_kg_or_gco2eq_per_gfuel(self):
+        return (
+            self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            + self.well_to_tank_kg_or_gco2eq_per_gfuel
+        )
+
+    @property
+    def tank_to_wake_emissions_kg_for_ets(self) -> float:
+        """Returns the emissions in kg for ETS"""
+        return (
+            self.tank_to_wake_kg_or_gco2eq_per_gfuel
+            - self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+        )
+
+    @property
+    def tank_to_wake_emissions_without_slip_kg_for_ets(self) -> float:
+        """Returns the emissions in kg for ETS"""
+        return (
+            self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            - self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+        )
+
+    def __add__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel
+            + other.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel
+            + other.well_to_tank_kg_or_gco2eq_per_gfuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            + other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            + other.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            + other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
+        )
+
+    def __radd__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return self.__add__(other)
+
+    def __mul__(self, other: float) -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel * other,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel * other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            * other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            * other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            * other,
+        )
+
+    def __rmul__(self, other: float) -> "GHGEmissions":
+        return self.__mul__(other)
+
+    def __truediv__(self, other: float) -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel / other,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel / other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            / other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            / other,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            / other,
+        )
+
+    def __rtruediv__(self, other: float) -> "GHGEmissions":
+        return self.__truediv__(other)
+
+    def __sub__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel
+            - other.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            well_to_tank_kg_or_gco2eq_per_gfuel=self.well_to_tank_kg_or_gco2eq_per_gfuel
+            - other.well_to_tank_kg_or_gco2eq_per_gfuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+            - other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel
+            - other.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel
+            - other.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
+        )
+
+    def __rsub__(self, other: "GHGEmissions") -> "GHGEmissions":
+        return self.__sub__(other)
+
+    def __neg__(self) -> "GHGEmissions":
+        return GHGEmissions(
+            tank_to_wake_kg_or_gco2eq_per_gfuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel,
+            well_to_tank_kg_or_gco2eq_per_gfuel=-self.well_to_tank_kg_or_gco2eq_per_gfuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=-self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel=-self.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
+        )
+
+
 class Fuel:
     fuel_type: TypeFuel
     origin: FuelOrigin
@@ -171,9 +376,7 @@ class Fuel:
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: Optional[
-            List[GhgEmissionFactorTankToWake]
-        ] = None,
+        ghg_emission_factor_tank_to_wake: Optional[List[GhgEmissionFactorTankToWake]] = None,
         mass_or_mass_fraction: Union[np.array, float] = 0.0,
     ):
         """Constructor for FuelSpecifications class
@@ -223,14 +426,10 @@ class Fuel:
         elif fuel_specified_by == FuelSpecifiedBy.IMO:
             self._get_factors_for_imo()
         elif fuel_specified_by == FuelSpecifiedBy.USER:
-            self.ghg_emission_factor_well_to_tank = (
-                ghg_emission_factor_well_to_tank_gco2eq_per_mj
-            )
+            self.ghg_emission_factor_well_to_tank = ghg_emission_factor_well_to_tank_gco2eq_per_mj
             self.ghg_emission_factor_tank_to_wake = ghg_emission_factor_tank_to_wake
         else:
-            raise NotImplementedError(
-                f"Fuel specified by {fuel_specified_by} is not implemented."
-            )
+            raise NotImplementedError(f"Fuel specified by {fuel_specified_by} is not implemented.")
 
     def __str__(self):
         return f"{self.fuel_type.name.lower()}_{self.origin.name.lower()}"
@@ -253,9 +452,7 @@ class Fuel:
                 else None
             ),
             ghg_emission_factor_tank_to_wake=(
-                self.ghg_emission_factor_tank_to_wake
-                if fuel_specified_by_user
-                else None
+                self.ghg_emission_factor_tank_to_wake if fuel_specified_by_user else None
             ),
             mass_or_mass_fraction=self.mass_or_mass_fraction,
         )
@@ -273,7 +470,9 @@ class Fuel:
         return self.ghg_emission_factor_well_to_tank_gco2eq_per_mj * self.lhv_mj_per_g
 
     def get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
-        self, fuel_consumer_class: FuelConsumerClassFuelEUMaritime = None
+        self,
+        fuel_consumer_class: FuelConsumerClassFuelEUMaritime = None,
+        exclude_slip: bool = False,
     ) -> float:
         """Returns the GHG emission factor from tank to wake in gCO2eq/gfuel
 
@@ -285,15 +484,16 @@ class Fuel:
             float: GHG emission factor from tank to wake in gCO2eq/gfuel
         """
         if self.fuel_specified_by == FuelSpecifiedBy.IMO:
-            return self.ghg_emission_factor_tank_to_wake[
-                0
-            ].ghg_emission_factor_gco2eq_per_gfuel
-        return next(
+            return self.ghg_emission_factor_tank_to_wake[0].ghg_emission_factor_gco2eq_per_gfuel
+        ghg_emission_factor_ttw = next(
             filter(
                 lambda x: x.fuel_consumer_class == fuel_consumer_class,
                 self.ghg_emission_factor_tank_to_wake,
             )
-        ).ghg_emission_factor_gco2eq_per_gfuel
+        )
+        if exclude_slip:
+            return ghg_emission_factor_ttw.co2_factor_gco2_per_gfuel
+        return ghg_emission_factor_ttw.ghg_emission_factor_gco2eq_per_gfuel
 
     def _get_prescribed_factors(self, organization: str = "eu") -> None:
         res = get_prescribed_factors(
@@ -321,27 +521,80 @@ class PrescribedFactors:
     ghg_emission_factor_tank_to_wake: List[GhgEmissionFactorTankToWake]
 
 
+def _resolve_fuel_alias(
+    organization: str, origin: FuelOrigin, fuel_type: TypeFuel, *, max_hops: int = 5
+) -> tuple[str, FuelOrigin, TypeFuel, list[tuple[str, FuelOrigin, TypeFuel]]]:
+    """
+    Resolves aliases recursively and prevents cycles.
+    Returns (org, origin, fuel_type, path), where path contains all visited nodes.
+    """
+    seen: set[tuple[str, FuelOrigin, TypeFuel]] = set()
+    path: list[tuple[str, FuelOrigin, TypeFuel]] = []
+    current = (organization, origin, fuel_type)
+
+    for _ in range(max_hops):
+        path.append(current)
+        if current in seen:
+            break
+        seen.add(current)
+        if current not in _FUEL_ALIAS_MAP:
+            return (*current, path)
+        current = _FUEL_ALIAS_MAP[current]
+
+    return (*current, path)
+
+
 @cache
 def get_prescribed_factors(
     *, organization: str = "eu", origin: FuelOrigin, fuel_type: TypeFuel
 ) -> PrescribedFactors:
-    """Get the GHG emission factors for fuel specified by EU Maritime Fuel"""
-    fuel_class = _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING[origin]
-    fuel_type_eu = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[fuel_type]
-    fuel_data = _DF_GHG_FACTORS_DICTIONARY[organization].query(
-        f"pathway_name == '{fuel_type_eu}' and fuel_class == '{fuel_class}'"
-    )
-    if len(fuel_data) == 0:
-        raise ValueError(
-            f"The fuel type {fuel_type} and origin {origin} is not available."
-        )
-    lhv_mj_per_g = fuel_data["LCV"].values[0]
+    """Get the GHG emission factors for fuel specified by EU Maritime Fuel or IMO, inkl. Alias-Fallbacks."""
 
+    def _try_query(org: str, orig: FuelOrigin, ftype: TypeFuel):
+        fuel_class = _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING[orig]
+        fuel_type_name = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[ftype]
+        df = _DF_GHG_FACTORS_DICTIONARY[org].query(
+            f"pathway_name == '{fuel_type_name}' and fuel_class == '{fuel_class}'"
+        )
+        return df
+
+    # 1) Original query
+    fuel_data = _try_query(organization, origin, fuel_type)
+    # 2) Alias fallback, if no rows found
+    alias_used = False
+    alias_path: list[tuple[str, FuelOrigin, TypeFuel]] = []
+    resolved_org, resolved_origin, resolved_type = organization, origin, fuel_type
+
+    if len(fuel_data) == 0:
+        resolved_org, resolved_origin, resolved_type, alias_path = _resolve_fuel_alias(
+            organization, origin, fuel_type
+        )
+        alias_used = (resolved_org, resolved_origin, resolved_type) != (
+            organization,
+            origin,
+            fuel_type,
+        )
+        if alias_used:
+            fuel_data = _try_query(resolved_org, resolved_origin, resolved_type)
+
+    # 3) If still empty, raise a clear error referencing the alias attempt
+    if len(fuel_data) == 0:
+        base_msg = f"No factor for {organization=}, {origin=}, {fuel_type=} found."
+        if alias_path:
+            path_str = " → ".join(
+                [f"({org}, {orig.name}, {ft.name})" for org, orig, ft in alias_path]
+            )
+            base_msg += f" Alias resolution path: {path_str}."
+        raise ValueError(base_msg + " Please extend alias table _FUEL_ALIAS_MAP or check CSV.")
+
+    # 4) Extract and return the values (as before)
+    lhv_mj_per_g = fuel_data["LCV"].values[0]
     ghg_emission_factor_well_to_tank_gco2eq_per_mj = fuel_data["CO2_WtT"].values[0]
+
     ghg_emission_factor_tank_to_wake = [
         GhgEmissionFactorTankToWake(
             fuel_consumer_class=(
-                each_data["fuel_consumer_unit_class"] if organization == "eu" else None
+                each_data["fuel_consumer_unit_class"] if resolved_org == "eu" else None
             ),
             co2_factor_gco2_per_gfuel=each_data["Cf_CO2"],
             ch4_factor_gch4_per_gfuel=each_data["Cf_CH4"],
@@ -350,10 +603,33 @@ def get_prescribed_factors(
         )
         for _, each_data in fuel_data.iterrows()
     ]
+
+    logger.info(
+        "get_prescribed_factors: alias_used=%s, resolved=(%s, %s, %s)",
+        alias_used,
+        resolved_org,
+        resolved_origin,
+        resolved_type,
+    )
+
     return PrescribedFactors(
         lhv_mj_per_g,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj,
         ghg_emission_factor_tank_to_wake,
+    )
+
+
+def get_ghg_factors_for_fuel_eu_maritime(
+    fuel_type: TypeFuel,
+    origin: FuelOrigin,
+    fuel_consumer_class: FuelConsumerClassFuelEUMaritime,
+) -> PrescribedFactors:
+    """Get the GHG emission factors for fuel specified by EU Maritime Fuel"""
+    fuel_class = _FUEL_CLASS_FUEL_EU_MARITIME_MAPPING[origin]
+    fuel_type_eu = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[fuel_type]
+    fuel_consumer_class_str = _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING[fuel_consumer_class]
+    return _DF_GHG_FACTORS_DICTIONARY["eu"].query(
+        f"pathway_name == '{fuel_type_eu}' and fuel_class == '{fuel_class}' and fuel_consumer_unit_class == '{fuel_consumer_class_str}'"
     )
 
 
@@ -365,9 +641,7 @@ class FuelByMassFraction:
         if len(self.fuels) > 0:
             total_fraction = sum([fuel.mass_or_mass_fraction for fuel in self.fuels])
             total_fraction = np.atleast_1d(total_fraction)
-            assert np.allclose(
-                total_fraction, 1.0, atol=1e-3
-            ), "The mass fraction must sum to 1."
+            assert np.allclose(total_fraction, 1.0, atol=1e-3), "The mass fraction must sum to 1."
             assert self.fuel_specified_by is not None
 
     @property
@@ -387,9 +661,7 @@ class FuelByMassFraction:
                 elif FuelSpecifiedBy.USER in fuel_specified_by_list:
                     return FuelSpecifiedBy.USER
                 else:
-                    raise ValueError(
-                        "The fuel is not specified by any of the available options."
-                    )
+                    raise ValueError("The fuel is not specified by any of the available options.")
             else:
                 return self.fuels[0].fuel_specified_by
         else:
@@ -400,14 +672,11 @@ class FuelByMassFraction:
         """
         Returns the low heat value of fuel based on fuel mass fraction
         """
-        return (
-            sum([fuel.lhv_mj_per_g * fuel.mass_or_mass_fraction for fuel in self.fuels])
-            * 1000
-        )
+        return sum([fuel.lhv_mj_per_g * fuel.mass_or_mass_fraction for fuel in self.fuels]) * 1000
 
     def get_kg_co2_per_kg_fuel(
         self, fuel_consumer_class: Optional[FuelConsumerClassFuelEUMaritime] = None
-    ) -> float:
+    ) -> GHGEmissions:
         """Returns the GHG emission factor from tank to wake in gCO2eq/gfuel as defined by IMO or EU
 
         Args:
@@ -415,7 +684,7 @@ class FuelByMassFraction:
                 It should be provided if the organization is "eu". Defaults to None.
 
         Returns:
-            float: GHG emission factor from tank to wake in gCO2eq/gfuel
+            GHGEmissions: GHG emission factor from tank to wake in gCO2eq/gfuel
         """
 
         if self.fuel_specified_by == FuelSpecifiedBy.IMO:
@@ -429,37 +698,62 @@ class FuelByMassFraction:
         ):
             pass
         else:
-            raise ValueError(
-                "The fuel is not specified by properly for this calculation."
-            )
-        res = 0
+            raise ValueError("The fuel is not specified by properly for this calculation.")
+        res = GHGEmissions()
         for fuel in self.fuels:
             # If the fuel contains other fuel than LNG and the consumer is a gas engine,
             # the GHG factor for those fuel should be calculated as generic internal combustion
             # engine (ICE)
             if fuel_consumer_class is not None and "LNG" in fuel_consumer_class.name:
                 if fuel.fuel_type != TypeFuel.NATURAL_GAS:
-                    res += (
-                        fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
-                            fuel_consumer_class=FuelConsumerClassFuelEUMaritime.ICE
+                    ghg_emission_for_fuel = (
+                        GHGEmissions(
+                            tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                                fuel_consumer_class=FuelConsumerClassFuelEUMaritime.ICE
+                            ),
+                            well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel,
+                            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                                fuel_consumer_class=FuelConsumerClassFuelEUMaritime.ICE,
+                                exclude_slip=True,
+                            ),
                         )
-                        + fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
-                    ) * fuel.mass_or_mass_fraction
-                else:
-                    res += (
-                        fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
-                            fuel_consumer_class=fuel_consumer_class
-                        )
-                        + fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
-                    ) * fuel.mass_or_mass_fraction
-            else:
-                res += (
-                    fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
-                        fuel_consumer_class=fuel_consumer_class
+                        * fuel.mass_or_mass_fraction
                     )
-                    + fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel
-                ) * fuel.mass_or_mass_fraction
-
+                else:
+                    ghg_emission_for_fuel = (
+                        GHGEmissions(
+                            tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                                fuel_consumer_class=fuel_consumer_class
+                            ),
+                            well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel,
+                            tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                                fuel_consumer_class=fuel_consumer_class,
+                                exclude_slip=True,
+                            ),
+                        )
+                        * fuel.mass_or_mass_fraction
+                    )
+            else:
+                ghg_emission_for_fuel = (
+                    GHGEmissions(
+                        tank_to_wake_kg_or_gco2eq_per_gfuel=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                            fuel_consumer_class=fuel_consumer_class
+                        ),
+                        well_to_tank_kg_or_gco2eq_per_gfuel=fuel.ghg_emission_factor_well_to_tank_gco2_per_gfuel,
+                        tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip=fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
+                            fuel_consumer_class=fuel_consumer_class, exclude_slip=True
+                        ),
+                    )
+                    * fuel.mass_or_mass_fraction
+                )
+            if fuel.origin in [FuelOrigin.BIO, FuelOrigin.RENEWABLE_NON_BIO]:
+                ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel = (
+                    ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel
+                )
+                ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel = (
+                    ghg_emission_for_fuel.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip
+                )
+            res += ghg_emission_for_fuel
         return res
 
     def get_kg_co2_per_kwh_fuel(
@@ -476,9 +770,7 @@ class FuelByMassFraction:
     def get_kg_co2_per_mj_fuel(
         self, fuel_consumer_class: FuelConsumerClassFuelEUMaritime = None
     ) -> float:
-        return (
-            self.get_kg_co2_per_kwh_fuel(fuel_consumer_class=fuel_consumer_class) / 3.6
-        )
+        return self.get_kg_co2_per_kwh_fuel(fuel_consumer_class=fuel_consumer_class) / 3.6
 
 
 @dataclass
@@ -578,18 +870,15 @@ class FuelConsumption:
             else:
                 for fuel in self.fuels:
                     fuel_fraction_to_add = fuel.copy
-                    fuel_fraction_to_add.mass_or_mass_fraction /= (
-                        self.total_fuel_consumption
-                    )
+                    fuel_fraction_to_add.mass_or_mass_fraction /= self.total_fuel_consumption
                     fuel_by_mass_fraction.fuels.append(fuel_fraction_to_add)
         else:
             for fuel in self.fuels:
                 fuel_fraction_new = fuel.copy
-                fuel_fraction_new.mass_or_mass_fraction[
-                    ~index_fuel_consumption_zero
-                ] = (
-                    fuel.mass_or_mass_fraction[~index_fuel_consumption_zero]
-                    / self.total_fuel_consumption[~index_fuel_consumption_zero]
+                index_fuel_consumption_non_zero = np.bitwise_not(index_fuel_consumption_zero)
+                fuel_fraction_new.mass_or_mass_fraction[index_fuel_consumption_non_zero] = (
+                    fuel.mass_or_mass_fraction[index_fuel_consumption_non_zero]
+                    / self.total_fuel_consumption[index_fuel_consumption_non_zero]
                 )
                 fuel_fraction_new.mass_or_mass_fraction[index_fuel_consumption_zero] = 0
                 fuel_by_mass_fraction.fuels.append(fuel_fraction_new)
@@ -601,7 +890,7 @@ class FuelConsumption:
 
     def get_total_co2_emissions(
         self, fuel_consumer_class: FuelConsumerClassFuelEUMaritime = None
-    ) -> Union[float, np.ndarray]:
+    ) -> GHGEmissions:
         """Returns the total CO2 emissions in kg or kg/s depending on the context.
 
         Args:
@@ -611,9 +900,6 @@ class FuelConsumption:
         Returns:
             total co2 emission: Total CO2 emissions in kg or kg/s depending on the context.
         """
-        return (
-            self.total_fuel_consumption
-            * self.fuel_by_mass_fraction.get_kg_co2_per_kg_fuel(
-                fuel_consumer_class=fuel_consumer_class
-            )
+        return self.total_fuel_consumption * self.fuel_by_mass_fraction.get_kg_co2_per_kg_fuel(
+            fuel_consumer_class=fuel_consumer_class
         )

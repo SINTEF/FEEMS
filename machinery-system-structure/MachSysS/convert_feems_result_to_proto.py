@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import Union, List, Dict, Optional, cast
 
 from feems.components_model.component_electric import FuelCellSystem
-from feems.fuel import FuelSpecifiedBy
+from feems.fuel import FuelSpecifiedBy, GHGEmissions
 from feems.types_for_feems import FEEMSResult, TypeComponent, EmissionType
 from feems.system_model import (
     MechanicalPropulsionSystemWithElectricPowerSystem,
@@ -49,6 +49,7 @@ _COLUMN_NAMES = {
     "rated capacity unit": "rated_capacity_unit",
     "switchboard id": "switchboard_id",
     "shaftline id": "shaftline_id",
+    "fuel consumer type": "fuel_consumer_type",
 }
 
 
@@ -73,7 +74,7 @@ class FEEMSResultConverter:
     def __init__(
         self,
         feems_result: Union[FEEMSResult, FEEMSResultForMachinerySystem],
-        system_feems: [
+        system_feems: Union[
             MechanicalPropulsionSystemWithElectricPowerSystem,
             ElectricPowerSystem,
             HybridPropulsionSystem,
@@ -193,7 +194,7 @@ class FEEMSResultConverter:
                 TypeComponent.BATTERY_SYSTEM,
             ]:
                 pass
-            elif power_source.type == [TypeComponent.PTI_PTO_SYSTEM]:
+            elif power_source.type == TypeComponent.PTI_PTO_SYSTEM:
                 pass
             else:
                 raise NotImplementedError(
@@ -278,7 +279,23 @@ class FEEMSResultConverter:
                     )
                 continue
             if key == "total_emission_kg":
-                result.nox_emission_total_kg = value[EmissionType.NOX]
+                result.nox_emission_total_kg = (
+                    value[EmissionType.NOX] if value is not None else 0.0
+                )
+                continue
+            if key == "co2_emission_total_kg":
+                value = cast(GHGEmissions, value)
+                result.co2_emission_total_kg.CopyFrom(
+                    proto.GHGEmissions(
+                        well_to_tank=value.well_to_tank_kg_or_gco2eq_per_gfuel,
+                        tank_to_wake=value.tank_to_wake_kg_or_gco2eq_per_gfuel,
+                        well_to_wake=value.well_to_wake_kg_or_gco2eq_per_gfuel,
+                        tank_to_wake_without_slip=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+                        well_to_wake_without_slip=value.well_to_wake_without_slip_kg_or_gco2eq_per_gfuel,
+                        tank_to_wake_from_green_fuel=value.tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel,
+                        tank_to_wake_without_slip_from_green_fuel=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel,
+                    )
+                )
                 continue
             if hasattr(result, key):
                 if value is not None:
@@ -315,6 +332,18 @@ class FEEMSResultConverter:
                                         lhv_mj_per_g=fuel.lhv_mj_per_g,
                                     )
                                 )
+                            continue
+                        if key_result_per_component == "co2_emissions_kg":
+                            value = cast(GHGEmissions, value)
+                            result_per_component.co2_emissions_kg.CopyFrom(
+                                proto.GHGEmissions(
+                                    well_to_tank=value.well_to_tank_kg_or_gco2eq_per_gfuel,
+                                    tank_to_wake=value.tank_to_wake_kg_or_gco2eq_per_gfuel,
+                                    well_to_wake=value.well_to_wake_kg_or_gco2eq_per_gfuel,
+                                    well_to_wake_without_slip=value.well_to_wake_without_slip_kg_or_gco2eq_per_gfuel,
+                                    tank_to_wake_without_slip=value.tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip,
+                                )
+                            )
                             continue
                         if value is not None:
                             setattr(
