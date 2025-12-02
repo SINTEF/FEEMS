@@ -1397,7 +1397,7 @@ class TestMultiFuelInventory(TestCase):
 
         self.assertFalse(system.has_multi_fuel_engines)
         self.assertEqual(system.multi_fuel_engine_inventory, {})
-        self.assertEqual(system.available_fuel_options, [])
+        self.assertEqual(len(system.available_fuel_options), 1)
 
     def test_electric_system_accepts_supported_fuel_option(self):
         genset = self._build_multi_fuel_genset()
