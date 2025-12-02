@@ -313,17 +313,18 @@ class ElectricPowerSystem(MachinerySystem):
                     if fuel_option not in seen:
                         options.append(fuel_option)
                         seen.add(fuel_option)
-                continue
-            if isinstance(component, FuelCellSystem):
+            elif isinstance(component, FuelCellSystem):
                 fuel_option = FuelOption(
                     fuel_type=component.fuel_cell.fuel_type,
                     fuel_origin=component.fuel_cell.fuel_origin,
                 )
-            if isinstance(component, COGES):
+            elif isinstance(component, COGES):
                 fuel_option = FuelOption(
                     fuel_type=component.cogas.fuel_type,
                     fuel_origin=component.cogas.fuel_origin,
                 )
+            else:
+                continue
             if fuel_option not in seen:
                 options.append(fuel_option)
                 seen.add(fuel_option)
@@ -943,7 +944,9 @@ class MechanicalPropulsionSystem(MachinerySystem):
                     options.append(option)
                     seen.add(option)
         for main_engine in self.main_engines:
-            engine_obj: Engine | EngineMultiFuel | None = getattr(main_engine, "engine", None)
+            engine_obj: Optional[Union[Engine, EngineMultiFuel]] = getattr(
+                main_engine, "engine", None
+            )
             if engine_obj is None or isinstance(engine_obj, EngineMultiFuel):
                 continue
             fuel_option = FuelOption(
