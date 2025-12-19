@@ -294,15 +294,17 @@ class EngineDualFuel(Engine):
         bspfc = self.specific_pilot_fuel_consumption_interp(engine_run_point.load_ratio)
         pilot_fuel_cons_kg_per_s = bspfc * power_kw / 1000 / 3600
         engine_run_point.fuel_flow_rate_kg_per_s += FuelConsumption(
-            fuels=[Fuel(
-                fuel_type=self.pilot_fuel_type,
-                origin=self.pilot_fuel_origin,
-                fuel_specified_by=fuel_specified_by,
-                lhv_mj_per_g=lhv_mj_per_g,
-                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
-                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-                mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
-            )]
+            fuels=[
+                Fuel(
+                    fuel_type=self.pilot_fuel_type,
+                    origin=self.pilot_fuel_origin,
+                    fuel_specified_by=fuel_specified_by,
+                    lhv_mj_per_g=lhv_mj_per_g,
+                    ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                    ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+                    mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
+                )
+            ]
         )
         engine_run_point.bspfc_g_per_kWh = bspfc
         return engine_run_point
