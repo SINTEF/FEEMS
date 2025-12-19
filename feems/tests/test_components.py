@@ -593,6 +593,42 @@ class TestComponent(TestCase):
         print(engine_run_point)
         print(engine_run_point.fuel_flow_rate_kg_per_s.__dict__)
 
+        # Test the same with pilot fuel being the same as main fuel
+        engine_same_fuel = EngineDualFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            nox_calculation_method=NOxCalculationMethod.TIER_3,
+            name="main engine 2",
+            rated_power=1000,
+            rated_speed=1000,
+            bsfc_curve=np.append(
+                np.reshape(np.arange(0.1, 1.1, 0.1), (-1, 1)),
+                np.random.rand(10, 1) * 200,
+                axis=1,
+            ),
+            fuel_type=TypeFuel.DIESEL,
+            bspfc_curve=np.append(
+                np.reshape(np.arange(0.1, 1.1, 0.1), (-1, 1)),
+                np.random.rand(10, 1) * 10,
+                axis=1,
+            ),
+            pilot_fuel_type=TypeFuel.DIESEL,
+        )
+        engine_run_point_same_fuel = engine_same_fuel.get_engine_run_point_from_power_out_kw(power)
+        total_consumption_kg_per_s = (
+            (
+                engine_run_point_same_fuel.bsfc_g_per_kWh
+                + engine_run_point_same_fuel.bspfc_g_per_kWh
+            )
+            * power
+            / 3600
+            / 1000
+        )
+        assert len(engine_run_point_same_fuel.fuel_flow_rate_kg_per_s.fuels) == 1
+        assert np.allclose(
+            engine_run_point_same_fuel.fuel_flow_rate_kg_per_s.fuels[0].mass_or_mass_fraction,
+            total_consumption_kg_per_s,
+        )
+
     def test_engine_multi_fuel(self):
         rated_power = 1000.0
         rated_speed = 1000.0

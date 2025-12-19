@@ -1280,7 +1280,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
             detail_result=pd.DataFrame(),
         )
         if len(self.shaft_line) == 0:
-            logger.warning("There is no switchboard in the system")
+            logger.warning("There is no shaftline in the system")
             return FEEMSResult(duration_s=0)
         for shaft_line in self.shaft_line:
             result_shaft_line: FEEMSResult = shaft_line.get_fuel_calculation_running_hours(
