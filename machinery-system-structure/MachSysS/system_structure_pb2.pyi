@@ -39,6 +39,7 @@ class FuelType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     LSFO_BLEND: _ClassVar[FuelType]
     ULSFO: _ClassVar[FuelType]
     VLSFO: _ClassVar[FuelType]
+    NONE3: _ClassVar[FuelType]
 
 class FuelOrigin(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = []
@@ -76,6 +77,7 @@ LSFO_CRUDE: FuelType
 LSFO_BLEND: FuelType
 ULSFO: FuelType
 VLSFO: FuelType
+NONE3: FuelType
 NONE1: FuelOrigin
 FOSSIL: FuelOrigin
 BIO: FuelOrigin
@@ -312,7 +314,6 @@ class Engine(_message.Message):
         TIER_1: _ClassVar[Engine.NOxCalculationMethod]
         TIER_3: _ClassVar[Engine.NOxCalculationMethod]
         CURVE: _ClassVar[Engine.NOxCalculationMethod]
-
     TIER_2: Engine.NOxCalculationMethod
     TIER_1: Engine.NOxCalculationMethod
     TIER_3: Engine.NOxCalculationMethod
@@ -324,7 +325,6 @@ class Engine(_message.Message):
         DIESEL: _ClassVar[Engine.EngineCycleType]
         OTTO: _ClassVar[Engine.EngineCycleType]
         LEAN_BURN_SPARK_IGNITION: _ClassVar[Engine.EngineCycleType]
-
     NONE: Engine.EngineCycleType
     DIESEL: Engine.EngineCycleType
     OTTO: Engine.EngineCycleType
@@ -759,7 +759,6 @@ class Subsystem(_message.Message):
         PTI_PTO: _ClassVar[Subsystem.PowerType]
         ENERGY_STORAGE: _ClassVar[Subsystem.PowerType]
         SHORE_CONNECTION: _ClassVar[Subsystem.PowerType]
-
     NONE1: Subsystem.PowerType
     POWER_SOURCE: Subsystem.PowerType
     POWER_CONSUMER: Subsystem.PowerType
@@ -799,7 +798,6 @@ class Subsystem(_message.Message):
         SHORE_POWER: _ClassVar[Subsystem.ComponentType]
         COGAS: _ClassVar[Subsystem.ComponentType]
         COGES: _ClassVar[Subsystem.ComponentType]
-
     NONE: Subsystem.ComponentType
     MAIN_ENGINE: Subsystem.ComponentType
     AUXILIARY_ENGINE: Subsystem.ComponentType
@@ -972,7 +970,6 @@ class MachinerySystem(_message.Message):
         MECHANICAL: _ClassVar[MachinerySystem.PropulsionType]
         ELECTRIC: _ClassVar[MachinerySystem.PropulsionType]
         HYBRID: _ClassVar[MachinerySystem.PropulsionType]
-
     MECHANICAL: MachinerySystem.PropulsionType
     ELECTRIC: MachinerySystem.PropulsionType
     HYBRID: MachinerySystem.PropulsionType
@@ -1055,7 +1052,6 @@ class MultiFuelEngine(_message.Message):
                 _Union[Engine.NOxCalculationMethod, str]
             ] = ...,
         ) -> None: ...
-
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]

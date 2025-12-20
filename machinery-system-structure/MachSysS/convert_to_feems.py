@@ -295,7 +295,10 @@ def convert_proto_multifuel_engine_to_feems(
             ),
             engine_cycle_type=EngineCycleType(fuel_mode.engine_cycle_type),
         )
-        if fuel_mode.HasField("pilot_fuel"):
+        if (
+            fuel_mode.HasField("pilot_fuel")
+            and fuel_mode.pilot_fuel.fuel_type != proto.FuelType.NONE3
+        ):
             fuel_characteristics.pilot_fuel_type = TypeFuel(
                 fuel_mode.pilot_fuel.fuel_type
             )
