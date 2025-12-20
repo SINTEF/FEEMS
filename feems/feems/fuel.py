@@ -31,6 +31,7 @@ class TypeFuel(Enum):
     LSFO_BLEND = 11
     ULSFO = 12
     VLSFO = 13
+    NONE = 99
 
 
 @unique

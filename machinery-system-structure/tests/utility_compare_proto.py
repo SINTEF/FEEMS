@@ -280,9 +280,9 @@ def compare_proto_electric_systems(
             diff_switchboard = compare_proto_switchboards_shaft_lines(
                 switchboard_ref, switchboard_to_compare
             )
-            diff.switchboards_modified[switchboard_ref.switchboard_id] = (
-                diff_switchboard
-            )
+            diff.switchboards_modified[
+                switchboard_ref.switchboard_id
+            ] = diff_switchboard
     return diff
 
 

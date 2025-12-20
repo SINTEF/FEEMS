@@ -48,7 +48,7 @@ def test_fuel_class():
         )
         for fuel_type in TypeFuel:
             for origin in FuelOrigin:
-                if origin not in [FuelOrigin.NONE]:
+                if origin not in [FuelOrigin.NONE] and fuel_type not in [TypeFuel.NONE]:
                     try:
                         fuel = Fuel(
                             fuel_type=fuel_type,

@@ -65,7 +65,7 @@ class FuelOption(NamedTuple):
         primary (bool): Indicates if this is the primary fuel source for the consumer.
             Defaults to True.
     """
-    
+
     fuel_type: TypeFuel
     fuel_origin: FuelOrigin
     for_pilot: bool = False

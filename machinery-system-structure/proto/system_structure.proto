@@ -102,7 +102,8 @@ enum FuelType {
   LSFO_CRUDE = 10;
   LSFO_BLEND = 11;
   ULSFO = 12;
-  VLSFO = 13; 
+  VLSFO = 13;
+  NONE3 = 99;
 }
 
 enum FuelOrigin {

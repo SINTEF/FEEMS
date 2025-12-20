@@ -349,6 +349,13 @@ def convert_multi_fuel_engine_to_protobuf(
             fuel_modes[-1].pilot_bsfc.CopyFrom(
                 convert_bsfc_array_value_to_protobuf(fuel_mode.bspfc_curve)
             )
+        else:
+            fuel_modes[-1].pilot_fuel.CopyFrom(
+                proto.Fuel(
+                    fuel_type=proto.FuelType.NONE3,
+                    fuel_origin=proto.FuelOrigin.NONE1,
+                )
+            )
 
     return proto.MultiFuelEngine(
         name=engine_feems.name,
