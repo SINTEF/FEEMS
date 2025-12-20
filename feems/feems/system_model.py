@@ -52,8 +52,24 @@ class FEEMSResultForMachinerySystem(NamedTuple):
 
 
 class FuelOption(NamedTuple):
+    """
+    Represents a specific configuration for a fuel source used within the system.
+    This class defines the characteristics of a fuel option, including its type,
+    origin, and usage role (primary vs. secondary, main vs. pilot).
+    Attributes:
+        fuel_type (TypeFuel): The specific classification of the fuel (e.g., MDO, HFO, LNG).
+        fuel_origin (FuelOrigin): The source or region of origin for the fuel, which may
+            impact emission factors or specific energy content.
+        for_pilot (bool): Indicates if this fuel is used specifically for pilot injection
+            (ignition) purposes. Defaults to False.
+        primary (bool): Indicates if this is the primary fuel source for the consumer.
+            Defaults to True.
+    """
+    
     fuel_type: TypeFuel
     fuel_origin: FuelOrigin
+    for_pilot: bool = False
+    primary: bool = True
 
 
 def _extract_multi_fuel_options(engine: object) -> List[FuelOption]:
@@ -62,14 +78,26 @@ def _extract_multi_fuel_options(engine: object) -> List[FuelOption]:
 
     options: List[FuelOption] = []
     seen: Set[FuelOption] = set()
-    for characteristics in engine.multi_fuel_characteristics:
+    for i, characteristics in enumerate(engine.multi_fuel_characteristics):
         option = FuelOption(
             fuel_type=characteristics.main_fuel_type,
             fuel_origin=characteristics.main_fuel_origin,
+            for_pilot=False,
+            primary=i == 0,
         )
         if option not in seen:
             options.append(option)
             seen.add(option)
+        if characteristics.pilot_fuel_type is not None:
+            option = FuelOption(
+                fuel_type=characteristics.pilot_fuel_type,
+                fuel_origin=characteristics.pilot_fuel_origin,
+                for_pilot=True,
+                primary=i == 0,
+            )
+            if option not in seen:
+                options.append(option)
+                seen.add(option)
     return options
 
 
@@ -301,6 +329,8 @@ class ElectricPowerSystem(MachinerySystem):
                 fuel_option = FuelOption(
                     fuel_type=component.aux_engine.fuel_type,
                     fuel_origin=component.aux_engine.fuel_origin,
+                    primary=True,
+                    for_pilot=False,
                 )
                 if fuel_option not in seen:
                     options.append(fuel_option)
@@ -309,6 +339,8 @@ class ElectricPowerSystem(MachinerySystem):
                     fuel_option = FuelOption(
                         fuel_type=component.aux_engine.pilot_fuel_type,
                         fuel_origin=component.aux_engine.pilot_fuel_origin,
+                        primary=True,
+                        for_pilot=True,
                     )
                     if fuel_option not in seen:
                         options.append(fuel_option)
@@ -317,11 +349,15 @@ class ElectricPowerSystem(MachinerySystem):
                 fuel_option = FuelOption(
                     fuel_type=component.fuel_cell.fuel_type,
                     fuel_origin=component.fuel_cell.fuel_origin,
+                    primary=True,
+                    for_pilot=False,
                 )
             elif isinstance(component, COGES):
                 fuel_option = FuelOption(
                     fuel_type=component.cogas.fuel_type,
                     fuel_origin=component.cogas.fuel_origin,
+                    primary=True,
+                    for_pilot=False,
                 )
             else:
                 continue
@@ -950,7 +986,10 @@ class MechanicalPropulsionSystem(MachinerySystem):
             if engine_obj is None or isinstance(engine_obj, EngineMultiFuel):
                 continue
             fuel_option = FuelOption(
-                fuel_type=engine_obj.fuel_type, fuel_origin=engine_obj.fuel_origin
+                fuel_type=engine_obj.fuel_type,
+                fuel_origin=engine_obj.fuel_origin,
+                for_pilot=False,
+                primary=True,
             )
             if fuel_option not in seen:
                 options.append(fuel_option)
@@ -959,6 +998,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
                 fuel_option = FuelOption(
                     fuel_type=engine_obj.pilot_fuel_type,
                     fuel_origin=engine_obj.pilot_fuel_origin,
+                    for_pilot=True,
+                    primary=True,
                 )
                 if fuel_option not in seen:
                     options.append(fuel_option)

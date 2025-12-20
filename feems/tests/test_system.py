@@ -1232,8 +1232,24 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
 class TestMultiFuelInventory(TestCase):
     def setUp(self) -> None:
         self.expected_options = [
-            FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL),
-            FuelOption(fuel_type=TypeFuel.DIESEL, fuel_origin=FuelOrigin.FOSSIL),
+            FuelOption(
+                fuel_type=TypeFuel.NATURAL_GAS,
+                fuel_origin=FuelOrigin.FOSSIL,
+                primary=True,
+                for_pilot=False,
+            ),
+            FuelOption(
+                fuel_type=TypeFuel.DIESEL,
+                fuel_origin=FuelOrigin.FOSSIL,
+                primary=True,
+                for_pilot=True,
+            ),
+            FuelOption(
+                fuel_type=TypeFuel.DIESEL,
+                fuel_origin=FuelOrigin.FOSSIL,
+                primary=False,
+                for_pilot=False,
+            ),
         ]
         self.genset_name = "multi-fuel genset"
         self.main_engine_name = "multi-fuel main engine"
@@ -1493,7 +1509,7 @@ class TestMultiFuelInventory(TestCase):
             integration_method=IntegrationMethod.simpson,
         )
 
-        incompatible_option = self.expected_options[1]
+        incompatible_option = self.expected_options[2]
         with self.assertRaises(InputError):
             hybrid_system.get_fuel_energy_consumption_running_time(
                 time_interval_s=1,
