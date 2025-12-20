@@ -52,6 +52,20 @@ class FEEMSResultForMachinerySystem(NamedTuple):
 
 
 class FuelOption(NamedTuple):
+    """
+    Represents a specific configuration for a fuel source used within the system.
+    This class defines the characteristics of a fuel option, including its type,
+    origin, and usage role (primary vs. secondary, main vs. pilot).
+    Attributes:
+        fuel_type (TypeFuel): The specific classification of the fuel (e.g., MDO, HFO, LNG).
+        fuel_origin (FuelOrigin): The source or region of origin for the fuel, which may
+            impact emission factors or specific energy content.
+        for_pilot (bool): Indicates if this fuel is used specifically for pilot injection
+            (ignition) purposes. Defaults to False.
+        primary (bool): Indicates if this is the primary fuel source for the consumer.
+            Defaults to True.
+    """
+    
     fuel_type: TypeFuel
     fuel_origin: FuelOrigin
     for_pilot: bool = False
