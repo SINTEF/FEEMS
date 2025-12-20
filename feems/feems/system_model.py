@@ -972,7 +972,10 @@ class MechanicalPropulsionSystem(MachinerySystem):
             if engine_obj is None or isinstance(engine_obj, EngineMultiFuel):
                 continue
             fuel_option = FuelOption(
-                fuel_type=engine_obj.fuel_type, fuel_origin=engine_obj.fuel_origin
+                fuel_type=engine_obj.fuel_type,
+                fuel_origin=engine_obj.fuel_origin,
+                for_pilot=False,
+                primary=True,
             )
             if fuel_option not in seen:
                 options.append(fuel_option)
@@ -981,6 +984,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
                 fuel_option = FuelOption(
                     fuel_type=engine_obj.pilot_fuel_type,
                     fuel_origin=engine_obj.pilot_fuel_origin,
+                    for_pilot=True,
+                    primary=True,
                 )
                 if fuel_option not in seen:
                     options.append(fuel_option)
