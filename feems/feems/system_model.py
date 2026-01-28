@@ -433,22 +433,26 @@ class ElectricPowerSystem(MachinerySystem):
     def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
         result = {"main_engine": [], "genset": [], "fuel_cell": []}
 
-        genset_options = set()
-        fuel_cell_options = set()
+        genset_options = []
+        fuel_cell_options = []
+        seen_genset = set()
+        seen_fuel_cell = set()
 
         for component in self.power_sources:
             options = _extract_fuel_options_from_component(component)
             if isinstance(component, Genset):
-                genset_options.update(options)
+                for option in options:
+                    if option not in seen_genset:
+                        seen_genset.add(option)
+                        genset_options.append(option)
             elif isinstance(component, FuelCellSystem):
-                fuel_cell_options.update(options)
+                for option in options:
+                    if option not in seen_fuel_cell:
+                        seen_fuel_cell.add(option)
+                        fuel_cell_options.append(option)
 
-        result["genset"] = sorted(
-            list(genset_options), key=lambda x: (x.fuel_type.name, x.fuel_origin.name)
-        )
-        result["fuel_cell"] = sorted(
-            list(fuel_cell_options), key=lambda x: (x.fuel_type.name, x.fuel_origin.name)
-        )
+        result["genset"] = genset_options
+        result["fuel_cell"] = fuel_cell_options
         return result
 
     def set_status_by_switchboard_id_power_type(
@@ -1095,15 +1099,17 @@ class MechanicalPropulsionSystem(MachinerySystem):
     def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
         result = {"main_engine": [], "genset": [], "fuel_cell": []}
 
-        main_engine_options = set()
+        main_engine_options = []
+        seen_main_engine = set()
 
         for component in self.main_engines:
             options = _extract_fuel_options_from_component(component)
-            main_engine_options.update(options)
+            for option in options:
+                if option not in seen_main_engine:
+                    seen_main_engine.add(option)
+                    main_engine_options.append(option)
 
-        result["main_engine"] = sorted(
-            list(main_engine_options), key=lambda x: (x.fuel_type.name, x.fuel_origin.name)
-        )
+        result["main_engine"] = main_engine_options
         return result
 
     @property
