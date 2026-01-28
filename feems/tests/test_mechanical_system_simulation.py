@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Tuple, List, NamedTuple
+from typing import NamedTuple
 
 from scipy import integrate
 

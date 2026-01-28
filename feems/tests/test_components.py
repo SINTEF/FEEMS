@@ -1,6 +1,6 @@
 import os
 import random
-from typing import List, cast
+from typing import cast
 from unittest import TestCase
 
 import numpy as np
@@ -19,7 +19,6 @@ from feems.components_model.component_electric import (
     FuelCellSystem,
 )
 from feems.components_model.component_mechanical import (
-    COGAS,
     Engine,
     EngineDualFuel,
     EngineMultiFuel,
@@ -33,7 +32,7 @@ from feems.components_model.utility import (
     get_efficiency_curve_from_dataframe,
     IntegrationMethod,
 )
-from feems.fuel import FuelByMassFraction, TypeFuel, Fuel, FuelSpecifiedBy, FuelOrigin
+from feems.fuel import TypeFuel, Fuel, FuelSpecifiedBy, FuelOrigin
 from feems.types_for_feems import EmissionType, Speed_rpm, NOxCalculationMethod, SwbId
 from feems.types_for_feems import TypeNode, TypeComponent, TypePower, Power_kW
 from tests.utility import (

@@ -8,7 +8,6 @@ sys.path.append(os.getcwd())
 from MachSysS import system_structure_pb2 as proto
 from MachSysS.convert_to_feems import convert_proto_propulsion_system_to_feems
 from feems.fuel import FuelOrigin, TypeFuel
-from feems.system_model import MachinerySystem, FuelOption
 
 
 class TestAvailableFuelOptionsProto(unittest.TestCase):
@@ -41,11 +40,23 @@ class TestAvailableFuelOptionsProto(unittest.TestCase):
 
         # Custom check for Main Engine (VLSFO only)
         def check_main_engine(engine_options):
-            vlsfo = find_option(engine_options, TypeFuel.VLSFO, for_pilot=False, primary=True)
+            lng = find_option(engine_options, TypeFuel.NATURAL_GAS, for_pilot=False, primary=True)
             self.assertIsNotNone(
-                vlsfo, f"Main Engine: VLSFO primary main fuel not found. Options: {engine_options}"
+                lng, f"Main Engine: LNG primary main fuel not found. Options: {engine_options}"
             )
-            self.assertEqual(vlsfo.fuel_origin, FuelOrigin.FOSSIL)
+            self.assertEqual(lng.fuel_origin, FuelOrigin.FOSSIL)
+            
+            # Diesel Pilot
+            diesel = find_option(engine_options, TypeFuel.DIESEL, for_pilot=True, primary=True)
+            self.assertIsNotNone(
+                diesel, f"Genset: Diesel primary pilot fuel not found. Options: {engine_options}"
+            )
+
+            # VLSFO backup (primary=False)
+            vlsfo = find_option(engine_options, TypeFuel.VLSFO, for_pilot=False, primary=False)
+            self.assertIsNotNone(
+                vlsfo, f"Genset: VLSFO backup fuel not found. Options: {engine_options}"
+            )
 
         # Custom check for Genset (LNG/Diesel Dual Fuel + VLSFO backup?)
         # Based on error: [FuelOption(DIESEL, for_pilot=True, primary=True), FuelOption(NATURAL_GAS, for_pilot=False, primary=True), FuelOption(VLSFO, for_pilot=False, primary=False)]

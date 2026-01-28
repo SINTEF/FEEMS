@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union, NamedTuple, List, Dict, TypeVar, Callable, Optional
+from typing import Union, List, Dict, TypeVar, Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,6 @@ from ..constant import (
     nox_factor_imo_slow_speed_g_kWh,
 )
 from ..fuel import (
-    FuelByMassFraction,
     FuelConsumption,
     FuelConsumerClassFuelEUMaritime,
     FuelSpecifiedBy,
@@ -151,11 +150,17 @@ class Engine(Component):
             factor = nox_factor_imo_medium_speed_g_hWh[tier_class][0]
             exponent = nox_factor_imo_medium_speed_g_hWh[tier_class][1]
             nox_g_per_kwh = factor * np.power(self.rated_speed, exponent)
-            curve = lambda x: nox_g_per_kwh
+
+            def curve(x):
+                return nox_g_per_kwh
+
         else:
             tier_class = nox_calculation_method.value
             nox_factor_g_kwh = nox_factor_imo_slow_speed_g_kWh[tier_class]
-            curve = lambda x: nox_factor_g_kwh
+
+            def curve(x):
+                return nox_factor_g_kwh
+
         self._emissions_per_kwh_interp[EmissionType.NOX] = curve
 
     def get_engine_run_point_from_power_out_kw(
@@ -773,11 +778,17 @@ class COGAS(BasicComponent):
             factor = nox_factor_imo_medium_speed_g_hWh[tier_class][0]
             exponent = nox_factor_imo_medium_speed_g_hWh[tier_class][1]
             nox_g_per_kwh = factor * np.power(self.rated_speed, exponent)
-            curve = lambda x: nox_g_per_kwh
+
+            def curve(x):
+                return nox_g_per_kwh
+
         else:
             tier_class = nox_calculation_method.value
             nox_factor_g_kwh = nox_factor_imo_slow_speed_g_kWh[tier_class]
-            curve = lambda x: nox_factor_g_kwh
+
+            def curve(x):
+                return nox_factor_g_kwh
+
         self._emissions_per_kwh_interp[EmissionType.NOX] = curve
 
     @property

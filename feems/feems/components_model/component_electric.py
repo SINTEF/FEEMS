@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Union, Tuple, NamedTuple, Optional, List
 
 import numpy as np
@@ -20,7 +19,6 @@ from .component_mechanical import (
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
 from .utility import integrate_data, IntegrationMethod, integrate_data_accumulative
-from ..constant import hhv_hydrogen_mj_per_kg, lhv_hydrogen_mj_per_kg
 from ..fuel import (
     FuelConsumption,
     TypeFuel,

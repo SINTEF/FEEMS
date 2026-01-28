@@ -15,15 +15,13 @@ from feems.components_model import (
 from feems.components_model.component_electric import FuelCell, FuelCellSystem
 from feems.components_model.utility import (
     IntegrationMethod,
-    integrate_data,
     integrate_multi_fuel_consumption,
 )
 from feems.runsimulation import (
-    EqualEngineSizeAllClosedSimulationInterface,
     run_simulation,
     BatteryFuelCellDieselHybridSimulationInterface,
 )
-from feems.simulation_interface import EnergySource, EnergySourceType
+from feems.simulation_interface import EnergySourceType
 from feems.system_model import ElectricPowerSystem
 from feems.types_for_feems import (
     TypeComponent,

@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from functools import reduce
 from operator import itemgetter
 from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set, Optional

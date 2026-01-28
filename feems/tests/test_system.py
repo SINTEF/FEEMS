@@ -1,5 +1,4 @@
 import copy
-import pprint
 import random
 from typing import List, Dict, Tuple, Optional
 from unittest import TestCase
@@ -11,9 +10,8 @@ from feems.components_model.component_electric import (
     Genset,
     PTIPTO,
 )
-from feems.components_model.component_mechanical import COGAS
 from feems.exceptions import InputError
-from feems.fuel import Fuel, FuelConsumption, FuelOrigin, TypeFuel, FuelSpecifiedBy
+from feems.fuel import Fuel, FuelOrigin, TypeFuel, FuelSpecifiedBy
 import numpy as np
 
 from feems.components_model import (
