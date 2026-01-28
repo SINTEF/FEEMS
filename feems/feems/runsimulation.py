@@ -1,8 +1,6 @@
-from dataclasses import dataclass
 
 from itertools import chain
-from typing import Dict, List
-from enum import Enum, auto
+from typing import Dict
 
 import numpy as np
 
@@ -11,7 +9,6 @@ from .components_model import SwbId
 from .simulation_interface import (
     SimulationInterface,
     ElectricPowerPlantStatus,
-    EnergySource,
     EnergySourceType,
 )
 from .system_model import ElectricPowerSystem

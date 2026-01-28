@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from functools import reduce
 from operator import itemgetter
 from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set, Optional
@@ -11,7 +10,7 @@ from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
-from .components_model.component_mechanical import EngineMultiFuel, Engine
+from .components_model.component_mechanical import EngineMultiFuel, Engine, EngineDualFuel
 
 from . import get_logger
 from .components_model.component_electric import (
@@ -101,6 +100,66 @@ def _extract_multi_fuel_options(engine: object) -> List[FuelOption]:
     return options
 
 
+def _extract_fuel_options_from_component(component: object) -> List[FuelOption]:
+    engine = None
+    if isinstance(component, Genset):
+        engine = component.aux_engine
+    elif isinstance(
+        component,
+        (
+            MainEngineForMechanicalPropulsion,
+            MainEngineWithGearBoxForMechanicalPropulsion,
+        ),
+    ):
+        engine = component.engine
+    elif isinstance(component, FuelCellSystem):
+        return [
+            FuelOption(
+                fuel_type=component.fuel_cell.fuel_type,
+                fuel_origin=component.fuel_cell.fuel_origin,
+                for_pilot=False,
+                primary=True,
+            )
+        ]
+    elif isinstance(component, (Engine, EngineMultiFuel, EngineDualFuel)):
+        engine = component
+
+    if engine is None:
+        return []
+
+    if isinstance(engine, EngineMultiFuel):
+        return _extract_multi_fuel_options(engine)
+    elif isinstance(engine, EngineDualFuel):
+        options = [
+            FuelOption(
+                fuel_type=engine.fuel_type,
+                fuel_origin=engine.fuel_origin,
+                for_pilot=False,
+                primary=True,
+            )
+        ]
+        options.append(
+            FuelOption(
+                fuel_type=engine.pilot_fuel_type,
+                fuel_origin=engine.pilot_fuel_origin,
+                for_pilot=True,
+                primary=True,
+            )
+        )
+        return options
+    elif isinstance(engine, Engine):
+        return [
+            FuelOption(
+                fuel_type=engine.fuel_type,
+                fuel_origin=engine.fuel_origin,
+                for_pilot=False,
+                primary=True,
+            )
+        ]
+
+    return []
+
+
 class MachinerySystem:
     time_interval_s: float
     integration_method: IntegrationMethod
@@ -136,6 +195,10 @@ class MachinerySystem:
     @property
     def available_fuel_options(self) -> List[FuelOption]:
         return []
+
+    @property
+    def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
+        return {"main_engine": [], "genset": [], "fuel_cell": []}
 
     def _validate_selected_fuel_option(
         self, fuel_option: Optional[FuelOption]
@@ -365,6 +428,32 @@ class ElectricPowerSystem(MachinerySystem):
                 options.append(fuel_option)
                 seen.add(fuel_option)
         return options
+
+    @property
+    def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
+        result = {"main_engine": [], "genset": [], "fuel_cell": []}
+
+        genset_options = []
+        fuel_cell_options = []
+        seen_genset = set()
+        seen_fuel_cell = set()
+
+        for component in self.power_sources:
+            options = _extract_fuel_options_from_component(component)
+            if isinstance(component, Genset):
+                for option in options:
+                    if option not in seen_genset:
+                        seen_genset.add(option)
+                        genset_options.append(option)
+            elif isinstance(component, FuelCellSystem):
+                for option in options:
+                    if option not in seen_fuel_cell:
+                        seen_fuel_cell.add(option)
+                        fuel_cell_options.append(option)
+
+        result["genset"] = genset_options
+        result["fuel_cell"] = fuel_cell_options
+        return result
 
     def set_status_by_switchboard_id_power_type(
         self, switchboard_id: SwbId, power_type: TypePower, status: np.ndarray
@@ -1007,6 +1096,23 @@ class MechanicalPropulsionSystem(MachinerySystem):
         return options
 
     @property
+    def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
+        result = {"main_engine": [], "genset": [], "fuel_cell": []}
+
+        main_engine_options = []
+        seen_main_engine = set()
+
+        for component in self.main_engines:
+            options = _extract_fuel_options_from_component(component)
+            for option in options:
+                if option not in seen_main_engine:
+                    seen_main_engine.add(option)
+                    main_engine_options.append(option)
+
+        result["main_engine"] = main_engine_options
+        return result
+
+    @property
     def no_shaft_lines(self) -> int:
         return len(self.shaft_line_id)
 
@@ -1421,6 +1527,19 @@ class HybridPropulsionSystem(MachinerySystem):
                 seen.add(option)
         return options
 
+    @property
+    def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
+        electric = self.electric_system.available_fuel_options_by_converter
+        mechanical = self.mechanical_system.available_fuel_options_by_converter
+
+        result = {"main_engine": [], "genset": [], "fuel_cell": []}
+
+        result["genset"] = electric.get("genset", [])
+        result["fuel_cell"] = electric.get("fuel_cell", [])
+        result["main_engine"] = mechanical.get("main_engine", [])
+
+        return result
+
     def get_fuel_energy_consumption_running_time(
         self,
         time_interval_s: float,
@@ -1491,6 +1610,19 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
         self.name = name
         self.electric_system = electric_system
         self.mechanical_system = mechanical_system
+
+    @property
+    def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
+        electric = self.electric_system.available_fuel_options_by_converter
+        mechanical = self.mechanical_system.available_fuel_options_by_converter
+
+        result = {"main_engine": [], "genset": [], "fuel_cell": []}
+
+        result["genset"] = electric.get("genset", [])
+        result["fuel_cell"] = electric.get("fuel_cell", [])
+        result["main_engine"] = mechanical.get("main_engine", [])
+
+        return result
 
     def do_power_balance_calculation(self) -> None:
         """Perform power balance calculation, determining the power output of all the power sources

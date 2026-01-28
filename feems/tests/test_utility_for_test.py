@@ -49,7 +49,6 @@ class TestUtilityForTest(unittest.TestCase):
                 4, number_components
             )
             rated_power_avail = random.random() * 5000
-            rated_speed_max = random.random() * 1000
             switchboard_id = random.randint(1, 10)
 
             #: Create a switchboard component
@@ -63,7 +62,6 @@ class TestUtilityForTest(unittest.TestCase):
             )
 
             #: Check if the number of components created is correct
-            type_power = [type_power for type_power in TypePower]
             self.assertEqual(switchboard.no_power_sources, number_components_list[0])
             self.assertEqual(switchboard.no_consumers, number_components_list[1])
             self.assertEqual(switchboard.no_pti_pto, number_components_list[2])

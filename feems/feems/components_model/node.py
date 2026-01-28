@@ -42,7 +42,6 @@ from .. import get_logger
 from ..exceptions import InputError
 from ..fuel import (
     FuelConsumption,
-    FuelByMassFraction,
     FuelOrigin,
     FuelSpecifiedBy,
     FuelConsumerClassFuelEUMaritime,
@@ -55,7 +54,6 @@ from ..types_for_feems import (
     TypeComponent,
     TimeIntervalList,
     SwbId,
-    EmissionType,
     Numeric,
 )
 

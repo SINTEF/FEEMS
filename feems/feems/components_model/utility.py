@@ -1,5 +1,4 @@
 import logging
-from dataclasses import fields
 from enum import unique, Enum
 from typing import Union, List, Callable, Tuple, Optional
 
@@ -174,7 +173,9 @@ def get_efficiency_curve_from_points(
         curve_points = np.append(
             np.array([0, 1]).reshape(-1, 1), np.array([eff, eff]).reshape(-1, 1), axis=1
         )
-        function = lambda x: eff
+        def function(x):
+            return eff
+
         return function, curve_points
     else:
         eff_curve = eff_curve[eff_curve[:, 0].argsort()]

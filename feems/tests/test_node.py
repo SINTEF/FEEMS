@@ -1,5 +1,5 @@
 import random
-from typing import Union, NamedTuple, cast
+from typing import NamedTuple, cast
 from unittest import TestCase
 
 import numpy as np
