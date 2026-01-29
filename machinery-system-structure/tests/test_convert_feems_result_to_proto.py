@@ -1,14 +1,15 @@
-import unittest
 import os
 import random
+import unittest
+
+import MachSysS.system_structure_pb2 as sys_structure_pb2
 import numpy as np
+from feems.fuel import FuelSpecifiedBy
+from feems.types_for_feems import TypePower
 from MachSysS.convert_feems_result_to_proto import FEEMSResultConverter
 from MachSysS.convert_to_feems import convert_proto_propulsion_system_to_feems
 from MachSysS.gymir_result_pb2 import GymirResult, SimulationInstance, TimeSeriesResult
 from MachSysS.system_structure_pb2 import MachinerySystem
-import MachSysS.system_structure_pb2 as sys_structure_pb2
-from feems.types_for_feems import TypePower
-from feems.fuel import FuelSpecifiedBy
 from MachSysS.utility import retrieve_machinery_system_from_file
 
 # Check if RunFeemsSim is available

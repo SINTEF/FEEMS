@@ -1,8 +1,8 @@
 import os
 import random
+
 import numpy as np
 import pandas as pd
-import pytest
 from feems.components_model.component_electric import Genset
 from feems.components_model.component_mechanical import (
     EngineMultiFuel,
@@ -321,13 +321,16 @@ def test_machinery_calculation_multifuel():
 
     # Energy Consistency Checks
     total_energy_consumption_default_gj = sum(
-        [f.mass_or_mass_fraction * f.lhv_mj_per_g for f in res_no_option_imo.mechanical_system.multi_fuel_consumption_total_kg.fuels]
+        f.mass_or_mass_fraction * f.lhv_mj_per_g 
+        for f in res_no_option_imo.mechanical_system.multi_fuel_consumption_total_kg.fuels
     )
     total_energy_consumption_vlsfo_gj = sum(
-        [f.mass_or_mass_fraction * f.lhv_mj_per_g for f in res_VLSFO_imo.mechanical_system.multi_fuel_consumption_total_kg.fuels]
+        f.mass_or_mass_fraction * f.lhv_mj_per_g 
+        for f in res_VLSFO_imo.mechanical_system.multi_fuel_consumption_total_kg.fuels
     )
     total_energy_consumption_natural_gas_gj = sum(
-        [f.mass_or_mass_fraction * f.lhv_mj_per_g for f in res_NATURAL_GAS_imo.mechanical_system.multi_fuel_consumption_total_kg.fuels]
+        f.mass_or_mass_fraction * f.lhv_mj_per_g 
+        for f in res_NATURAL_GAS_imo.mechanical_system.multi_fuel_consumption_total_kg.fuels
     )
     
     # Notebook equality assertions

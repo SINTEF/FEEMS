@@ -19,9 +19,9 @@ from feems.system_model import (
 )
 from feems.types_for_feems import EmissionType, FEEMSResult, TypeComponent
 
-import MachSysS.system_structure_pb2  # noqa: F401
 import MachSysS.feems_result_pb2 as proto
 import MachSysS.gymir_result_pb2 as proto_gymir
+import MachSysS.system_structure_pb2  # noqa: F401
 
 # %% ../03_ConvertFEEMSResultToProto.ipynb 4
 # Define logger

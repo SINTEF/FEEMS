@@ -26,4 +26,3 @@ dev = [
   "unittest-xml-reporting>=3.2.0",
   "pytest-cov>=4.1.0",
 ]
-

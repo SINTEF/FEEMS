@@ -1,40 +1,39 @@
 import unittest
-import os
-import numpy as np
 from functools import reduce
 
+import numpy as np
 from feems.components_model.component_electric import (
+    PTIPTO,
     ElectricComponent,
     ElectricMachine,
     Genset,
-    PTIPTO,
 )
 from feems.components_model.component_mechanical import (
     Engine,
+    EngineCycleType,
     EngineDualFuel,
+    EngineMultiFuel,
+    FuelCharacteristics,
     MainEngineForMechanicalPropulsion,
     MechanicalPropulsionComponent,
     NOxCalculationMethod,
-    EngineMultiFuel,
-    FuelCharacteristics,
-    EngineCycleType,
 )
 from feems.fuel import FuelOrigin, TypeFuel
 from feems.system_model import (
     ElectricPowerSystem,
+    HybridPropulsionSystem,
     MechanicalPropulsionSystem,
     MechanicalPropulsionSystemWithElectricPowerSystem,
-    HybridPropulsionSystem,
 )
 from feems.types_for_feems import Power_kW, Speed_rpm, TypeComponent, TypePower
-
 from MachSysS.convert_to_protobuf import (
-    convert_mechanical_system_to_protobuf,
-    convert_mechanical_propulsion_system_with_electric_system_to_protobuf,
-    convert_hybrid_propulsion_system_to_protobuf,
     convert_electric_system_to_protobuf,
     convert_electric_system_to_protobuf_machinery_system,
+    convert_hybrid_propulsion_system_to_protobuf,
+    convert_mechanical_propulsion_system_with_electric_system_to_protobuf,
+    convert_mechanical_system_to_protobuf,
 )
+
 
 class TestConvertToProtobuf(unittest.TestCase):
     def setUp(self):
@@ -284,13 +283,13 @@ class TestConvertToProtobuf(unittest.TestCase):
         self.assertIsNotNone(hybrid_prop_system_proto)
         
         # Save check (simulated)
-        electric_system_with_pto_proto = convert_electric_system_to_protobuf(
+        convert_electric_system_to_protobuf(
             electric_system=electric_system_with_pto
         )
-        mechanical_system_with_pto_proto = convert_mechanical_system_to_protobuf(
+        convert_mechanical_system_to_protobuf(
             mechanical_propulsion_system=mechanical_system_with_pto
         )
-        electric_propulsion_system_proto = convert_electric_system_to_protobuf_machinery_system(
+        convert_electric_system_to_protobuf_machinery_system(
             electric_system=self.electric_power_system, maximum_allowed_genset_load_percentage=80
         )
         # Assuming if no error raised, verification passed.

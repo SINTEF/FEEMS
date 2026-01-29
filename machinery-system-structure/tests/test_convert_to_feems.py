@@ -1,18 +1,19 @@
-import unittest
 import os
+import unittest
+
 import MachSysS.system_structure_pb2 as proto
 from feems.fuel import FuelOrigin, TypeFuel
+from feems.types_for_feems import TypeComponent
 from MachSysS.convert_to_feems import (
-    convert_proto_switchboard_to_feems,
     convert_proto_propulsion_system_to_feems,
+    convert_proto_switchboard_to_feems,
 )
 from MachSysS.convert_to_protobuf import (
-    convert_switchboard_to_protobuf,
     convert_electric_system_to_protobuf_machinery_system,
     convert_hybrid_propulsion_system_to_protobuf,
     convert_mechanical_propulsion_system_with_electric_system_to_protobuf,
+    convert_switchboard_to_protobuf,
 )
-from feems.types_for_feems import TypeComponent
 from MachSysS.utility import retrieve_machinery_system_from_file
 
 # Adjust import for utility based on execution context
@@ -106,7 +107,8 @@ class TestConvertToFeems(unittest.TestCase):
                 self.assertEqual(len(diff_subsystem.components_added), 0)
                 for component_key, diff_component in diff_subsystem.components_modified.items():
                     self.assertEqual(len(diff_component), 0,
-                        f"subcomponent {component_key} for component {key} has been modified: {diff_component.__str__()}"
+                        f"subcomponent {component_key} for component {key} has been modified: "
+                        f"{diff_component.__str__()}"
                     )
 
     def test_system_with_coges(self):
@@ -140,7 +142,8 @@ class TestConvertToFeems(unittest.TestCase):
                 self.assertEqual(len(diff_subsystem.components_added), 0)
                 for component_key, diff_component in diff_subsystem.components_modified.items():
                     self.assertEqual(len(diff_component), 0,
-                        f"subcomponent {component_key} for component {key} has been modified: {diff_component.__str__()}"
+                        f"subcomponent {component_key} for component {key} has been modified: "
+                        f"{diff_component.__str__()}"
                     )
 
     def test_mechanical_propulsion_system(self):
@@ -173,7 +176,8 @@ class TestConvertToFeems(unittest.TestCase):
                 self.assertEqual(len(diff_subsystem.components_added), 0)
                 for component_key, diff_component in diff_subsystem.components_modified.items():
                     self.assertEqual(len(diff_component), 0,
-                        f"subcomponent {component_key} for component {key} has been modified: {diff_component.__str__()}"
+                        f"subcomponent {component_key} for component {key} has been modified: "
+                        f"{diff_component.__str__()}"
                     )
                     
         for (
@@ -188,7 +192,8 @@ class TestConvertToFeems(unittest.TestCase):
                 self.assertEqual(len(diff_subsystem.components_added), 0)
                 for component_key, diff_component in diff_subsystem.components_modified.items():
                     self.assertEqual(len(diff_component), 0,
-                        f"subcomponent {component_key} for component {key} has been modified: {diff_component.__str__()}"
+                        f"subcomponent {component_key} for component {key} has been modified: "
+                        f"{diff_component.__str__()}"
                     )
 
     def test_hybrid_propulsion_system(self):
@@ -220,7 +225,8 @@ class TestConvertToFeems(unittest.TestCase):
                 self.assertEqual(len(diff_subsystem.components_added), 0)
                 for component_key, diff_component in diff_subsystem.components_modified.items():
                     self.assertEqual(len(diff_component), 0,
-                        f"subcomponent {component_key} for component {key} has been modified: {diff_component.__str__()}"
+                        f"subcomponent {component_key} for component "
+                        f"{key} has been modified: {diff_component.__str__()}"
                     )
         
         for (
@@ -235,7 +241,8 @@ class TestConvertToFeems(unittest.TestCase):
                 self.assertEqual(len(diff_subsystem.components_added), 0)
                 for component_key, diff_component in diff_subsystem.components_modified.items():
                     self.assertEqual(len(diff_component), 0,
-                        f"subcomponent {component_key} for component {key} has been modified: {diff_component.__str__()}"
+                        f"subcomponent {component_key} for component {key} "
+                        f"has been modified: {diff_component.__str__()}"
                     )
 
 if __name__ == '__main__':

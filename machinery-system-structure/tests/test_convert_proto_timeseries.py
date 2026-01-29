@@ -1,6 +1,6 @@
-import pytest
-import numpy as np
 import random
+
+import numpy as np
 import pandas as pd
 from MachSysS.convert_proto_timeseries import (
     convert_proto_timeseries_to_pd_dataframe,
@@ -11,6 +11,7 @@ from MachSysS.gymir_result_pb2 import (
     PropulsionPowerInstance,
     TimeSeriesResult,
 )
+
 
 def test_convert_proto_timeseries_to_pd_series():
     time_array = np.arange(0, 1000, 1)

@@ -1,7 +1,9 @@
 import os
+
 import numpy as np
 from MachSysS.utility import retrieve_machinery_system_from_file
 from RunFeemsSim.pms_basic import get_min_load_table_dict_from_proto_system
+
 
 def test_get_min_load_table_dict_from_proto_system():
     # Construct absolute path to the data file in the same directory as this test file

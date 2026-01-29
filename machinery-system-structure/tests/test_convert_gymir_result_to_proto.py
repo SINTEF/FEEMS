@@ -1,7 +1,8 @@
 import os
-import pytest
 from random import random
+
 from MachSysS.convert_gymir_result_to_proto import GymirResultConverter
+
 
 def test_convert_gymir_result_to_proto():
     gymir_result_converter = GymirResultConverter()
