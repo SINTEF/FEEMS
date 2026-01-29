@@ -1,1 +1,9 @@
-__version__ = "0.2.5"
+try:
+    from importlib.metadata import version
+except ImportError:
+    from importlib_metadata import version  # type: ignore
+
+try:
+    __version__ = version("RunFeemsSim")
+except Exception:
+    __version__ = "unknown"

@@ -1,21 +1,21 @@
 from .component_base import BasicComponent, Component, SerialSystem
 from .component_electric import (
+    Battery,
+    BatterySystem,
     ElectricComponent,
     ElectricMachine,
     Genset,
-    BatterySystem,
-    Battery,
-    SuperCapacitorSystem,
     SuperCapacitor,
+    SuperCapacitorSystem,
 )
 from .component_mechanical import (
-    MechanicalComponent,
     Engine,
-    MainEngineWithGearBoxForMechanicalPropulsion,
-    MechanicalPropulsionComponent,
     MainEngineForMechanicalPropulsion,
+    MainEngineWithGearBoxForMechanicalPropulsion,
+    MechanicalComponent,
+    MechanicalPropulsionComponent,
 )
-from .node import Node, SwbId, ShaftLine, Switchboard
+from .node import Node, ShaftLine, SwbId, Switchboard
 from .utility import get_efficiency_curve_from_points
 
 __all__ = [

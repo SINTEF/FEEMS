@@ -1,23 +1,19 @@
 import random
-from typing import List, Union, NamedTuple, Optional
+from typing import List, NamedTuple, Optional, Union
 
-from feems.fuel import FuelOrigin, TypeFuel
 import numpy as np
 import pandas as pd
-from scipy.interpolate import PchipInterpolator
-
-from feems import get_logger
-from feems.components_model.component_base import Component, BasicComponent
+from feems.components_model.component_base import BasicComponent, Component
 from feems.components_model.component_electric import (
-    FuelCellSystem,
-    FuelCell,
-    Genset,
-    ElectricMachine,
-    ElectricComponent,
-    BatterySystem,
-    SerialSystemElectric,
-    Battery,
     PTIPTO,
+    Battery,
+    BatterySystem,
+    ElectricComponent,
+    ElectricMachine,
+    FuelCell,
+    FuelCellSystem,
+    Genset,
+    SerialSystemElectric,
 )
 from feems.components_model.component_mechanical import (
     COGAS,
@@ -27,13 +23,17 @@ from feems.components_model.component_mechanical import (
 )
 from feems.components_model.node import Switchboard
 from feems.exceptions import ConfigurationError
+from feems.fuel import FuelOrigin, TypeFuel
 from feems.types_for_feems import (
-    TypeComponent,
-    TypePower,
+    NOxCalculationMethod,
     Power_kW,
     Speed_rpm,
-    NOxCalculationMethod,
+    TypeComponent,
+    TypePower,
 )
+from scipy.interpolate import PchipInterpolator
+
+from feems import get_logger
 
 # Create a electric efficiency curve for an electric machine
 load = np.array([1.00, 0.75, 0.50, 0.25])
@@ -56,9 +56,9 @@ class PowerSummary(NamedTuple):
 
 # noinspection PyShadowingNames
 def create_random_monotonic_eff_curve(min_efficiency_perc=0, max_efficiency_perc=1) -> np.ndarray:
-    assert (
-        max_efficiency_perc > min_efficiency_perc
-    ), "maximum efficiency should be greater than minimum efficiency"
+    assert max_efficiency_perc > min_efficiency_perc, (
+        "maximum efficiency should be greater than minimum efficiency"
+    )
     monotonic = False
     load = np.array([0.25, 0.50, 0.75, 1.00])
     eff = np.zeros(load.shape)

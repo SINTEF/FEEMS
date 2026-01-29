@@ -1,41 +1,40 @@
 from dataclasses import dataclass
-from typing import Union, List, Dict, TypeVar, Callable, Optional
+from typing import Callable, Dict, List, Optional, TypeVar, Union
 
 import numpy as np
 import pandas as pd
 
-from .component_base import Component, BasicComponent, ComponentRunPoint
 from .. import get_logger
 from ..constant import (
-    nox_tier_slow_speed_max_rpm,
     nox_factor_imo_medium_speed_g_hWh,
     nox_factor_imo_slow_speed_g_kWh,
+    nox_tier_slow_speed_max_rpm,
 )
 from ..fuel import (
-    FuelConsumption,
-    FuelConsumerClassFuelEUMaritime,
-    FuelSpecifiedBy,
     Fuel,
+    FuelConsumerClassFuelEUMaritime,
+    FuelConsumption,
     FuelOrigin,
+    FuelSpecifiedBy,
     GhgEmissionFactorTankToWake,
     TypeFuel,
 )
 from ..types_for_feems import (
+    EmissionCurve,
+    EmissionType,
+    EngineCycleType,
+    NOxCalculationMethod,
+    Power_kW,
+    Speed_rpm,
     TypeComponent,
     TypePower,
-    Speed_rpm,
-    Power_kW,
-    NOxCalculationMethod,
-    EmissionType,
-    EmissionCurve,
-    EngineCycleType,
 )
+from .component_base import BasicComponent, Component, ComponentRunPoint
 from .utility import (
     get_efficiency_curve_from_dataframe,
     get_efficiency_curve_from_points,
     get_emission_curve_from_points,
 )
-
 
 logger = get_logger(__name__)
 
@@ -364,8 +363,10 @@ class EngineMultiFuel(Engine):
         Set the fuel characteristics in use based on the fuel type and origin. If not provided,
         it will use the first fuel characteristics in the list.
         Args:
-            fuel_type (TypeFuel): Fuel type. Optional. Defaults to None, which means the first fuel type in the list.
-            fuel_origin (FuelOrigin): Fuel origin. Optional. Defaults to None, which means the first fuel origin in the list.
+            fuel_type (TypeFuel): Fuel type. Optional. Defaults to None,
+                which means the first fuel type in the list.
+            fuel_origin (FuelOrigin): Fuel origin. Optional. Defaults to None,
+                which means the first fuel origin in the list.
         """
         if fuel_type is None or fuel_origin is None:
             self.fuel_in_use = self.multi_fuel_characteristics[0]
@@ -700,7 +701,8 @@ class COGAS(BasicComponent):
         uid: Optional[str] = None,
     ):
         """Constructor for COGES component"""
-        # Validate the inputs for curves. The length of the curves should be the same and the x values should be the same.
+        # Validate the inputs for curves. The length of the curves should be the same
+        # and the x values should be the same.
         if gas_turbine_power_curve is not None and steam_turbine_power_curve is not None:
             if gas_turbine_power_curve.shape != steam_turbine_power_curve.shape:
                 raise ValueError(
@@ -796,7 +798,8 @@ class COGAS(BasicComponent):
         """Power output of the gas turbine in kW"""
         if self.power_ratio_gas_turbine_interpolator is None:
             raise ValueError(
-                "The power ratio gas turbine interpolator is not defined. Please provide the power curves for the gas and steam turbines."
+                "The power ratio gas turbine interpolator is not defined."
+                " Please provide the power curves for the gas and steam turbines."
             )
         return self.power_ratio_gas_turbine_interpolator(self.power_output / self.rated_power)
 
@@ -813,7 +816,8 @@ class COGAS(BasicComponent):
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
     ) -> COGASRunPoint:
-        # GHG factors for FuelEU Maritime is not available for COGAS yet. It should raise an error if the user tries to use it.
+        # GHG factors for FuelEU Maritime is not available for COGAS yet.
+        # It should raise an error if the user tries to use it.
         if fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
             raise ValueError("GHG factors for FuelEU Maritime is not available for COGAS yet.")
         if power_kw is None:

@@ -1,10 +1,9 @@
 from unittest import TestCase
 
 import numpy as np
-
-from feems.components_model import ElectricComponent, Battery
+from feems.components_model import Battery, ElectricComponent
 from feems.components_model.component_electric import BatterySystem
-from feems.types_for_feems import TypePower, TypeComponent
+from feems.types_for_feems import TypeComponent, TypePower
 
 
 # input power is power on terminal

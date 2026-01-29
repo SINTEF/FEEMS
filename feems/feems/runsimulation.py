@@ -1,4 +1,3 @@
-
 from itertools import chain
 from typing import Dict
 
@@ -7,12 +6,12 @@ import numpy as np
 from . import get_logger
 from .components_model import SwbId
 from .simulation_interface import (
-    SimulationInterface,
     ElectricPowerPlantStatus,
     EnergySourceType,
+    SimulationInterface,
 )
 from .system_model import ElectricPowerSystem
-from .types_for_feems import TypePower, TypeComponent
+from .types_for_feems import TypeComponent, TypePower
 
 logger = get_logger(__name__)
 
@@ -131,9 +130,9 @@ class BatteryFuelCellDieselHybridSimulationInterface(SimulationInterface):
         power_source_priority: EnergySourceType = EnergySourceType.LNG_DIESEL,
     ) -> None:
         n_datapoints = len(next(iter(power_kw_per_switchboard.values())))
-        assert all(
-            n_datapoints == len(v) for v in power_kw_per_switchboard.values()
-        ), "All load vectors must have equal length"
+        assert all(n_datapoints == len(v) for v in power_kw_per_switchboard.values()), (
+            "All load vectors must have equal length"
+        )
         off_vector = np.zeros(n_datapoints)
         on_vector = np.ones(n_datapoints)
         equal_load_sharing_vector = np.zeros(n_datapoints)

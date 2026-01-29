@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
-from enum import Enum, unique, auto
+from enum import Enum, auto, unique
 from functools import reduce
-from typing import NewType, NamedTuple, Union, List, Optional, TypeVar, DefaultDict
+from typing import DefaultDict, List, NamedTuple, NewType, Optional, TypeVar, Union
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ class EmissionType(Enum):
 
 @dataclass
 class FEEMSResult:
-    from feems.fuel import FuelConsumption, FuelByMassFraction, GHGEmissions
+    from feems.fuel import FuelByMassFraction, FuelConsumption, GHGEmissions
 
     duration_s: Optional[float] = None
     energy_consumption_electric_total_mj: float = 0.0

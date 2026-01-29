@@ -2,11 +2,11 @@ import random
 import unittest
 
 import numpy as np
-
 from feems.components_model.utility import (
     get_list_random_distribution_numbers_for_total_number,
 )
 from feems.types_for_feems import TypePower
+
 from tests.utility import (
     create_random_monotonic_eff_curve,
     create_switchboard_with_components,

@@ -5,18 +5,16 @@ from unittest import TestCase
 
 import numpy as np
 import pandas as pd
-from scipy.interpolate import PchipInterpolator
-
 from feems.components_model.component_base import BasicComponent, SerialSystem
 from feems.components_model.component_electric import (
     COGES,
-    ElectricMachine,
-    ElectricComponent,
     PTIPTO,
-    Genset,
-    SerialSystemElectric,
+    ElectricComponent,
+    ElectricMachine,
     FuelCell,
     FuelCellSystem,
+    Genset,
+    SerialSystemElectric,
 )
 from feems.components_model.component_mechanical import (
     Engine,
@@ -28,31 +26,40 @@ from feems.components_model.component_mechanical import (
 )
 from feems.components_model.node import Node, get_fuel_emission_energy_balance_for_component
 from feems.components_model.utility import (
-    get_efficiency_curve_from_points,
-    get_efficiency_curve_from_dataframe,
     IntegrationMethod,
-)
-from feems.fuel import TypeFuel, Fuel, FuelSpecifiedBy, FuelOrigin
-from feems.types_for_feems import EmissionType, Speed_rpm, NOxCalculationMethod, SwbId
-from feems.types_for_feems import TypeNode, TypeComponent, TypePower, Power_kW
-from tests.utility import (
-    create_cogas_system,
-    create_components,
-    create_random_monotonic_eff_curve,
-    create_basic_components,
-    create_dataframe_save_and_return,
-    create_engine_component,
-    ELECTRIC_MACHINE_EFF_CURVE,
-    create_electric_components_for_switchboard,
-    create_multi_fuel_characteristics_sample,
+    get_efficiency_curve_from_dataframe,
+    get_efficiency_curve_from_points,
 )
 from feems.constant import nox_factor_imo_medium_speed_g_hWh
+from feems.fuel import Fuel, FuelOrigin, FuelSpecifiedBy, TypeFuel
+from feems.types_for_feems import (
+    EmissionType,
+    NOxCalculationMethod,
+    Power_kW,
+    Speed_rpm,
+    SwbId,
+    TypeComponent,
+    TypeNode,
+    TypePower,
+)
+from scipy.interpolate import PchipInterpolator
+
+from tests.utility import (
+    ELECTRIC_MACHINE_EFF_CURVE,
+    create_basic_components,
+    create_cogas_system,
+    create_components,
+    create_dataframe_save_and_return,
+    create_electric_components_for_switchboard,
+    create_engine_component,
+    create_multi_fuel_characteristics_sample,
+    create_random_monotonic_eff_curve,
+)
 
 CONVERTER_EFF = np.array([[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]).transpose()
 
 
 class TestComponent(TestCase):
-
     def setUp(self):
         """Create a serial system for testing for a pti/pto system with 5 components."""
         gearbox = BasicComponent(
@@ -432,7 +439,6 @@ class TestComponent(TestCase):
         os.unlink(filename)
 
     def test_serial_system(self):
-
         load_perc = 0.50  # np.random.rand() * 100
         efficiency = 1
         for component in self.components:
@@ -444,7 +450,6 @@ class TestComponent(TestCase):
         )
 
     def test_pti_pto(self):
-
         #: Create a PTIPTO instance
         switchboard_id = 1
         shaft_line_id = 1

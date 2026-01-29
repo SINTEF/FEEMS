@@ -1,23 +1,23 @@
 import unittest
-import numpy as np
 
+import numpy as np
 from feems.components_model.component_electric import (
-    ElectricMachine,
-    Genset,
-    FuelCellSystem,
-    FuelCell,
     ElectricComponent,
+    ElectricMachine,
+    FuelCell,
+    FuelCellSystem,
+    Genset,
 )
 from feems.components_model.component_mechanical import (
     Engine,
-    MainEngineForMechanicalPropulsion,
     EngineDualFuel,
     EngineMultiFuel,
     FuelCharacteristics,
+    MainEngineForMechanicalPropulsion,
 )
-from feems.system_model import ElectricPowerSystem, MechanicalPropulsionSystem, FuelOption
-from feems.types_for_feems import TypePower, TypeComponent
-from feems.fuel import TypeFuel, FuelOrigin
+from feems.fuel import FuelOrigin, TypeFuel
+from feems.system_model import ElectricPowerSystem, FuelOption, MechanicalPropulsionSystem
+from feems.types_for_feems import TypeComponent, TypePower
 
 
 class TestAvailableFuelOptions(unittest.TestCase):

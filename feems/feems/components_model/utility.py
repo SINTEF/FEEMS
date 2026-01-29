@@ -1,17 +1,17 @@
 import logging
-from enum import unique, Enum
-from typing import Union, List, Callable, Tuple, Optional
+from enum import Enum, unique
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from numpy import cumsum
-from scipy.integrate import trapezoid, simpson
+from scipy.integrate import simpson, trapezoid
 from scipy.interpolate import PchipInterpolator
 
 from feems import get_logger
 from feems.exceptions import InputError
 from feems.fuel import FuelConsumption
-from feems.types_for_feems import TimeIntervalList, EmissionCurvePoint
+from feems.types_for_feems import EmissionCurvePoint, TimeIntervalList
 
 logger = get_logger(__name__)
 
@@ -173,6 +173,7 @@ def get_efficiency_curve_from_points(
         curve_points = np.append(
             np.array([0, 1]).reshape(-1, 1), np.array([eff, eff]).reshape(-1, 1), axis=1
         )
+
         def function(x):
             return eff
 

@@ -18,27 +18,20 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import Dict, List, Tuple, Union
 
+import MachSysS.convert_to_feems as feems_converter
+import MachSysS.system_structure_pb2 as proto_system
 import numpy as np
-
 from feems.components_model import SwbId
-from feems.simulation_interface import SimulationInterface, EnergySourceType
+from feems.simulation_interface import EnergySourceType, SimulationInterface
 from feems.system_model import (
     ElectricPowerSystem,
-    MechanicalPropulsionSystemWithElectricPowerSystem,
     HybridPropulsionSystem,
+    MechanicalPropulsionSystemWithElectricPowerSystem,
 )
 from feems.types_for_feems import Power_kW, TypeComponent
 
-import MachSysS.system_structure_pb2 as proto_system
-import MachSysS.convert_to_feems as feems_converter
-
-
-OnPattern = Tuple[
-    bool, ...
-]  # Tuple of on-status for each producer in a power management system.
-Load2OnPattern = Dict[
-    Power_kW, OnPattern
-]  # Mapping from load power into PMS on-status.
+OnPattern = Tuple[bool, ...]  # Tuple of on-status for each producer in a power management system.
+Load2OnPattern = Dict[Power_kW, OnPattern]  # Mapping from load power into PMS on-status.
 
 
 @dataclass
@@ -55,9 +48,7 @@ class PmsLoadTable:
         """Return the sorted load table with loads and patterns separated."""
         return self._bins, self._i2on
 
-    def on_pattern(
-        self, load: Union[List[float], List[Power_kW], np.ndarray]
-    ) -> List[OnPattern]:
+    def on_pattern(self, load: Union[List[float], List[Power_kW], np.ndarray]) -> List[OnPattern]:
         """Return one OnPattern for each input value in load vector."""
         return [self._i2on[i] for i in np.digitize(load, self._bins[1:])]  # type: ignore[no-untyped-call]
 
@@ -66,9 +57,9 @@ def get_rated_power_from_power_source(subsystem: proto_system.Subsystem) -> floa
     if subsystem.rated_power_kw > 0:
         return subsystem.rated_power_kw
     else:
-        component = feems_converter.collect_electric_components_from_sub_system(
-            subsystem
-        )[0].get("proto_component")
+        component = feems_converter.collect_electric_components_from_sub_system(subsystem)[0].get(
+            "proto_component"
+        )
         return component.rated_power_kw
 
 
@@ -101,32 +92,22 @@ def get_min_load_table_dict_from_feems_system(
     component_types: List[TypeComponent] = None,
 ) -> Load2OnPattern:
     """Return a minimum load table dict generated from a feems model"""
-    electric_system = (
-        system if not hasattr(system, "electric_system") else system.electric_system
-    )
+    electric_system = system if not hasattr(system, "electric_system") else system.electric_system
     power_sources = [component for component in electric_system.power_sources]
     if component_types is not None:
         power_sources = [
-            component
-            for component in power_sources
-            if component.type in component_types
+            component for component in power_sources if component.type in component_types
         ]
     rated_power_all = [power_source.rated_power for power_source in power_sources]
-    return min_load_table_dict(
-        rated_power_all, maximum_allowed_genset_load_percentage / 100
-    )
+    return min_load_table_dict(rated_power_all, maximum_allowed_genset_load_percentage / 100)
 
 
-def min_load_table_dict(
-    rated_power_kw: List[Power_kW], max_load_factor: float
-) -> Load2OnPattern:
+def min_load_table_dict(rated_power_kw: List[Power_kW], max_load_factor: float) -> Load2OnPattern:
     """Return a minimum load table dict generated from a list of genset ratings."""
     patterns = list(itertools.product([False, True], repeat=len(rated_power_kw)))
     assert len(patterns) == 2 ** len(rated_power_kw)
     loads = [
-        Power_kW(
-            max_load_factor * sum(pwr for pwr, on in zip(rated_power_kw, pat) if on)
-        )
+        Power_kW(max_load_factor * sum(pwr for pwr, on in zip(rated_power_kw, pat) if on))
         for pat in patterns
     ]
     assert len(loads) == len(patterns)
@@ -152,8 +133,7 @@ class PmsLoadTableSimulationInterface(SimulationInterface):
         self._n_bus_ties = n_bus_ties
         self._pms_load_table = pms_load_table
         assert all(
-            self._n_power_sources == len(v)
-            for v in pms_load_table.min_load2on_pattern.values()
+            self._n_power_sources == len(v) for v in pms_load_table.min_load2on_pattern.values()
         ), f"All PMS on_pattern lengths must match the genset count = {self._n_power_sources}"
 
     def set_status(
@@ -171,11 +151,7 @@ class PmsLoadTableSimulationInterface(SimulationInterface):
         n_datapoint_max = max(n_datapoints)
         if len(n_datapoints) > 1:
             for swb_id, power_kw in power_kw_per_switchboard.items():
-                if (
-                    len(power_kw) < n_datapoint_max
-                    and len(power_kw) != 1
-                    and power_kw[0] != 0
-                ):
+                if len(power_kw) < n_datapoint_max and len(power_kw) != 1 and power_kw[0] != 0:
                     raise ValueError(
                         f"Load vector for switchboard {swb_id} has length {len(power_kw)} "
                         f"but should have length {n_datapoint_max} or 1 with 0 value."
@@ -183,20 +159,16 @@ class PmsLoadTableSimulationInterface(SimulationInterface):
         n_datapoints = n_datapoint_max
         total_power_kw = sum(power_kw_per_switchboard.values(), np.zeros(n_datapoints))
         off_vector = np.zeros(n_datapoints)
-        on_vector = np.ones(n_datapoints)
+        np.ones(n_datapoints)
         equal_load_sharing_vector = np.zeros(n_datapoints)
         number_power_sources = len(electric_power_system.power_sources)
-        on_pattern_per_datapoint = np.array(
-            self._pms_load_table.on_pattern(total_power_kw)
-        )
+        on_pattern_per_datapoint = np.array(self._pms_load_table.on_pattern(total_power_kw))
         assert on_pattern_per_datapoint.shape == (n_datapoints, self._n_power_sources)
         if self._n_bus_ties > 0:
-            electric_power_system.set_bus_tie_status_all(
-                np.ones([n_datapoints, self._n_bus_ties])
-            )
-        assert (
-            self._n_power_sources == number_power_sources
-        ), f"The electric_power_system.power_sources count is different from {self._n_power_sources}"
+            electric_power_system.set_bus_tie_status_all(np.ones([n_datapoints, self._n_bus_ties]))
+        assert self._n_power_sources == number_power_sources, (
+            f"The electric_power_system.power_sources count is different from {self._n_power_sources}"
+        )
         for i, source in enumerate(electric_power_system.power_sources):
             source.status = on_pattern_per_datapoint[:, i].astype(bool)
             source.load_sharing_mode = equal_load_sharing_vector
