@@ -8,7 +8,7 @@ types-protobuf
 typing_extensions
 jupyter
 jupyterlab
-nbdev
+nbdev<=2.3.27
 deepdiff
 plotly
 poetry
