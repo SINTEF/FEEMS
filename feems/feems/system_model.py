@@ -275,9 +275,7 @@ class ElectricPowerSystem(MachinerySystem):
                     component2switchboard.append(component.switchboard_id)
                 else:
                     raise TypeError(
-                        "The component was specified to be power source but is not an instance of"
-                        " ElectricMachine, Genset, FuelCellSystem, ShorePowerConnection,"
-                        " ShorePowerConnectionSystem"
+                        "The component was specified to be power source but is not an instance of ElectricMachine, Genset, FuelCellSystem, COGES, ShorePowerConnection, ShorePowerConnectionSystem"
                     )
             elif component.type == TypeComponent.PROPULSION_DRIVE:
                 if isinstance(component, (ElectricComponent, SerialSystemElectric)):
