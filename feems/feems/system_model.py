@@ -28,6 +28,8 @@ from .components_model.component_electric import (
     PowerSystemComponent,
     EnergyStorageComponent,
     FuelCellSystem,
+    ShorePowerConnection,
+    ShorePowerConnectionSystem,
 )
 from .components_model.node import Switchboard, BusBreaker, ShaftLine, SwbId
 from .components_model.utility import IntegrationMethod
@@ -257,13 +259,23 @@ class ElectricPowerSystem(MachinerySystem):
         #: Categorize the components
         for component in power_plant_components:
             if component.power_type == TypePower.POWER_SOURCE:
-                if isinstance(component, (ElectricMachine, Genset, FuelCellSystem, COGES)):
+                if isinstance(
+                    component,
+                    (
+                        ElectricMachine,
+                        Genset,
+                        FuelCellSystem,
+                        COGES,
+                        ShorePowerConnection,
+                        ShorePowerConnectionSystem,
+                    ),
+                ):
                     self.power_sources.append(component)
                     power_source2switchboard.append(component.switchboard_id)
                     component2switchboard.append(component.switchboard_id)
                 else:
                     raise TypeError(
-                        "The component was specified to be power source but is not an instance of ElectricMachine, Genset, FuelCellSystem"
+                        "The component was specified to be power source but is not an instance of ElectricMachine, Genset, FuelCellSystem, COGES, ShorePowerConnection, ShorePowerConnectionSystem"
                     )
             elif component.type == TypeComponent.PROPULSION_DRIVE:
                 if isinstance(component, (ElectricComponent, SerialSystemElectric)):
