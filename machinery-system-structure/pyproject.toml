@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "MachSysS"
-dynamic = ["version"]
+version = "0.7.7"
 description = "Machinery System Structure for interface"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [{name = "Kevin Koosup Yum", email = "kevinkoosup.yum@sintef.no"}]
 keywords = ['FEEMS', 'protobuf', 'system', 'structure']
 classifiers = ["Natural Language :: English", "Intended Audience :: Developers", "Development Status :: 1 - Planning", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3 :: Only"]
@@ -18,19 +18,5 @@ dependencies = ['protobuf~=4.21.12']
 Repository = "https://github.com/SINTEF/FEEMS"
 Documentation = "https://keviny.github.io/MachSysS/"
 
-[project.entry-points.nbdev]
-MachSysS = "MachSysS._modidx:d"
-
-[tool.setuptools.dynamic]
-version = {attr = "MachSysS.__version__"}
-
 [tool.setuptools.packages.find]
 include = ["MachSysS"]
-
-[tool.nbdev]
-nbs_path = '.'
-doc_path = 'docs'
-branch = 'master'
-recursive = false
-custom_sidebar = false
-title = 'MachSysS'

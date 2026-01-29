@@ -5,44 +5,32 @@
 > pms model to apply for an electric power system that has a functionality of load dependent 
 > start-stop of gensets.
 
-## Installation of the package
-The package is distributed by the Azure Artifacts package manager. To install the package, 
-you need to install artifacts-keyring package and should have a valid Azure DevOps account. 
-```sh
-pip install artifacts-keyring
-```
-Then, you need to add the package source to your pip configuration. You can do this by copying 
-the pip configuration file (pip.conf for macOS and Linux or pip.ini for Windows) to your 
-virtual environment directory or base python directory. The file should contain the following lines:
-```sh
-[global]
-extra-index-url=https://pkgs.dev.azure.com/SintefOceanEnergySystem/_packaging/SintefOceanEnergySystem/pypi/simple/
-```
-If you already have a pip configuration file, you can add the above lines to the file. Finally, 
-you can install the package by running the following command:
-```sh
-pip install RunFeemsSim
-```
- 
-## Installation of the development environment
-For the development, one should create a virtual environment and install the package using the 
-requirements.txt file. First, create a virtual environment and activate it. 
-```sh 
-python -m venv venv
-source venv/bin/activate
-```
-Then, you need to add the package source to your pip configuration. You can do this by copying 
-the pip configuration file (pip.conf for macOS and Linux or pip.ini for Windows) to your venv 
-directory or base python directory. The file should contain the following lines:
-```sh
-[global]
-extra-index-url=https://pkgs.dev.azure.com/SintefOceanEnergySystem/_packaging/SintefOceanEnergySystem/pypi/simple/
+## Installation
+
+### For Developers (Workspace)
+This package is part of the FEEMS workspace managed by `uv`.
+To set up the environment, run the following from the workspace root:
+
+```bash
+uv sync
 ```
 
-Then, install the package using the requirements.txt file.
-```sh
-pip install -r requirements.txt
+This will install `RunFeemsSim` in editable mode along with its dependencies (`feems`, `MachSysS`).
+
+### From Package Registry
+If you are installing from a package registry (e.g. Azure Artifacts):
+
+```bash
+pip install RunFeemsSim
 ```
+
+## Development
+
+This package uses `nbdev`. The source code is generated from Jupyter Notebooks (e.g., `00_machinery_calculation.ipynb`).
+- Modify the notebooks.
+- Run `nbdev_export` to update the Python modules in `RunFeemsSim/`. (Ensure you have `nbdev` installed or use the workspace tools if configured).
+
+## Usage
 
 ## Usage
 

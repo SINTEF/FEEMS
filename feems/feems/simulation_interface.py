@@ -1,17 +1,16 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import NamedTuple, Dict, Tuple
+from typing import Dict, NamedTuple, Tuple
 
 import numpy as np
-from feems.fuel import TypeFuel
 
+from feems.fuel import TypeFuel
 from feems.types_for_feems import FEEMSResult, Numeric
 
 from . import get_logger
 from .components_model import SwbId
 from .system_model import ElectricPowerSystem
-
 
 logger = get_logger(__name__)
 
@@ -51,7 +50,7 @@ class EnergySource:
             energy_consumption = feems_result.fuel_consumption_total_kg
         else:
             raise TypeError(
-                "The energy source type is not valid. It should be " "EnergySourceType enum type."
+                "The energy source type is not valid. It should be EnergySourceType enum type."
             )
         energy_consumption_actual = (1 - ratio_energy_used_in_previous_source) * energy_consumption
         self.remaining_capacity -= energy_consumption_actual

@@ -1,7 +1,6 @@
 from unittest import TestCase
 
 import numpy as np
-
 from feems.components_model import SwbId
 from feems.runsimulation import EqualEngineSizeAllClosedSimulationInterface
 

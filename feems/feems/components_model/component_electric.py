@@ -1,11 +1,27 @@
-from typing import Union, Tuple, NamedTuple, Optional, List
+from typing import List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 from .. import get_logger
-
-from .component_base import SerialSystem, Component, BasicComponent, ComponentRunPoint
+from ..fuel import (
+    Fuel,
+    FuelConsumerClassFuelEUMaritime,
+    FuelConsumption,
+    FuelOrigin,
+    FuelSpecifiedBy,
+    GhgEmissionFactorTankToWake,
+    TypeFuel,
+)
+from ..types_for_feems import (
+    Power_kW,
+    Speed_rpm,
+    SwbId,
+    TimeIntervalList,
+    TypeComponent,
+    TypePower,
+)
+from .component_base import BasicComponent, Component, ComponentRunPoint, SerialSystem
 from .component_mechanical import (
     COGAS,
     COGASRunPoint,
@@ -15,28 +31,10 @@ from .component_mechanical import (
     EngineRunPoint,
     FuelCharacteristics,
     MainEngineForMechanicalPropulsion,
-    MechanicalPropulsionComponent,
     MainEngineWithGearBoxForMechanicalPropulsion,
+    MechanicalPropulsionComponent,
 )
-from .utility import integrate_data, IntegrationMethod, integrate_data_accumulative
-from ..fuel import (
-    FuelConsumption,
-    TypeFuel,
-    FuelSpecifiedBy,
-    Fuel,
-    FuelOrigin,
-    GhgEmissionFactorTankToWake,
-    FuelConsumerClassFuelEUMaritime,
-)
-from ..types_for_feems import (
-    TypeComponent,
-    TypePower,
-    Power_kW,
-    Speed_rpm,
-    TimeIntervalList,
-    SwbId,
-)
-
+from .utility import IntegrationMethod, integrate_data, integrate_data_accumulative
 
 logger = get_logger(__name__)
 

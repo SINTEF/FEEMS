@@ -10,14 +10,23 @@ After the system model is configured, given the operational control inputs and p
 
 ## Installing FEEMS
 
-```
+This package is part of the FEEMS workspace.
+
+### For Users
+```bash
 pip install feems
 ```
 
-## Building from the source code
-
-You should have installed poetry
-
+### For Developers (Workspace Setup)
+Ensure you have `uv` installed, then from the workspace root:
+```bash
+uv sync
 ```
 
+## Building from source
+
+To build the package specifically:
+```bash
+cd feems
+uv build
 ```

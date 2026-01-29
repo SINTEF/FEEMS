@@ -1,13 +1,13 @@
+import random
 from functools import reduce
 from typing import NamedTuple
 
+import numpy as np
+from feems.components_model.utility import IntegrationMethod
+from feems.types_for_feems import TypePower
 from scipy import integrate
 
-from feems.components_model.utility import IntegrationMethod
 from .test_system import TestMechanicalPropulsionSystemSetup
-from feems.types_for_feems import TypePower
-import numpy as np
-import random
 
 
 class PowerSeries(NamedTuple):

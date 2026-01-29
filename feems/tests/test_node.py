@@ -3,12 +3,10 @@ from typing import NamedTuple, cast
 from unittest import TestCase
 
 import numpy as np
-from scipy.integrate import simpson
-
 from feems.components_model import (
+    BasicComponent,
     ElectricComponent,
     Genset,
-    BasicComponent,
     MainEngineWithGearBoxForMechanicalPropulsion,
     MechanicalPropulsionComponent,
     ShaftLine,
@@ -17,12 +15,14 @@ from feems.components_model.component_electric import FuelCellSystem
 from feems.components_model.utility import (
     get_list_random_distribution_numbers_for_total_number,
 )
-from feems.types_for_feems import TypePower, TypeComponent
+from feems.types_for_feems import TypeComponent, TypePower
+from scipy.integrate import simpson
+
 from tests.utility import (
+    create_a_pti_pto,
+    create_engine_component,
     create_switchboard_with_components,
     set_random_power_input_consumer_pti_pto_energy_storage,
-    create_engine_component,
-    create_a_pti_pto,
 )
 
 
@@ -324,7 +324,6 @@ class TestSwitchboard(TestCase):
 
 class TestShaftLine(TestCase):
     def test_shaft_line(self):
-
         time_step = 1
         number_test_points = 100
         number_main_engines = random.randint(1, 4)

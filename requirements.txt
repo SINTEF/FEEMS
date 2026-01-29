@@ -1,5 +1,0 @@
-pandas
-numpy
-scipy
-protobuf~=4.21.12
-pandas

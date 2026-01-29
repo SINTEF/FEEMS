@@ -1,28 +1,28 @@
-from typing import Union, List, Tuple, Optional, TypeVar, Dict
 from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, TypeVar, Union
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 from scipy.interpolate import PchipInterpolator
-from scipy.optimize import newton, root, least_squares
+from scipy.optimize import least_squares, newton, root
 
+from .. import get_logger
+from ..exceptions import InputError
+from ..fuel import FuelConsumerClassFuelEUMaritime, FuelConsumption
+from ..types_for_feems import (
+    EmissionType,
+    Numeric,
+    NumericT,
+    Power_kW,
+    Speed_rpm,
+    TypeComponent,
+    TypePower,
+)
 from .utility import (
     get_efficiency_curve_from_dataframe,
     get_efficiency_curve_from_points,
 )
-from .. import get_logger
-from ..exceptions import InputError
-from ..types_for_feems import (
-    EmissionType,
-    TypeComponent,
-    TypePower,
-    Power_kW,
-    Speed_rpm,
-    Numeric,
-    NumericT,
-)
-from ..fuel import FuelConsumption, FuelConsumerClassFuelEUMaritime
 
 # Define logger
 logger = get_logger(__name__)

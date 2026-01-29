@@ -1,60 +1,60 @@
 import logging
 from collections import defaultdict
 from functools import reduce
-from typing import Dict, Tuple, List, Union, cast, Sequence, Optional
+from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
 
-from .component_base import Component
-from .component_electric import (
-    COGES,
-    ElectricComponent,
-    FuelCellSystem,
-    Genset,
-    MechanicalComponent,
-    SerialSystemElectric,
-    FuelCell,
-    Battery,
-    BatterySystem,
-    SuperCapacitor,
-    SuperCapacitorSystem,
-    PTIPTO,
-    ShorePowerConnection,
-    ShorePowerConnectionSystem,
-    ElectricMachine,
-)
-from .component_mechanical import (
-    MainEngineForMechanicalPropulsion,
-    MainEngineWithGearBoxForMechanicalPropulsion,
-    EngineRunPoint,
-    Engine,
-    EngineDualFuel,
-    EngineMultiFuel,
-)
-from .utility import (
-    integrate_data,
-    IntegrationMethod,
-    integrate_multi_fuel_consumption,
-    IntegrationError,
-)
 from .. import get_logger
 from ..exceptions import InputError
 from ..fuel import (
+    FuelConsumerClassFuelEUMaritime,
     FuelConsumption,
     FuelOrigin,
     FuelSpecifiedBy,
-    FuelConsumerClassFuelEUMaritime,
     TypeFuel,
 )
 from ..types_for_feems import (
     FEEMSResult,
+    Numeric,
+    SwbId,
+    TimeIntervalList,
+    TypeComponent,
     TypeNode,
     TypePower,
-    TypeComponent,
-    TimeIntervalList,
-    SwbId,
-    Numeric,
+)
+from .component_base import Component
+from .component_electric import (
+    COGES,
+    PTIPTO,
+    Battery,
+    BatterySystem,
+    ElectricComponent,
+    ElectricMachine,
+    FuelCell,
+    FuelCellSystem,
+    Genset,
+    MechanicalComponent,
+    SerialSystemElectric,
+    ShorePowerConnection,
+    ShorePowerConnectionSystem,
+    SuperCapacitor,
+    SuperCapacitorSystem,
+)
+from .component_mechanical import (
+    Engine,
+    EngineDualFuel,
+    EngineMultiFuel,
+    EngineRunPoint,
+    MainEngineForMechanicalPropulsion,
+    MainEngineWithGearBoxForMechanicalPropulsion,
+)
+from .utility import (
+    IntegrationError,
+    IntegrationMethod,
+    integrate_data,
+    integrate_multi_fuel_consumption,
 )
 
 # Define logger
@@ -1080,7 +1080,7 @@ class ShaftLine(Node):
         for power_type, name_list in self.name_component_by_power_type.items():
             name_list_unique = list(set(name_list))
             if len(name_list) != len(name_list_unique):
-                msg = "There are duplicates in the component name for %s" "category for the %s" % (
+                msg = "There are duplicates in the component name for %scategory for the %s" % (
                     power_type,
                     self.name,
                 )

@@ -1,15 +1,14 @@
 """This module provides classes for fuel consumption and emissions."""
 
-from functools import cache
-import os
 import logging
+import os
 from dataclasses import dataclass, field
 from enum import Enum, unique
-from typing import Dict, Union, Optional, List
+from functools import cache
+from typing import Dict, List, Optional, Union
 
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -629,7 +628,8 @@ def get_ghg_factors_for_fuel_eu_maritime(
     fuel_type_eu = _FUEL_TYPE_FUEL_EU_MARITIME_MAPPING[fuel_type]
     fuel_consumer_class_str = _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING[fuel_consumer_class]
     return _DF_GHG_FACTORS_DICTIONARY["eu"].query(
-        f"pathway_name == '{fuel_type_eu}' and fuel_class == '{fuel_class}' and fuel_consumer_unit_class == '{fuel_consumer_class_str}'"
+        f"pathway_name == '{fuel_type_eu}' and fuel_class == '{fuel_class}'"
+        f" and fuel_consumer_unit_class == '{fuel_consumer_class_str}'"
     )
 
 
@@ -690,9 +690,9 @@ class FuelByMassFraction:
         if self.fuel_specified_by == FuelSpecifiedBy.IMO:
             fuel_consumer_class = None
         elif self.fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
-            assert (
-                fuel_consumer_class is not None
-            ), "Please provide the fuel consumer class for EU defined fuel."
+            assert fuel_consumer_class is not None, (
+                "Please provide the fuel consumer class for EU defined fuel."
+            )
         elif self.fuel_specified_by == FuelSpecifiedBy.USER or (
             self.fuel_specified_by == FuelSpecifiedBy.NONE and len(self.fuels) == 0
         ):

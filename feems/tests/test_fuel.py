@@ -1,20 +1,20 @@
+import logging
 import random
 from typing import List
-import logging
 
 import numpy as np
 import pytest
 from feems.fuel import (
-    FuelByMassFraction,
-    FuelConsumption,
+    _GWP100_CH4,
+    _GWP100_N2O,
     Fuel,
+    FuelByMassFraction,
+    FuelConsumerClassFuelEUMaritime,
+    FuelConsumption,
+    FuelOrigin,
     FuelSpecifiedBy,
     TypeFuel,
-    FuelOrigin,
-    FuelConsumerClassFuelEUMaritime,
     get_ghg_factors_for_fuel_eu_maritime,
-    _GWP100_N2O,
-    _GWP100_CH4,
 )
 from pytest_subtests import SubTests
 
@@ -44,7 +44,8 @@ def test_fuel_class():
     for specified_by in [FuelSpecifiedBy.FUEL_EU_MARITIME]:
         print(f"Fuel specified by {specified_by.name}")
         print(
-            "fuel_name\tghg_wtt [gCO2eq/gFuel]\tghg_ttw[gCO2/gFuel]\tghg_wtw[gCO2eq/gFuel]\tghg_wtw[gCO2eq/mj]\tlhv[MJ/kg]\torigin"
+            "fuel_name\tghg_wtt [gCO2eq/gFuel]\tghg_ttw[gCO2/gFuel]\tghg_wtw[gCO2eq/gFuel]"
+            "\tghg_wtw[gCO2eq/mj]\tlhv[MJ/kg]\torigin"
         )
         for fuel_type in TypeFuel:
             for origin in FuelOrigin:
@@ -86,7 +87,10 @@ def test_fuel_class():
                             if not np.isnan(fuel_data.WTW_energy.values[0]):
                                 assert fuel_data.WTW_energy.values[0] == pytest.approx(
                                     ghg_wtw_per_mj
-                                ), f"WTW energy is not equal for fuel {name}, origin {origin} and consumer {consumer_type} ({fuel_data.WTW_energy.values[0]} != {ghg_wtw_per_mj})"
+                                ), (
+                                    f"WTW energy is not equal for fuel {name}, origin {origin} and"
+                                    f" consumer {consumer_type} ({fuel_data.WTW_energy.values[0]} != {ghg_wtw_per_mj})"
+                                )
                         lhv_mj_per_kg = fuel.lhv_mj_per_g * 1000
                         print(
                             f"{name}\t{ghg_wtt:.2f}\t{ghg_ttw:.2f}\t{ghg_wtw}\t{ghg_wtw_per_mj}"

@@ -4,13 +4,12 @@ from typing import Union
 from unittest import TestCase
 
 import numpy as np
-
 from feems.components_model import (
-    Engine,
-    ElectricMachine,
-    Genset,
-    ElectricComponent,
     Battery,
+    ElectricComponent,
+    ElectricMachine,
+    Engine,
+    Genset,
 )
 from feems.components_model.component_electric import FuelCell, FuelCellSystem
 from feems.components_model.utility import (
@@ -18,18 +17,18 @@ from feems.components_model.utility import (
     integrate_multi_fuel_consumption,
 )
 from feems.runsimulation import (
-    run_simulation,
     BatteryFuelCellDieselHybridSimulationInterface,
+    run_simulation,
 )
 from feems.simulation_interface import EnergySourceType
 from feems.system_model import ElectricPowerSystem
 from feems.types_for_feems import (
-    TypeComponent,
+    NOxCalculationMethod,
     Power_kW,
     Speed_rpm,
-    TypePower,
     SwbId,
-    NOxCalculationMethod,
+    TypeComponent,
+    TypePower,
 )
 
 random.seed(10)

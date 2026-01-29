@@ -17,11 +17,11 @@ CopyRight: SINTEF Ocean
 import re
 from dataclasses import dataclass
 from functools import reduce
-from typing import List, Union, Dict
+from typing import Dict, List, Union
+
 import MachSysS.system_structure_pb2 as proto
 from deepdiff.diff import DeepDiff
 from google.protobuf.json_format import MessageToDict
-
 
 ProtoComponent = Union[
     proto.MechanicalComponent,
@@ -163,18 +163,14 @@ def compare_proto_subsystems(
     subsystem2_dict = MessageToDict(subsystem2)
     subsystem1_dict_non_components = reduce(
         lambda acc, key: (
-            {**acc, **{key: subsystem1_dict.pop(key)}}
-            if key in subsystem1_dict
-            else acc
+            {**acc, **{key: subsystem1_dict.pop(key)}} if key in subsystem1_dict else acc
         ),
         non_component_attribute_keys,
         {},
     )
     subsystem2_dict_non_components = reduce(
         lambda acc, key: (
-            {**acc, **{key: subsystem2_dict.pop(key)}}
-            if key in subsystem2_dict
-            else acc
+            {**acc, **{key: subsystem2_dict.pop(key)}} if key in subsystem2_dict else acc
         ),
         non_component_attribute_keys,
         {},
@@ -191,15 +187,9 @@ def compare_proto_subsystems(
     components_list_subsystem2 = convert_camel_case_list_to_snake_case_list(
         list(subsystem2_dict.keys())
     )
-    components_removed = list(
-        set(components_list_subsystem1) - set(components_list_subsystem2)
-    )
-    components_added = list(
-        set(components_list_subsystem2) - set(components_list_subsystem1)
-    )
-    components_common = list(
-        set(components_list_subsystem1) & set(components_list_subsystem2)
-    )
+    components_removed = list(set(components_list_subsystem1) - set(components_list_subsystem2))
+    components_added = list(set(components_list_subsystem2) - set(components_list_subsystem1))
+    components_common = list(set(components_list_subsystem1) & set(components_list_subsystem2))
     diff_components = {}
     for component_name in components_common:
         diff_components[component_name] = compare_proto_components(
@@ -240,9 +230,7 @@ def compare_proto_switchboards_shaft_lines(
             diff.subsystems_removed.append(subsystem_ref.name)
         else:
             diff.subsystems_added.remove(subsystem_ref.name)
-            diff_subsystem = compare_proto_subsystems(
-                subsystem_ref, subsystem_to_compare
-            )
+            diff_subsystem = compare_proto_subsystems(subsystem_ref, subsystem_to_compare)
             diff.subsystems_modified[subsystem_ref.name] = diff_subsystem
     return diff
 
@@ -259,9 +247,7 @@ def compare_proto_electric_systems(
     """
     diff = DiffElectricPowerSystem(
         switchboards_removed=[],
-        switchboards_added=[
-            switchboard.switchboard_id for switchboard in eps2.switchboards
-        ],
+        switchboards_added=[switchboard.switchboard_id for switchboard in eps2.switchboards],
         switchboards_modified={},
     )
     for switchboard_ref in eps1.switchboards:
@@ -280,9 +266,7 @@ def compare_proto_electric_systems(
             diff_switchboard = compare_proto_switchboards_shaft_lines(
                 switchboard_ref, switchboard_to_compare
             )
-            diff.switchboards_modified[
-                switchboard_ref.switchboard_id
-            ] = diff_switchboard
+            diff.switchboards_modified[switchboard_ref.switchboard_id] = diff_switchboard
     return diff
 
 
@@ -298,17 +282,14 @@ def compare_proto_mechanical_system(
     """
     diff = DiffMechanicalSystem(
         shaft_lines_removed=[],
-        shaft_lines_added=[
-            shaft_line.shaft_line_id for shaft_line in shaft_lines2.shaft_lines
-        ],
+        shaft_lines_added=[shaft_line.shaft_line_id for shaft_line in shaft_lines2.shaft_lines],
         shaft_lines_modified={},
     )
     for shaft_line_ref in shaft_lines1.shaft_lines:
         try:
             shaft_line_to_compare = next(
                 filter(
-                    lambda shaft_line: shaft_line_ref.shaft_line_id
-                    == shaft_line.shaft_line_id,
+                    lambda shaft_line: shaft_line_ref.shaft_line_id == shaft_line.shaft_line_id,
                     shaft_lines2.shaft_lines,
                 )
             )

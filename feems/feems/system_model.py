@@ -1,45 +1,45 @@
 from functools import reduce
 from operator import itemgetter
-from typing import Union, List, Tuple, Dict, NewType, NamedTuple, Set, Optional
+from typing import Dict, List, NamedTuple, NewType, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from feems.fuel import FuelSpecifiedBy, FuelOrigin, TypeFuel
 
 from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
-from .components_model.component_mechanical import EngineMultiFuel, Engine, EngineDualFuel
+from feems.fuel import FuelOrigin, FuelSpecifiedBy, TypeFuel
 
 from . import get_logger
 from .components_model.component_electric import (
     COGES,
-    ElectricComponent,
-    ElectricMachine,
-    Genset,
-    SerialSystemElectric,
     PTIPTO,
     Battery,
-    MechanicalComponent,
     BatterySystem,
-    SuperCapacitor,
-    SuperCapacitorSystem,
-    PowerSystemComponent,
+    ElectricComponent,
+    ElectricMachine,
     EnergyStorageComponent,
     FuelCellSystem,
+    Genset,
+    MechanicalComponent,
+    PowerSystemComponent,
+    SerialSystemElectric,
     ShorePowerConnection,
     ShorePowerConnectionSystem,
+    SuperCapacitor,
+    SuperCapacitorSystem,
 )
-from .components_model.node import Switchboard, BusBreaker, ShaftLine, SwbId
+from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel
+from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard
 from .components_model.utility import IntegrationMethod
 from .exceptions import ConfigurationError, InputError
 from .types_for_feems import (
     FEEMSResult,
-    TypePower,
-    TypeComponent,
-    TypeValueBus,
     TimeIntervalList,
+    TypeComponent,
+    TypePower,
+    TypeValueBus,
 )
 
 BusId = NewType("BusId", int)
@@ -275,14 +275,17 @@ class ElectricPowerSystem(MachinerySystem):
                     component2switchboard.append(component.switchboard_id)
                 else:
                     raise TypeError(
-                        "The component was specified to be power source but is not an instance of ElectricMachine, Genset, FuelCellSystem, ShorePowerConnection, ShorePowerConnectionSystem"
+                        "The component was specified to be power source but is not an instance of"
+                        " ElectricMachine, Genset, FuelCellSystem, ShorePowerConnection,"
+                        " ShorePowerConnectionSystem"
                     )
             elif component.type == TypeComponent.PROPULSION_DRIVE:
                 if isinstance(component, (ElectricComponent, SerialSystemElectric)):
                     self.propulsion_drives.append(component)
                 else:
                     raise TypeError(
-                        "The component was specified to be propulsion drive but is not a ElectricComponent or SerialSystemElectric insetance"
+                        "The component was specified to be propulsion drive but is not a"
+                        " ElectricComponent or SerialSystemElectric insetance"
                     )
                 component2switchboard.append(component.switchboard_id)
             elif component.type == TypeComponent.PTI_PTO_SYSTEM:
@@ -301,7 +304,8 @@ class ElectricPowerSystem(MachinerySystem):
                     self.energy_storage.append(component)
                 else:
                     raise TypeError(
-                        "The component was specified to be energy storage but is not an instance of Battery, BatterySystem, SuperCapacitor, SuperCapacitorSystem"
+                        "The component was specified to be energy storage but is not an instance of"
+                        " Battery, BatterySystem, SuperCapacitor, SuperCapacitorSystem"
                     )
                 component2switchboard.append(component.switchboard_id)
                 energy_storage2switchboard.append(component.switchboard_id)
@@ -310,7 +314,8 @@ class ElectricPowerSystem(MachinerySystem):
                     self.other_load.append(component)
                 else:
                     raise TypeError(
-                        "The component was specified to be energy storage but is not an instance of ElectricComponent or SerialSystemElectric"
+                        "The component was specified to be energy storage but is not an instance of"
+                        " ElectricComponent or SerialSystemElectric"
                     )
                 component2switchboard.append(component.switchboard_id)
             else:
@@ -334,7 +339,7 @@ class ElectricPowerSystem(MachinerySystem):
         for s in self.switchboard_id:
             if isinstance(s, int) and s <= 0:
                 raise ConfigurationError(
-                    "The switchboard id should be a positive integer, " "it is: %s" % s
+                    "The switchboard id should be a positive integer, it is: %s" % s
                 )
         self.switchboard_id.sort()
         for swb_id in self.switchboard_id:

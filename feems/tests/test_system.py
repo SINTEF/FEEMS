@@ -1,59 +1,58 @@
 import copy
 import random
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 from unittest import TestCase
 
-from feems.components_model.component_electric import (
-    COGES,
-    ElectricMachine,
-    SerialSystemElectric,
-    Genset,
-    PTIPTO,
-)
-from feems.exceptions import InputError
-from feems.fuel import Fuel, FuelOrigin, TypeFuel, FuelSpecifiedBy
 import numpy as np
-
 from feems.components_model import (
     BasicComponent,
-    MainEngineWithGearBoxForMechanicalPropulsion,
-    MechanicalPropulsionComponent,
-    Engine,
-    ElectricComponent,
-    BatterySystem,
     Battery,
+    BatterySystem,
+    ElectricComponent,
+    Engine,
+    MainEngineWithGearBoxForMechanicalPropulsion,
     MechanicalComponent,
+    MechanicalPropulsionComponent,
+)
+from feems.components_model.component_electric import (
+    COGES,
+    PTIPTO,
+    ElectricMachine,
+    Genset,
+    SerialSystemElectric,
 )
 from feems.components_model.utility import IntegrationMethod
+from feems.exceptions import InputError
+from feems.fuel import Fuel, FuelOrigin, FuelSpecifiedBy, TypeFuel
 from feems.system_model import (
-    ElectricPowerSystem,
     BusId,
-    MechanicalPropulsionSystem,
-    HybridPropulsionSystem,
-    MechanicalPropulsionSystemWithElectricPowerSystem,
-    FuelOption,
+    ElectricPowerSystem,
     FEEMSResultForMachinerySystem,
+    FuelOption,
+    HybridPropulsionSystem,
+    MechanicalPropulsionSystem,
+    MechanicalPropulsionSystemWithElectricPowerSystem,
 )
 from feems.types_for_feems import (
+    EmissionType,
+    EngineCycleType,
+    FEEMSResult,
+    NOxCalculationMethod,
+    Power_kW,
+    Speed_rpm,
     SwbId,
     TypeComponent,
     TypePower,
-    Power_kW,
-    Speed_rpm,
-    FEEMSResult,
-    NOxCalculationMethod,
-    EmissionType,
-    EngineCycleType,
 )
 
 # import os
 from tests.utility import (
     ELECTRIC_MACHINE_EFF_CURVE,
-    create_a_pti_pto,
     create_a_propulsion_drive,
+    create_a_pti_pto,
     create_cogas_system,
-    create_genset_component,
     create_engine_component,
+    create_genset_component,
     create_multi_fuel_characteristics_sample,
 )
 
@@ -593,8 +592,10 @@ class TestElectricPowerSystem(TestCase):
         # Then we will also generate power inputs for power consumer components so that
         # the total power inputs will result in the bus load percentage generated.
         # Set the power for the power consumers from the random percentage of load for each bus
-        sum_power_output_rated_bus = self.power_system_for_diesel_electric_system.get_sum_power_out_rated_buses_by_power_type(
-            TypePower.POWER_CONSUMER
+        sum_power_output_rated_bus = (
+            self.power_system_for_diesel_electric_system.get_sum_power_out_rated_buses_by_power_type(
+                TypePower.POWER_CONSUMER
+            )
         )
         load_perc_power_output_bus = np.random.rand(
             self.no_points_to_test,
@@ -797,9 +798,9 @@ class TestElectricPowerSystem(TestCase):
             else:
                 index_end = self.no_points_to_test
             for swb_id, bus_id in switchboard2bus.items():
-                sum_power_output_power_sources_buses[bus_id][
-                    index_start:index_end
-                ] += sum_power_output_power_sources_switchboards[swb_id][index_start:index_end]
+                sum_power_output_power_sources_buses[bus_id][index_start:index_end] += (
+                    sum_power_output_power_sources_switchboards[swb_id][index_start:index_end]
+                )
         for bus_id in sum_power_output_power_sources_buses:
             self.assertAlmostEqual(
                 np.abs(
@@ -1088,7 +1089,6 @@ class TestMechanicalPropulsionSystemSetup(TestCase):
         self.pti_pto = []
         self.propeller_load = []
         for i in range(self.number_shaft_lines):
-
             shaft_line_id = i + 1
 
             # Generate random number of main engines for each shaft lines (1 ~ 2)
