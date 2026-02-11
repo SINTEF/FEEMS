@@ -1,0 +1,86 @@
+# Changelog
+
+All notable changes to the FEEMS package will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.11.13] - 2024-02-11
+
+### Documentation
+- Added comprehensive README.md with features, installation, and usage examples
+- Created complete API reference documentation (API_REFERENCE.md)
+- Enhanced examples with detailed explanations and context
+- Added shore power example (02_Shore_Power_Example.ipynb)
+- Created shore power guide (SHORE_POWER_GUIDE.md)
+- Updated pyproject.toml with proper metadata for PyPI
+
+### Fixed
+- Various bug fixes and improvements
+
+## [0.11.x] - Previous Releases
+
+### Added
+- Shore power connection components (ShorePowerConnection, ShorePowerConnectionSystem)
+- Battery energy storage support
+- Multi-fuel engine support (EngineDualFuel, EngineMultiFuel)
+- COGAS system support
+- Enhanced emission calculations (FuelEU Maritime, IMO)
+- Time-series simulation capabilities
+- Power Management System integration
+
+### Changed
+- Improved power balance calculation algorithms
+- Enhanced component efficiency calculations
+- Optimized fuel consumption calculations
+
+### Core Features (Existing)
+- Component-based modeling framework
+- Electric power system modeling
+- Mechanical propulsion system modeling
+- Hybrid propulsion support
+- PTI/PTO systems
+- Fuel consumption and emissions calculations
+- Energy balance analysis
+- Load sharing and bus-tie management
+
+## Version History Overview
+
+- **0.11.x**: Current stable release with comprehensive features
+- **0.10.x**: Enhanced emission calculations and FuelEU Maritime support
+- **0.9.x**: Added battery and energy storage support
+- **0.8.x**: Shore power integration
+- **0.7.x**: Multi-fuel engine support
+- **0.6.x**: COGAS system support
+- **0.5.x**: PTI/PTO functionality
+- **0.4.x**: Hybrid propulsion support
+- **0.3.x**: Mechanical propulsion systems
+- **0.2.x**: Electric power system enhancements
+- **0.1.x**: Initial release with basic functionality
+
+## Upgrade Guide
+
+### To 0.11.13
+
+This release is primarily a documentation update with no breaking API changes. All existing code should work without modifications.
+
+**What's New**:
+- Comprehensive documentation for easier onboarding
+- More examples and use cases
+- API reference for developers
+
+**No Action Required**: Existing code remains compatible.
+
+## Contributing
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines on contributing to FEEMS.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/SINTEF/FEEMS/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/SINTEF/FEEMS/discussions)
+- **Email**: kevin.koosup.yum@gmail.com
