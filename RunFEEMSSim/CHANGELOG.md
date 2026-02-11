@@ -5,6 +5,18 @@ All notable changes to the RunFeemsSim package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.2.6...RunFeemsSim-v0.3.0) (2026-02-11)
+
+
+### Features
+
+* add py.typed to packages ([6267bcd](https://github.com/SINTEF/FEEMS/commit/6267bcdbab3b25a6697b97c7b5d96a6a533b6896))
+
+
+### Documentation
+
+* add comprehensive documentation for PyPI publication ([d8a55ca](https://github.com/SINTEF/FEEMS/commit/d8a55cab4152d3bfc4602d0918e4dfbb06e70d70))
+
 ## [0.2.6] - 2024-02-11
 
 ### Changed
