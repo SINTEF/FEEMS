@@ -1,15 +1,15 @@
 name: Publish Python 🐍 distribution 📦 to PyPI for RunFeemsSim
 
 on:
-  push:
-    branches: ["release"]
-    paths:
-      - "RunFEEMSSim/**"
+  release:
+    types: [published]
 
 jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
+    # Only build and publish if the release tag is for RunFEEMSSim
+    if: startsWith(github.event.release.tag_name, 'RunFEEMSSim-v')
 
     steps:
       - uses: actions/checkout@v4
