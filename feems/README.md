@@ -357,8 +357,7 @@ If you use FEEMS in your research, please cite:
   title = {FEEMS: Fuel, Emissions, Energy Calculation for Machinery System},
   author = {Yum, Kevin Koosup and contributors},
   year = {2024},
-  url = {https://github.com/SINTEF/FEEMS},
-  version = {0.12.1}
+  url = {https://github.com/SINTEF/FEEMS}
 }
 ```
 

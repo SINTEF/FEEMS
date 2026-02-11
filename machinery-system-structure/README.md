@@ -402,8 +402,7 @@ Licensed under the Apache License 2.0 - see LICENSE file for details.
   title = {MachSysS: Machinery System Structure},
   author = {Yum, Kevin Koosup and contributors},
   year = {2024},
-  url = {https://github.com/SINTEF/FEEMS},
-  version = {0.8.1}
+  url = {https://github.com/SINTEF/FEEMS}
 }
 ```
 

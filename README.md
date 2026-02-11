@@ -16,9 +16,9 @@ The FEEMS ecosystem enables accurate calculation of fuel consumption, emissions,
 
 | Package | Version | Description | License |
 |---------|---------|-------------|---------|
-| **[feems](feems/)** | 0.12.1 | Core modeling framework for marine power systems | MIT |
-| **[MachSysS](machinery-system-structure/)** | 0.8.1 | Protocol Buffer definitions and data conversion | Apache-2.0 |
-| **[RunFeemsSim](RunFEEMSSim/)** | 0.3.1 | High-level simulation interface with PMS logic | Apache-2.0 |
+| **[feems](feems/)** | [![PyPI](https://img.shields.io/pypi/v/feems?label=PyPI)](https://pypi.org/project/feems/) | Core modeling framework for marine power systems | MIT |
+| **[MachSysS](machinery-system-structure/)** | [![PyPI](https://img.shields.io/pypi/v/MachSysS?label=PyPI)](https://pypi.org/project/MachSysS/) | Protocol Buffer definitions and data conversion | Apache-2.0 |
+| **[RunFeemsSim](RunFEEMSSim/)** | [![PyPI](https://img.shields.io/pypi/v/RunFeemsSim?label=PyPI)](https://pypi.org/project/RunFeemsSim/) | High-level simulation interface with PMS logic | Apache-2.0 |
 
 ### Package Relationships
 
@@ -32,15 +32,13 @@ The FEEMS ecosystem enables accurate calculation of fuel consumption, emissions,
            │                       │
     ┌──────▼──────┐         ┌─────▼────────┐
     │ RunFeemsSim │         │  MachSysS    │
-    │  (v0.3.1)   │◄────────┤  (v0.8.1)    │
-    │ Simulation  │         │ Data Exchange│
+    │ Simulation  │◄────────┤ Data Exchange│
     └──────┬──────┘         └─────┬────────┘
            │                       │
            │      ┌───────────────┘
            │      │
         ┌──▼──────▼──┐
         │   feems     │
-        │  (v0.12.1)  │
         │ Core Engine │
         └─────────────┘
 ```
@@ -519,9 +517,9 @@ This work has been supported by various research projects and industry collabora
 
 ## 📈 Project Status
 
-- **feems**: Stable (v0.12.1)
-- **MachSysS**: Stable (v0.8.1)
-- **RunFeemsSim**: Pre-Alpha (v0.3.1)
+- **feems**: Stable [![PyPI](https://img.shields.io/pypi/v/feems?label=PyPI)](https://pypi.org/project/feems/)
+- **MachSysS**: Stable [![PyPI](https://img.shields.io/pypi/v/MachSysS?label=PyPI)](https://pypi.org/project/MachSysS/)
+- **RunFeemsSim**: Pre-Alpha [![PyPI](https://img.shields.io/pypi/v/RunFeemsSim?label=PyPI)](https://pypi.org/project/RunFeemsSim/)
 
 ### Roadmap
 
@@ -538,8 +536,7 @@ If you use FEEMS in your research or publications, please cite:
   author = {Yum, Kevin Koosup and contributors},
   year = {2024},
   organization = {SINTEF Ocean},
-  url = {https://github.com/SINTEF/FEEMS},
-  version = {0.12.1}
+  url = {https://github.com/SINTEF/FEEMS}
 }
 ```
 
