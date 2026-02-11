@@ -158,35 +158,134 @@ print(f"Total CO2: {result.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_g
 
 ### Component Hierarchy
 
+FEEMS uses a component-based modeling approach where complex systems are built from individual components.
+
+**Base Classes:**
 ```
-BasicComponent (abstract)
+Component (abstract base)
+├── BasicComponent
+│   ├── ElectricComponent
+│   │   ├── ElectricMachine (Generator/Motor)
+│   │   ├── Battery
+│   │   ├── BatterySystem
+│   │   ├── FuelCell
+│   │   ├── FuelCellSystem
+│   │   ├── ShorePowerConnection
+│   │   ├── ShorePowerConnectionSystem
+│   │   ├── SuperCapacitor
+│   │   ├── SuperCapacitorSystem
+│   │   └── MechanicalPropulsionComponent (Propeller, Gearbox, Clutch)
+│   │
+│   ├── SerialSystem (composite components)
+│   │   ├── SerialSystemElectric
+│   │   │   ├── PTIPTO (Power Take In/Power Take Off)
+│   │   │   └── PropulsionDrive (Converter chain + Motor)
+│   │   └── COGAS (Combined Gas and Steam)
+│   │
+│   └── COGES (Combined Gas and Electric System)
+│
 ├── Engine
-│   ├── EngineDualFuel
-│   ├── EngineMultiFuel
-│   └── MainEngineForMechanicalPropulsion
-├── ElectricComponent
-│   ├── ElectricMachine (Generator/Motor)
-│   ├── Battery
-│   ├── ShorePowerConnection
-│   └── Converter/Transformer
-└── SerialSystem (composite)
-    ├── Genset (Engine + Generator)
-    ├── PropulsionDrive (Transformer + Rectifier + Inverter + Motor)
-    └── COGAS (Gas Turbine + Steam Turbine)
+│   ├── EngineDualFuel (e.g., Diesel/Gas)
+│   └── EngineMultiFuel (multiple fuel options)
+│
+├── MainEngineForMechanicalPropulsion
+│   └── MainEngineWithGearBoxForMechanicalPropulsion
+│
+└── Genset (Engine + Generator composite)
 ```
 
 ### System Structure
 
+FEEMS supports three main system configurations:
+
+#### 1. Electric Power System
+
+For diesel-electric and hybrid electric propulsion:
+
 ```
 ElectricPowerSystem
-├── Switchboards (electrical buses)
-├── Power Sources (gensets, shore power, batteries)
-├── Propulsion Drives (electric motors with converters)
-├── Other Loads (auxiliary loads)
-├── PTI/PTO Systems
-├── Energy Storage
-└── Bus-Tie Breakers (inter-bus connections)
+│
+├── Switchboard 1 (electrical bus)
+│   ├── Power Sources
+│   │   ├── Genset (Engine + Generator)
+│   │   ├── FuelCellSystem
+│   │   ├── ShorePowerConnection
+│   │   └── COGES
+│   ├── Energy Storage
+│   │   ├── Battery / BatterySystem
+│   │   └── SuperCapacitor / SuperCapacitorSystem
+│   ├── Propulsion Drives
+│   │   └── SerialSystemElectric (Converters + Motor)
+│   ├── PTI/PTO Systems
+│   │   └── PTIPTO (shaft generator/motor)
+│   └── Other Loads
+│       └── ElectricComponent (hotel, auxiliary loads)
+│
+├── Switchboard 2 (electrical bus)
+│   └── [same structure as Switchboard 1]
+│
+└── Bus-Tie Breakers
+    └── BusBreaker (connects Switchboard 1 ↔ Switchboard 2)
 ```
+
+**Key Features:**
+- Multiple switchboards with independent or connected operation
+- Automatic load sharing among power sources
+- Battery/shore power integration
+- Bus-tie breakers for switchboard coupling
+
+#### 2. Mechanical Propulsion System
+
+For conventional mechanical propulsion:
+
+```
+MechanicalPropulsionSystem
+│
+├── ShaftLine 1
+│   ├── Main Engine
+│   │   └── MainEngineForMechanicalPropulsion
+│   │       └── MainEngineWithGearBoxForMechanicalPropulsion
+│   ├── PTI/PTO (optional)
+│   │   └── PTIPTO (connects to electric system)
+│   └── Mechanical Loads
+│       ├── Propeller
+│       ├── Gearbox
+│       └── Clutch
+│
+└── ShaftLine 2
+    └── [same structure as ShaftLine 1]
+```
+
+**Key Features:**
+- Multiple independent shaftlines
+- Optional PTI/PTO for hybrid operation
+- Main engine with or without gearbox
+
+#### 3. Hybrid System (Mechanical + Electric)
+
+For vessels with both mechanical propulsion and electric auxiliary power:
+
+```
+MechanicalPropulsionSystemWithElectricPowerSystem
+│
+├── MechanicalPropulsionSystem
+│   └── ShaftLine(s)
+│       ├── Main Engine(s)
+│       ├── PTI/PTO (optional, connects to electric side)
+│       └── Propeller(s)
+│
+└── ElectricPowerSystem
+    └── Switchboard(s)
+        ├── Genset(s) (auxiliary power)
+        ├── Shore Power
+        └── Hotel/Auxiliary Loads
+```
+
+**Key Features:**
+- Independent mechanical propulsion
+- Separate electric system for auxiliaries
+- PTI/PTO coupling between systems
+- Full PTI mode for boost propulsion power
 
 ## Real-World Applications
 
