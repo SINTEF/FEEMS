@@ -1,15 +1,14 @@
 name: Publish Python 🐍 distribution 📦 to PyPI for MachSysS
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'MachSysS-v*'
 
 jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
-    # Only build and publish if the release tag is for MachSysS
-    if: startsWith(github.event.release.tag_name, 'machinery-system-structure-v')
 
     steps:
       - uses: actions/checkout@v4

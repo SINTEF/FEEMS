@@ -1,15 +1,14 @@
 name: Publish Python 🐍 distribution 📦 to PyPI for FEEMS
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'feems-v*'
 
 jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
-    # Only build and publish if the release tag is for feems
-    if: startsWith(github.event.release.tag_name, 'feems-v')
 
     steps:
       - uses: actions/checkout@v4
