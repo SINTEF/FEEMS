@@ -8,7 +8,7 @@ jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
-    # Only build and publish if the release tag is for RunFeemsSim
+    # Only build and publish if the release tag is for RunFEEMSSim
     if: startsWith(github.event.release.tag_name, 'RunFEEMSSim-v')
 
     steps:
