@@ -14,6 +14,7 @@ dependencies = ["pandas>=2.1.1", "scipy>=1.11.2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["feems"]
+artifacts = ["feems/package_data/*.csv", "feems/package_data/*.xlsx"]
 
 [dependency-groups]
 dev = [
