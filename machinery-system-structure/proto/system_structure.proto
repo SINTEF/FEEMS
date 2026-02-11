@@ -317,6 +317,9 @@ message Subsystem {
   uint32 base_load_order = 21; // The order of the power source in the base load calculation. 1 is the primary base load, 2 is the secondary base load, etc.
   string uid = 22;
   MultiFuelEngine multi_fuel_engine = 23;
+  double start_delay_s = 24;
+  double turn_off_power_kw = 25;
+  double power_minimum_specific = 26;
 }
 
 message Switchboard {

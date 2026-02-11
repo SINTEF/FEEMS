@@ -7,11 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-02-11
+
 ### Security
 - **CRITICAL**: Updated protobuf from 4.21.12 to 5.29.6 to fix security vulnerabilities
   - CVE-2025-4565: Critical vulnerability in Protocol Buffers
   - CVE-2026-0994: Critical vulnerability in Protocol Buffers
 - All tests pass with updated protobuf version (backward compatible upgrade)
+
+### Added
+- Subsystem fields: `start_delay_s`, `turn_off_power_kw`, `power_minimum_specific`
+
+### Changed
+- Regenerated protobuf Python bindings after schema updates
+- Version bump to 0.7.9
+
+### Removed
+- Removed legacy `build_package.sh` script
+
+### Documentation
+- Updated MachSysS version references to 0.7.9
 
 ## [0.7.7] - 2024-02-11
 
@@ -76,23 +91,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Upgrade Guide
 
-### To 0.7.7
+### To 0.7.9
 
-This release is primarily a documentation update with no breaking API changes. All existing code should work without modifications.
+This release updates protobuf to 5.29.6 to address critical security issues, with no breaking API changes. All existing code should work without modifications.
 
 **What's New**:
-- Comprehensive documentation for easier integration
-- More examples for common use cases
-- Better understanding of protobuf schemas
+- Security fixes via protobuf runtime upgrade
+- Verified compatibility with existing APIs
 
 **No Action Required**: Existing code remains compatible.
 
 ### Protobuf Compatibility
 
-MachSysS uses Protocol Buffers ~4.21.12. If you regenerate Python bindings from `.proto` files, ensure you use a compatible `protoc` version:
+MachSysS uses Protocol Buffers 5.29.6. If you regenerate Python bindings from `.proto` files, ensure you use a compatible `protoc` version:
 
 ```bash
-protoc --version  # Should be 3.x or 4.x
+protoc --version  # Should be 5.x
 ./compile_proto.sh
 ```
 
