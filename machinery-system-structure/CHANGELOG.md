@@ -5,6 +5,14 @@ All notable changes to the MachSysS (Machinery System Structure) package will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **CRITICAL**: Updated protobuf from 4.21.12 to 5.29.6 to fix security vulnerabilities
+  - CVE-2025-4565: Critical vulnerability in Protocol Buffers
+  - CVE-2026-0994: Critical vulnerability in Protocol Buffers
+- All tests pass with updated protobuf version (backward compatible upgrade)
+
 ## [0.7.7] - 2024-02-11
 
 ### Documentation

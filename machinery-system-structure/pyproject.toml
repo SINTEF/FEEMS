@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
 ]
-dependencies = ['protobuf~=4.21.12']
+dependencies = ['protobuf>=5.29.6,<6']
 
 [project.urls]
 Repository = "https://github.com/SINTEF/FEEMS"
