@@ -16,9 +16,9 @@ The FEEMS ecosystem enables accurate calculation of fuel consumption, emissions,
 
 | Package | Version | Description | License |
 |---------|---------|-------------|---------|
-| **[feems](feems/)** | 0.11.13 | Core modeling framework for marine power systems | MIT |
-| **[MachSysS](machinery-system-structure/)** | 0.7.9 | Protocol Buffer definitions and data conversion | Apache-2.0 |
-| **[RunFeemsSim](RunFEEMSSim/)** | 0.2.6 | High-level simulation interface with PMS logic | Apache-2.0 |
+| **[feems](feems/)** | 0.12.1 | Core modeling framework for marine power systems | MIT |
+| **[MachSysS](machinery-system-structure/)** | 0.8.1 | Protocol Buffer definitions and data conversion | Apache-2.0 |
+| **[RunFeemsSim](RunFEEMSSim/)** | 0.3.1 | High-level simulation interface with PMS logic | Apache-2.0 |
 
 ### Package Relationships
 
@@ -32,7 +32,7 @@ The FEEMS ecosystem enables accurate calculation of fuel consumption, emissions,
            │                       │
     ┌──────▼──────┐         ┌─────▼────────┐
     │ RunFeemsSim │         │  MachSysS    │
-    │  (v0.2.6)   │◄────────┤  (v0.7.9)    │
+    │  (v0.3.1)   │◄────────┤  (v0.8.1)    │
     │ Simulation  │         │ Data Exchange│
     └──────┬──────┘         └─────┬────────┘
            │                       │
@@ -40,7 +40,7 @@ The FEEMS ecosystem enables accurate calculation of fuel consumption, emissions,
            │      │
         ┌──▼──────▼──┐
         │   feems     │
-        │  (v0.11.13) │
+        │  (v0.12.1)  │
         │ Core Engine │
         └─────────────┘
 ```
@@ -519,9 +519,9 @@ This work has been supported by various research projects and industry collabora
 
 ## 📈 Project Status
 
-- **feems**: Stable (v0.11.13)
-- **MachSysS**: Stable (v0.7.9)
-- **RunFeemsSim**: Pre-Alpha (v0.2.6)
+- **feems**: Stable (v0.12.1)
+- **MachSysS**: Stable (v0.8.1)
+- **RunFeemsSim**: Pre-Alpha (v0.3.1)
 
 ### Roadmap
 
@@ -539,7 +539,7 @@ If you use FEEMS in your research or publications, please cite:
   year = {2024},
   organization = {SINTEF Ocean},
   url = {https://github.com/SINTEF/FEEMS},
-  version = {0.11.13}
+  version = {0.12.1}
 }
 ```
 

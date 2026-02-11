@@ -358,7 +358,7 @@ If you use FEEMS in your research, please cite:
   author = {Yum, Kevin Koosup and contributors},
   year = {2024},
   url = {https://github.com/SINTEF/FEEMS},
-  version = {0.11.13}
+  version = {0.12.1}
 }
 ```
 
