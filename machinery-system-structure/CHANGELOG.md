@@ -5,6 +5,14 @@ All notable changes to the MachSysS (Machinery System Structure) package will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.9.2...MachSysS-v0.9.3) (2026-02-11)
+
+
+### Bug Fixes
+
+* updated publish ([cefd41c](https://github.com/SINTEF/FEEMS/commit/cefd41cade63c4f85064507c232e7c6263def9e6))
+* updated publish ([17494b8](https://github.com/SINTEF/FEEMS/commit/17494b8ffae95f8ae7afbf0e4f8cafe2ac598e7f))
+
 ## [0.9.2](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.9.1...MachSysS-v0.9.2) (2026-02-11)
 
 
