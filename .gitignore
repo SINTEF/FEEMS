@@ -10,3 +10,7 @@ dist
 /feems.egg-info/
 .DS_Store
 *.egg-info/
+.claude/
+.ruff_cache/
+.pytest_cache/
+.vscode/

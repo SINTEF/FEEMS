@@ -1,0 +1,93 @@
+[
+  {
+    "name": "Aux engine 1",
+    "component": "Auxiliary engine 700",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "Generator 1"
+  },
+  {
+    "name": "Aux engine 2",
+    "component": "Auxiliary engine 1000",
+    "switchboard_id": 2,
+    "shaftline_id": null,
+    "connected_to": "Generator 2"
+  },
+  {
+    "name": "Generator 1",
+    "component": "Generator A",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "switchboard"
+  },
+  {
+    "name": "Generator 2",
+    "component": "Generator B",
+    "switchboard_id": 2,
+    "shaftline_id": null,
+    "connected_to": "switchboard"
+  },
+  {
+    "name": "Thruster motor 1",
+    "component": "Electric Motor A",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "Inverter 1"
+  },
+  {
+    "name": "Thruster motor 2",
+    "component": "Electric Motor B",
+    "switchboard_id": 2,
+    "shaftline_id": null,
+    "connected_to": "Inverter 2"
+  },
+  {
+    "name": "Inverter 1",
+    "component": "Inverter",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "Rectifier 1"
+  },
+  {
+    "name": "Inverter 2",
+    "component": "Inverter",
+    "switchboard_id": 2,
+    "shaftline_id": null,
+    "connected_to": "Rectifier 2"
+  },
+  {
+    "name": "Rectifier 1",
+    "component": "Active Front End Rectifier",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "Transformer 1"
+  },
+  {
+    "name": "Rectifier 2",
+    "component": "Active Front End Rectifier",
+    "switchboard_id": 2,
+    "shaftline_id": null,
+    "connected_to": "Transformer 2"
+  },
+  {
+    "name": "Transformer 1",
+    "component": "Transformer",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "switchboard"
+  },
+  {
+    "name": "Transformer 2",
+    "component": "Transformer",
+    "switchboard_id": 2,
+    "shaftline_id": null,
+    "connected_to": "switchboard"
+  },
+  {
+    "name": "Aux load",
+    "component": "Auxiliary Load",
+    "switchboard_id": 1,
+    "shaftline_id": null,
+    "connected_to": "switchboard"
+  }
+]

@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "feems"
 version = "0.11.13"
 description = ""
-readme = "readme.md"
+readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "Kevin Koosup Yum", email = "kevin.koosup.yum@gmail.com" }]
@@ -14,6 +14,7 @@ dependencies = ["pandas>=2.1.1", "scipy>=1.11.2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["feems"]
+artifacts = ["feems/package_data/*.csv", "feems/package_data/*.xlsx"]
 
 [dependency-groups]
 dev = [

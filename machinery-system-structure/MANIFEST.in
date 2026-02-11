@@ -1,5 +1,0 @@
-include LICENSE
-include CONTRIBUTING.md
-include README.md
-graft proto
-recursive-exclude * __pycache__
