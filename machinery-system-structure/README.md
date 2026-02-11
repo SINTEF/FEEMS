@@ -371,7 +371,7 @@ uv run ruff format machinery-system-structure/
 ## Requirements
 
 - Python ≥ 3.10
-- protobuf ~= 4.21.12
+- protobuf >= 5.29.6, < 6
 - feems (for conversion utilities)
 - pandas (for time-series conversion)
 
@@ -403,7 +403,7 @@ Licensed under the Apache License 2.0 - see LICENSE file for details.
   author = {Yum, Kevin Koosup and contributors},
   year = {2024},
   url = {https://github.com/SINTEF/FEEMS},
-  version = {0.7.9}
+  version = {0.8.1}
 }
 ```
 

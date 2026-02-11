@@ -526,7 +526,7 @@ Licensed under the Apache License 2.0 - see LICENSE file for details.
   author = {Yum, Kevin Koosup and contributors},
   year = {2024},
   url = {https://github.com/SINTEF/FEEMS},
-  version = {0.2.6}
+    version = {0.3.1}
 }
 ```
 
