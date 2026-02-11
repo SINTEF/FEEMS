@@ -1,5 +1,5 @@
 {
-  "feems": "0.11.13",
-  "machinery-system-structure": "0.7.9",
-  "RunFEEMSSim": "0.2.6"
+  "feems": "0.12.0",
+  "machinery-system-structure": "0.8.0",
+  "RunFEEMSSim": "0.3.0"
 }
