@@ -5,6 +5,25 @@ All notable changes to the FEEMS package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.12.1...feems-v0.13.0) (2026-02-11)
+
+
+### Features
+
+* Add available_fuel_options_by_converter property ([1badf62](https://github.com/SINTEF/FEEMS/commit/1badf626fb9f01aceb8cc9ec2bd0e426f8d9d7d3))
+* Add available_fuel_options_by_converter property ([ecd0eba](https://github.com/SINTEF/FEEMS/commit/ecd0ebaae15adbd12660a67ba0b728b973ef6332))
+
+
+### Bug Fixes
+
+* Add ShorePower to ElectricPowerSystem ([#50](https://github.com/SINTEF/FEEMS/issues/50)) ([28d5cff](https://github.com/SINTEF/FEEMS/commit/28d5cff88e6d866ec3c20024083f5568892b4097))
+
+
+### Documentation
+
+* add comprehensive documentation for PyPI publication ([d8a55ca](https://github.com/SINTEF/FEEMS/commit/d8a55cab4152d3bfc4602d0918e4dfbb06e70d70))
+* improve feems architecture documentation ([8ec3d3a](https://github.com/SINTEF/FEEMS/commit/8ec3d3aeb1bd0145aee96f6fc8b8e00818413fd2))
+
 ## [0.12.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.11.13...feems-v0.12.0) (2026-02-11)
 
 
