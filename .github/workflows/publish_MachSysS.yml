@@ -9,7 +9,8 @@ jobs:
     name: Build distribution 📦
     runs-on: ubuntu-latest
     # Only build and publish if the release tag is for MachSysS
-    if: startsWith(github.event.release.tag_name, 'machinery-system-structure-v')
+    if: |
+      startsWith(github.event.release.tag_name, 'machinery-system-structure-v')
 
     steps:
       - uses: actions/checkout@v4
