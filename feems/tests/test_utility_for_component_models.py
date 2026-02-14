@@ -1,6 +1,8 @@
 import unittest
 
-from feems.components_model.utility import *
+import numpy as np
+from feems.components_model.utility import get_list_random_distribution_numbers_for_total_number
+from feems.exceptions import InputError
 
 
 class TestUtility(unittest.TestCase):

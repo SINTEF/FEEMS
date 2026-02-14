@@ -1,47 +1,59 @@
 import copy
-import pprint
 import random
-from typing import List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 from unittest import TestCase
 
-from feems.components_model.component_electric import (
-    COGES,
-    ElectricMachine,
-    SerialSystemElectric,
-)
-from feems.components_model.component_mechanical import COGAS
-from feems.fuel import Fuel, FuelConsumption
 import numpy as np
-
 from feems.components_model import (
     BasicComponent,
-    MainEngineWithGearBoxForMechanicalPropulsion,
-    MechanicalPropulsionComponent,
-    Engine,
-    ElectricComponent,
-    BatterySystem,
     Battery,
+    BatterySystem,
+    ElectricComponent,
+    Engine,
+    MainEngineWithGearBoxForMechanicalPropulsion,
+    MechanicalComponent,
+    MechanicalPropulsionComponent,
+)
+from feems.components_model.component_electric import (
+    COGES,
+    PTIPTO,
+    ElectricMachine,
+    Genset,
+    SerialSystemElectric,
 )
 from feems.components_model.utility import IntegrationMethod
-from feems.system_model import ElectricPowerSystem, BusId, MechanicalPropulsionSystem
+from feems.exceptions import InputError
+from feems.fuel import Fuel, FuelOrigin, FuelSpecifiedBy, TypeFuel
+from feems.system_model import (
+    BusId,
+    ElectricPowerSystem,
+    FEEMSResultForMachinerySystem,
+    FuelOption,
+    HybridPropulsionSystem,
+    MechanicalPropulsionSystem,
+    MechanicalPropulsionSystemWithElectricPowerSystem,
+)
 from feems.types_for_feems import (
+    EmissionType,
+    EngineCycleType,
+    FEEMSResult,
+    NOxCalculationMethod,
+    Power_kW,
+    Speed_rpm,
     SwbId,
     TypeComponent,
     TypePower,
-    Power_kW,
-    Speed_rpm,
-    FEEMSResult,
-    NOxCalculationMethod,
-    EmissionType,
 )
 
 # import os
 from tests.utility import (
     ELECTRIC_MACHINE_EFF_CURVE,
-    create_a_pti_pto,
     create_a_propulsion_drive,
+    create_a_pti_pto,
     create_cogas_system,
+    create_engine_component,
     create_genset_component,
+    create_multi_fuel_characteristics_sample,
 )
 
 random.seed(10)
@@ -127,9 +139,7 @@ class TestElectricPowerSystem(TestCase):
         no_of_genset_per_switchboard_diesel_electric = 2
         self.no_gensets_for_conventional = int(np.round(np.random.rand() * 3)) + 1
         self.no_gensets_for_hybrid = int(np.round(np.random.rand() * 3)) + 1
-        self.no_gensets_for_diesel_electric = (
-            int(np.round(np.random.rand() * 3)) + 2
-        ) * 2
+        self.no_gensets_for_diesel_electric = (int(np.round(np.random.rand() * 3)) + 2) * 2
         self.rated_power_aux_engine = Power_kW(2700)
         self.rated_power_generator = Power_kW(2500)
         self.rated_speed_genset = Speed_rpm(1500)
@@ -141,9 +151,7 @@ class TestElectricPowerSystem(TestCase):
             efficiency_curve_for_generator_motor,
             no_of_genset_per_switchboard,
         )
-        self.no_switchboard_conventional = self.gensets_for_conventional[
-            -1
-        ].switchboard_id
+        self.no_switchboard_conventional = self.gensets_for_conventional[-1].switchboard_id
         self.gensets_for_hybrid = TestElectricPowerSystem.get_gensets(
             self.no_gensets_for_hybrid,
             self.rated_power_generator,
@@ -161,9 +169,7 @@ class TestElectricPowerSystem(TestCase):
             efficiency_curve_for_generator_motor,
             no_of_genset_per_switchboard_diesel_electric,
         )
-        self.no_switchboard_diesel_electric = self.gensets_for_diesel_electric[
-            -1
-        ].switchboard_id
+        self.no_switchboard_diesel_electric = self.gensets_for_diesel_electric[-1].switchboard_id
 
         # PTI PTO
         self.no_pti_pto = 1
@@ -212,29 +218,23 @@ class TestElectricPowerSystem(TestCase):
         self.switchboard_id_thrusters_for_diesel_electric = np.arange(
             1, self.no_switchboard_diesel_electric + 1
         ).tolist()
-        self.propulsion_drives_for_hybrid = (
-            TestElectricPowerSystem.get_propulsion_drives(
-                self.no_thruster,
-                self.rated_power_thruster,
-                self.rated_speed_thruster,
-                self.switchboard_id_thrusters_for_hybrid,
-            )
+        self.propulsion_drives_for_hybrid = TestElectricPowerSystem.get_propulsion_drives(
+            self.no_thruster,
+            self.rated_power_thruster,
+            self.rated_speed_thruster,
+            self.switchboard_id_thrusters_for_hybrid,
         )
-        self.propulsion_drives_for_conventional = (
-            TestElectricPowerSystem.get_propulsion_drives(
-                self.no_thruster,
-                self.rated_power_thruster,
-                self.rated_speed_thruster,
-                self.switchboard_id_thrusters_for_conventional,
-            )
+        self.propulsion_drives_for_conventional = TestElectricPowerSystem.get_propulsion_drives(
+            self.no_thruster,
+            self.rated_power_thruster,
+            self.rated_speed_thruster,
+            self.switchboard_id_thrusters_for_conventional,
         )
-        self.propulsion_drives_for_diesel_electric = (
-            TestElectricPowerSystem.get_propulsion_drives(
-                self.no_thruster_diesel_electric,
-                self.rated_power_thruster,
-                self.rated_speed_thruster,
-                self.switchboard_id_thrusters_for_diesel_electric,
-            )
+        self.propulsion_drives_for_diesel_electric = TestElectricPowerSystem.get_propulsion_drives(
+            self.no_thruster_diesel_electric,
+            self.rated_power_thruster,
+            self.rated_speed_thruster,
+            self.switchboard_id_thrusters_for_diesel_electric,
         )
 
         # Other load
@@ -421,9 +421,7 @@ class TestElectricPowerSystem(TestCase):
             self.power_system_for_conventional_system.bus_tie_breakers
         ):
             for switchboard_id in bus_tie_breaker.switchboard_ids:
-                self.assertTrue(
-                    switchboard_id in self.bus_tie_connections_conventional[i]
-                )
+                self.assertTrue(switchboard_id in self.bus_tie_connections_conventional[i])
 
         # Test for the hybrid system
         # # Check if the components are all included in the system
@@ -504,9 +502,7 @@ class TestElectricPowerSystem(TestCase):
             self.power_system_for_diesel_electric_system.bus_tie_breakers
         ):
             for switchboard_id in bus_tie_breaker.switchboard_ids:
-                self.assertTrue(
-                    switchboard_id in self.bus_tie_connections_diesel_electric[i]
-                )
+                self.assertTrue(switchboard_id in self.bus_tie_connections_diesel_electric[i])
 
     def test_power_balance_calculation(self):
         if self.power_balance_test_complete:
@@ -543,9 +539,7 @@ class TestElectricPowerSystem(TestCase):
             switch2bus_configuration.append([])
             while True:
                 switch2bus_configuration[i] = [1]
-                for j in range(
-                    self.power_system_for_diesel_electric_system.no_switchboard - 1
-                ):
+                for j in range(self.power_system_for_diesel_electric_system.no_switchboard - 1):
                     bus_tie_configuration_at_change[i, j] = bool(random.getrandbits(1))
                     switch2bus_configuration[i].append(
                         int(not (bus_tie_configuration_at_change[i, j]))
@@ -566,9 +560,7 @@ class TestElectricPowerSystem(TestCase):
                         * 1
                         / no_different_bus_tie_configuration
                         * self.no_points_to_test
-                        + (i - 1)
-                        * self.no_points_to_test
-                        / no_different_bus_tie_configuration
+                        + (i - 1) * self.no_points_to_test / no_different_bus_tie_configuration
                     )
                     if index_next != index_bus_config_change[i - 1]:
                         index_bus_config_change.append(index_next)
@@ -578,12 +570,8 @@ class TestElectricPowerSystem(TestCase):
                     index_bus_config_change[i - 1] : index_bus_config_change[i], :
                 ] = bus_tie_configuration_at_change[i - 1, :]
         # noinspection PyUnboundLocalVariable
-        bus_tie_configuration[index_bus_config_change[i] :] = (
-            bus_tie_configuration_at_change[i]
-        )
-        self.power_system_for_diesel_electric_system.set_bus_tie_status_all(
-            bus_tie_configuration
-        )
+        bus_tie_configuration[index_bus_config_change[i] :] = bus_tie_configuration_at_change[i]
+        self.power_system_for_diesel_electric_system.set_bus_tie_status_all(bus_tie_configuration)
         self.assertEqual(
             self.power_system_for_diesel_electric_system.bus_configuration_change_index,
             index_bus_config_change,
@@ -604,8 +592,10 @@ class TestElectricPowerSystem(TestCase):
         # Then we will also generate power inputs for power consumer components so that
         # the total power inputs will result in the bus load percentage generated.
         # Set the power for the power consumers from the random percentage of load for each bus
-        sum_power_output_rated_bus = self.power_system_for_diesel_electric_system.get_sum_power_out_rated_buses_by_power_type(
-            TypePower.POWER_CONSUMER
+        sum_power_output_rated_bus = (
+            self.power_system_for_diesel_electric_system.get_sum_power_out_rated_buses_by_power_type(
+                TypePower.POWER_CONSUMER
+            )
         )
         load_perc_power_output_bus = np.random.rand(
             self.no_points_to_test,
@@ -618,16 +608,15 @@ class TestElectricPowerSystem(TestCase):
         for i, switchboard2bus in enumerate(
             self.power_system_for_diesel_electric_system.switchboard2bus
         ):
-            index_start = self.power_system_for_diesel_electric_system.bus_configuration_change_index[
-                i
-            ]
-            if (
-                i + 1
-                < self.power_system_for_diesel_electric_system.no_bus_configuration_change
-            ):
-                index_end = self.power_system_for_diesel_electric_system.bus_configuration_change_index[
-                    i + 1
-                ]
+            index_start = (
+                self.power_system_for_diesel_electric_system.bus_configuration_change_index[i]
+            )
+            if i + 1 < self.power_system_for_diesel_electric_system.no_bus_configuration_change:
+                index_end = (
+                    self.power_system_for_diesel_electric_system.bus_configuration_change_index[
+                        i + 1
+                    ]
+                )
             else:
                 index_end = self.no_points_to_test
             for _, bus_id in switchboard2bus.items():
@@ -641,9 +630,7 @@ class TestElectricPowerSystem(TestCase):
             _,
             switchboard,
         ) in self.power_system_for_diesel_electric_system.switchboards.items():
-            for component in switchboard.component_by_power_type[
-                TypePower.POWER_CONSUMER.value
-            ]:
+            for component in switchboard.component_by_power_type[TypePower.POWER_CONSUMER.value]:
                 first_loading = True
                 for i, switchboard2bus in enumerate(
                     self.power_system_for_diesel_electric_system.switchboard2bus
@@ -683,35 +670,33 @@ class TestElectricPowerSystem(TestCase):
                     )
                     first_loading = False
                 sum_power_input += component.power_input
-            sum_power_input_switchboard += (
-                switchboard.get_sum_power_input_by_power_type(TypePower.POWER_CONSUMER)
+            sum_power_input_switchboard += switchboard.get_sum_power_input_by_power_type(
+                TypePower.POWER_CONSUMER
             )
 
         # Test the energy conservation and methods for summing the power input/output for buses
-        sum_power_input_buses_comp_tmp = self.power_system_for_diesel_electric_system.get_sum_power_in_buses_by_power_type(
-            TypePower.POWER_CONSUMER
+        sum_power_input_buses_comp_tmp = (
+            self.power_system_for_diesel_electric_system.get_sum_power_in_buses_by_power_type(
+                TypePower.POWER_CONSUMER
+            )
         )
         sum_power_input_buses_comp = self.sum_bus(sum_power_input_buses_comp_tmp)
 
-        sum_power_output_buses_comp = self.power_system_for_diesel_electric_system.get_sum_power_output_buses_by_power_type(
-            TypePower.POWER_CONSUMER
+        sum_power_output_buses_comp = (
+            self.power_system_for_diesel_electric_system.get_sum_power_output_buses_by_power_type(
+                TypePower.POWER_CONSUMER
+            )
         )
-        self.assertAlmostEqual(
-            np.abs(sum_power_input - sum_power_input_switchboard).sum(), 0
-        )
+        self.assertAlmostEqual(np.abs(sum_power_input - sum_power_input_switchboard).sum(), 0)
         self.assertAlmostEqual(
             np.abs(sum_power_input_switchboard - sum_power_input_buses_comp).sum(), 0
         )
         for bus in sum_power_output_buses:
             # noinspection PyTypeChecker
-            np.array_equal(
-                sum_power_output_buses[bus], sum_power_output_buses_comp[bus]
-            )
+            np.array_equal(sum_power_output_buses[bus], sum_power_output_buses_comp[bus])
             # noinspection PyTypeChecker
             self.assertAlmostEqual(
-                np.abs(
-                    sum_power_output_buses[bus] - sum_power_output_buses_comp[bus]
-                ).sum(),
+                np.abs(sum_power_output_buses[bus] - sum_power_output_buses_comp[bus]).sum(),
                 0,
             )
 
@@ -759,8 +744,10 @@ class TestElectricPowerSystem(TestCase):
                 )
 
         # Sum all the power input for the buses
-        sum_power_input_buses_comp = self.power_system_for_diesel_electric_system.get_sum_power_in_buses_by_power_type(
-            TypePower.POWER_CONSUMER
+        sum_power_input_buses_comp = (
+            self.power_system_for_diesel_electric_system.get_sum_power_in_buses_by_power_type(
+                TypePower.POWER_CONSUMER
+            )
         )
 
         sum_power_input_buses_comp = self.add_bus(
@@ -799,24 +786,21 @@ class TestElectricPowerSystem(TestCase):
         for i, switchboard2bus in enumerate(
             self.power_system_for_diesel_electric_system.switchboard2bus
         ):
-            index_start = self.power_system_for_diesel_electric_system.bus_configuration_change_index[
-                i
-            ]
-            if (
-                i + 1
-                < self.power_system_for_diesel_electric_system.no_bus_configuration_change
-            ):
-                index_end = self.power_system_for_diesel_electric_system.bus_configuration_change_index[
-                    i + 1
-                ]
+            index_start = (
+                self.power_system_for_diesel_electric_system.bus_configuration_change_index[i]
+            )
+            if i + 1 < self.power_system_for_diesel_electric_system.no_bus_configuration_change:
+                index_end = (
+                    self.power_system_for_diesel_electric_system.bus_configuration_change_index[
+                        i + 1
+                    ]
+                )
             else:
                 index_end = self.no_points_to_test
             for swb_id, bus_id in switchboard2bus.items():
-                sum_power_output_power_sources_buses[bus_id][
-                    index_start:index_end
-                ] += sum_power_output_power_sources_switchboards[swb_id][
-                    index_start:index_end
-                ]
+                sum_power_output_power_sources_buses[bus_id][index_start:index_end] += (
+                    sum_power_output_power_sources_switchboards[swb_id][index_start:index_end]
+                )
         for bus_id in sum_power_output_power_sources_buses:
             self.assertAlmostEqual(
                 np.abs(
@@ -856,10 +840,7 @@ class TestElectricPowerSystem(TestCase):
             "Mechanical energy consumption (kJ): %s"
             % result.energy_consumption_mechanical_total_mj
         )
-        print(
-            "Electric energy consumption (kJ): %s"
-            % result.energy_consumption_electric_total_mj
-        )
+        print("Electric energy consumption (kJ): %s" % result.energy_consumption_electric_total_mj)
         print("Running time (s):")
         print("\t" + "Gensets: %s" % result.running_hours_genset_total_hr)
         print("\t" + "Fuel cell: %s" % result.running_hours_fuel_cell_total_hr)
@@ -929,9 +910,7 @@ class TestElectricPowerSystem(TestCase):
 
         electric_system.do_power_balance_calculation()
         self.assertAlmostEqual(
-            np.power(
-                battery_system.power_input + propulsion_drive.power_input, 2
-            ).sum(),
+            np.power(battery_system.power_input + propulsion_drive.power_input, 2).sum(),
             0,
             5,
         )
@@ -1035,10 +1014,8 @@ class TestCOGESSystem(TestCase):
         # Calculate the fuel consumption manually
         cogas_fuel_consumption = 0
         for coges in self.coges:
-            cogas_power_output, _ = (
-                coges.generator.get_power_input_from_bidirectional_output(
-                    coges.power_output
-                )
+            cogas_power_output, _ = coges.generator.get_power_input_from_bidirectional_output(
+                coges.power_output
             )
             cogas_efficiency = coges.cogas.get_efficiency_from_load_percentage(
                 cogas_power_output / coges.cogas.rated_power
@@ -1048,10 +1025,7 @@ class TestCOGESSystem(TestCase):
                 origin=coges.cogas.fuel_origin,
             ).lhv_mj_per_g
             cogas_fuel_consumption_rate = (
-                cogas_power_output
-                / cogas_efficiency
-                / (lhv_fuel_mj_per_g * 1000)
-                / 1000
+                cogas_power_output / cogas_efficiency / (lhv_fuel_mj_per_g * 1000) / 1000
             )
             cogas_fuel_consumption += cogas_fuel_consumption_rate * 3600
 
@@ -1115,7 +1089,6 @@ class TestMechanicalPropulsionSystemSetup(TestCase):
         self.pti_pto = []
         self.propeller_load = []
         for i in range(self.number_shaft_lines):
-
             shaft_line_id = i + 1
 
             # Generate random number of main engines for each shaft lines (1 ~ 2)
@@ -1142,9 +1115,7 @@ class TestMechanicalPropulsionSystemSetup(TestCase):
             self.propeller_load.append(propeller_load)
 
         # noinspection PyTypeChecker
-        self.components = (
-            self.main_engine_component + self.pti_pto + self.propeller_load
-        )
+        self.components = self.main_engine_component + self.pti_pto + self.propeller_load
         # Create a system model
         self.system = MechanicalPropulsionSystem(
             name="Mechanical Propulsion", components_list=self.components
@@ -1160,9 +1131,7 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
             self.assertTrue(
                 component in self.system.component_by_shaft_line_id[shaftline_list[-1]]
             )
-            self.assertTrue(
-                component in self.system.shaft_line[shaftline_list[-1] - 1].components
-            )
+            self.assertTrue(component in self.system.shaft_line[shaftline_list[-1] - 1].components)
 
         # make shaft line list unique
         number_shaft_line_given = len(list(dict.fromkeys(shaftline_list)))
@@ -1198,12 +1167,8 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
     def test_set_power_input_output_pti_pto(self):
         for pti_pto in self.pti_pto:
             number_points = np.random.randint(10, 10000)
-            power_output = (
-                2 * np.random.random(number_points) - 1
-            ) * pti_pto.rated_power
-            power_input, load = pti_pto.get_power_input_from_bidirectional_output(
-                power_output
-            )
+            power_output = (2 * np.random.random(number_points) - 1) * pti_pto.rated_power
+            power_input, load = pti_pto.get_power_input_from_bidirectional_output(power_output)
             self.assertEqual(
                 self.system.set_power_input_pti_pto_by_power_output_value_for_name_shaft_line_id(
                     pti_pto.name, pti_pto.shaft_line_id, power_output
@@ -1218,21 +1183,15 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
                 ),
                 1,
             )
-            power_output, load = pti_pto.get_power_output_from_bidirectional_input(
-                power_input
-            )
+            power_output, load = pti_pto.get_power_output_from_bidirectional_input(power_input)
             self.assertTrue(np.equal(power_input, pti_pto.power_input).all())
             self.assertTrue(np.equal(power_output, pti_pto.power_output).all())
 
     def test_set_power_consumer_load(self):
         for component in self.propeller_load:
             number_points = np.random.randint(10, 10000)
-            power_output = (
-                2 * np.random.random(number_points) - 1
-            ) * component.rated_power
-            power_input, load = component.get_power_input_from_bidirectional_output(
-                power_output
-            )
+            power_output = (2 * np.random.random(number_points) - 1) * component.rated_power
+            power_input, load = component.get_power_input_from_bidirectional_output(power_output)
             self.assertEqual(
                 self.system.set_power_consumer_load_by_power_output_for_given_name_shaft_line_id(
                     component.name, component.shaft_line_id, power_output
@@ -1249,9 +1208,7 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
             )
             self.assertTrue(np.equal(power_input, component.power_input).all())
             self.assertTrue(
-                np.equal(
-                    np.round(power_output, 3), np.round(component.power_output, 3)
-                ).all()
+                np.equal(np.round(power_output, 3), np.round(component.power_output, 3)).all()
             )
 
     def test_set_status_main_engine_for_name_shaft_line_id(self):
@@ -1268,3 +1225,302 @@ class TestMechanicalPropulsionSystem(TestMechanicalPropulsionSystemSetup):
 
     def test_power_balance_and_fuel_calculation(self):
         pass
+
+
+class TestMultiFuelInventory(TestCase):
+    def setUp(self) -> None:
+        self.expected_options = [
+            FuelOption(
+                fuel_type=TypeFuel.NATURAL_GAS,
+                fuel_origin=FuelOrigin.FOSSIL,
+                primary=True,
+                for_pilot=False,
+            ),
+            FuelOption(
+                fuel_type=TypeFuel.DIESEL,
+                fuel_origin=FuelOrigin.FOSSIL,
+                primary=True,
+                for_pilot=True,
+            ),
+            FuelOption(
+                fuel_type=TypeFuel.DIESEL,
+                fuel_origin=FuelOrigin.FOSSIL,
+                primary=False,
+                for_pilot=False,
+            ),
+        ]
+        self.genset_name = "multi-fuel genset"
+        self.main_engine_name = "multi-fuel main engine"
+
+    def _build_multi_fuel_genset(self, switchboard_id: int = 1):
+        engine = create_engine_component(
+            name=f"{self.genset_name} engine",
+            rated_power_max=1500,
+            rated_speed_max=900,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+            engine_type=TypeComponent.MAIN_ENGINE,
+        )
+        default_characteristic = engine.multi_fuel_characteristics[0]
+        engine.fuel_type = default_characteristic.main_fuel_type
+        engine.fuel_origin = default_characteristic.main_fuel_origin
+        engine.engine_cycle_type = EngineCycleType.DIESEL
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name=f"{self.genset_name} generator",
+            rated_power=Power_kW(1500),
+            rated_speed=Speed_rpm(750),
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=switchboard_id,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        return Genset(
+            name=self.genset_name,
+            aux_engine=engine,
+            generator=generator,
+        )
+
+    def _build_mechanical_system(
+        self, pti_pto: Optional[PTIPTO] = None
+    ) -> MechanicalPropulsionSystem:
+        engine = create_engine_component(
+            name=f"{self.main_engine_name} engine",
+            rated_power_max=2000,
+            rated_speed_max=900,
+            multi_fuel_characteristics=create_multi_fuel_characteristics_sample(),
+            engine_type=TypeComponent.MAIN_ENGINE,
+        )
+        default_characteristic = engine.multi_fuel_characteristics[0]
+        engine.fuel_type = default_characteristic.main_fuel_type
+        engine.fuel_origin = default_characteristic.main_fuel_origin
+        engine.engine_cycle_type = EngineCycleType.DIESEL
+        main_engine = MainEngineWithGearBoxForMechanicalPropulsion(
+            self.main_engine_name,
+            engine,
+            BasicComponent(
+                type_=TypeComponent.GEARBOX,
+                power_type=TypePower.POWER_TRANSMISSION,
+                name="gearbox",
+                rated_power=Power_kW(2000),
+                rated_speed=Speed_rpm(500),
+                eff_curve=np.array([1.0]),
+            ),
+        )
+        propeller = MechanicalPropulsionComponent(
+            type_=TypeComponent.PROPELLER_LOAD,
+            power_type=TypePower.POWER_CONSUMER,
+            name="propeller",
+            rated_power=Power_kW(1500),
+            eff_curve=np.array([1.0]),
+            rated_speed=Speed_rpm(150),
+            shaft_line_id=main_engine.shaft_line_id,
+        )
+        components: List[MechanicalComponent] = [main_engine, propeller]
+        if pti_pto is not None:
+            components.append(pti_pto)
+        return MechanicalPropulsionSystem("mechanical", components)
+
+    def test_electric_system_inventory_reports_multi_fuel_options(self):
+        genset = self._build_multi_fuel_genset()
+        system = ElectricPowerSystem("electric", [genset], [])
+        inventory = system.multi_fuel_engine_inventory
+
+        self.assertTrue(system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {self.genset_name: self.expected_options},
+        )
+        self.assertEqual(system.available_fuel_options, self.expected_options)
+
+    def test_mechanical_system_inventory_reports_multi_fuel_options(self):
+        system = self._build_mechanical_system()
+        inventory = system.multi_fuel_engine_inventory
+
+        self.assertTrue(system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {self.main_engine_name: self.expected_options},
+        )
+        self.assertEqual(system.available_fuel_options, self.expected_options)
+
+    def test_hybrid_system_inventory_combines_electric_and_mechanical(self):
+        pti_pto = create_a_pti_pto(
+            name="PTI/PTO",
+            rated_power=Power_kW(800),
+            rated_speed=Speed_rpm(500),
+            switchboard_id=1,
+            shaft_line_id=1,
+        )
+        electric_system = ElectricPowerSystem(
+            "electric",
+            [self._build_multi_fuel_genset(), pti_pto],
+            [],
+        )
+        mechanical_system = self._build_mechanical_system(pti_pto=pti_pto)
+        hybrid_system = HybridPropulsionSystem("hybrid", electric_system, mechanical_system)
+
+        inventory = hybrid_system.multi_fuel_engine_inventory
+        self.assertTrue(hybrid_system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {
+                f"mechanical::{self.main_engine_name}": self.expected_options,
+                f"electric::{self.genset_name}": self.expected_options,
+            },
+        )
+        self.assertEqual(hybrid_system.available_fuel_options, self.expected_options)
+
+    def test_mechanical_system_with_electric_power_inventory_combines_sources(self):
+        pti_pto = create_a_pti_pto(
+            name="PTI/PTO",
+            rated_power=Power_kW(800),
+            rated_speed=Speed_rpm(500),
+            switchboard_id=1,
+            shaft_line_id=1,
+        )
+        electric_system = ElectricPowerSystem(
+            "electric",
+            [self._build_multi_fuel_genset(), pti_pto],
+            [],
+        )
+        mechanical_system = self._build_mechanical_system(pti_pto=pti_pto)
+        combined_system = MechanicalPropulsionSystemWithElectricPowerSystem(
+            "combined",
+            electric_system,
+            mechanical_system,
+        )
+
+        inventory = combined_system.multi_fuel_engine_inventory
+        self.assertTrue(combined_system.has_multi_fuel_engines)
+        self.assertEqual(
+            inventory,
+            {
+                f"mechanical::{self.main_engine_name}": self.expected_options,
+                f"electric::{self.genset_name}": self.expected_options,
+            },
+        )
+        self.assertEqual(combined_system.available_fuel_options, self.expected_options)
+
+    def test_system_without_multi_fuel_engines_reports_false(self):
+        genset = create_genset_component(
+            name="single-fuel genset",
+            rated_power=Power_kW(1200),
+            rated_speed=Speed_rpm(750),
+            switchboard_id=1,
+        )
+        system = ElectricPowerSystem("single", [genset], [])
+
+        self.assertFalse(system.has_multi_fuel_engines)
+        self.assertEqual(system.multi_fuel_engine_inventory, {})
+        self.assertEqual(len(system.available_fuel_options), 1)
+
+    def test_electric_system_accepts_supported_fuel_option(self):
+        genset = self._build_multi_fuel_genset()
+        system = ElectricPowerSystem("electric", [genset], [])
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+
+        result = system.get_fuel_energy_consumption_running_time(
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            fuel_option=self.expected_options[0],
+        )
+
+        self.assertIsInstance(result, FEEMSResult)
+
+    def test_electric_system_rejects_unsupported_fuel_option(self):
+        genset = self._build_multi_fuel_genset()
+        system = ElectricPowerSystem("electric", [genset], [])
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+
+        unsupported = FuelOption(
+            fuel_type=self.expected_options[0].fuel_type,
+            fuel_origin=FuelOrigin.BIO,
+        )
+
+        with self.assertRaises(InputError):
+            system.get_fuel_energy_consumption_running_time(
+                fuel_specified_by=FuelSpecifiedBy.IMO,
+                fuel_option=unsupported,
+            )
+
+    def test_mechanical_system_rejects_option_when_not_available(self):
+        system = self._build_mechanical_system()
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+
+        unsupported = FuelOption(
+            fuel_type=self.expected_options[0].fuel_type,
+            fuel_origin=FuelOrigin.BIO,
+        )
+
+        with self.assertRaises(InputError):
+            system.get_fuel_energy_consumption_running_time(
+                fuel_specified_by=FuelSpecifiedBy.IMO,
+                fuel_option=unsupported,
+            )
+
+    def test_hybrid_requires_option_supported_by_all_multi_fuel_engines(self):
+        pti_pto = create_a_pti_pto(
+            name="PTI/PTO",
+            rated_power=Power_kW(800),
+            rated_speed=Speed_rpm(500),
+            switchboard_id=1,
+            shaft_line_id=1,
+        )
+        limited_characteristics = create_multi_fuel_characteristics_sample()[:1]
+        genset_engine = create_engine_component(
+            name=f"{self.genset_name} limited engine",
+            rated_power_max=1500,
+            rated_speed_max=900,
+            multi_fuel_characteristics=limited_characteristics,
+            engine_type=TypeComponent.MAIN_ENGINE,
+        )
+        default_limited_characteristic = limited_characteristics[0]
+        genset_engine.fuel_type = default_limited_characteristic.main_fuel_type
+        genset_engine.fuel_origin = default_limited_characteristic.main_fuel_origin
+        genset_engine.engine_cycle_type = EngineCycleType.DIESEL
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name=f"{self.genset_name} limited generator",
+            rated_power=Power_kW(1500),
+            rated_speed=Speed_rpm(750),
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=1,
+            eff_curve=ELECTRIC_MACHINE_EFF_CURVE,
+        )
+        limited_genset = Genset(
+            name=f"{self.genset_name} limited",
+            aux_engine=genset_engine,
+            generator=generator,
+        )
+        electric_system = ElectricPowerSystem(
+            "electric",
+            [limited_genset, pti_pto],
+            [],
+        )
+        mechanical_system = self._build_mechanical_system(pti_pto=pti_pto)
+        hybrid_system = HybridPropulsionSystem("hybrid", electric_system, mechanical_system)
+
+        hybrid_system.mechanical_system.set_time_interval(
+            time_interval_s=1,
+            integration_method=IntegrationMethod.simpson,
+        )
+        hybrid_system.electric_system.set_time_interval(
+            time_interval_s=1,
+            integration_method=IntegrationMethod.simpson,
+        )
+
+        incompatible_option = self.expected_options[2]
+        with self.assertRaises(InputError):
+            hybrid_system.get_fuel_energy_consumption_running_time(
+                time_interval_s=1,
+                integration_method=IntegrationMethod.simpson,
+                fuel_specified_by=FuelSpecifiedBy.IMO,
+                fuel_option=incompatible_option,
+            )
+
+        compatible_option = self.expected_options[0]
+        result = hybrid_system.get_fuel_energy_consumption_running_time(
+            time_interval_s=1,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            fuel_option=compatible_option,
+        )
+        self.assertIsInstance(result, FEEMSResultForMachinerySystem)

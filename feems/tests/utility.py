@@ -1,34 +1,39 @@
 import random
-from typing import List, Union, NamedTuple
+from typing import List, NamedTuple, Optional, Union
 
-from feems.fuel import FuelOrigin, TypeFuel
 import numpy as np
 import pandas as pd
+from feems.components_model.component_base import BasicComponent, Component
+from feems.components_model.component_electric import (
+    PTIPTO,
+    Battery,
+    BatterySystem,
+    ElectricComponent,
+    ElectricMachine,
+    FuelCell,
+    FuelCellSystem,
+    Genset,
+    SerialSystemElectric,
+)
+from feems.components_model.component_mechanical import (
+    COGAS,
+    Engine,
+    EngineMultiFuel,
+    FuelCharacteristics,
+)
+from feems.components_model.node import Switchboard
+from feems.exceptions import ConfigurationError
+from feems.fuel import FuelOrigin, TypeFuel
+from feems.types_for_feems import (
+    NOxCalculationMethod,
+    Power_kW,
+    Speed_rpm,
+    TypeComponent,
+    TypePower,
+)
 from scipy.interpolate import PchipInterpolator
 
 from feems import get_logger
-from feems.components_model.component_base import Component, BasicComponent
-from feems.components_model.component_electric import (
-    FuelCellSystem,
-    FuelCell,
-    Genset,
-    ElectricMachine,
-    ElectricComponent,
-    BatterySystem,
-    SerialSystemElectric,
-    Battery,
-    PTIPTO,
-)
-from feems.components_model.component_mechanical import COGAS, Engine
-from feems.components_model.node import Switchboard
-from feems.exceptions import ConfigurationError
-from feems.types_for_feems import (
-    TypeComponent,
-    TypePower,
-    Power_kW,
-    Speed_rpm,
-    NOxCalculationMethod,
-)
 
 # Create a electric efficiency curve for an electric machine
 load = np.array([1.00, 0.75, 0.50, 0.25])
@@ -36,9 +41,7 @@ eff = np.array([0.9585018015, 0.9595580564, 0.9533974336, 0.9298900684])
 ELECTRIC_MACHINE_EFF_CURVE = np.array([load, eff]).transpose()
 
 # Create an efficiency curve for an electric inverter
-CONVERTER_EFF = np.array(
-    [[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]
-).transpose()
+CONVERTER_EFF = np.array([[1.00, 0.75, 0.50, 0.25], [0.98, 0.972, 0.97, 0.96]]).transpose()
 
 
 logger = get_logger(__name__)
@@ -52,22 +55,17 @@ class PowerSummary(NamedTuple):
 
 
 # noinspection PyShadowingNames
-def create_random_monotonic_eff_curve(
-    min_efficiency_perc=0, max_efficiency_perc=1
-) -> np.ndarray:
-    assert (
-        max_efficiency_perc > min_efficiency_perc
-    ), "maximum efficiency should be greater than minimum efficiency"
+def create_random_monotonic_eff_curve(min_efficiency_perc=0, max_efficiency_perc=1) -> np.ndarray:
+    assert max_efficiency_perc > min_efficiency_perc, (
+        "maximum efficiency should be greater than minimum efficiency"
+    )
     monotonic = False
     load = np.array([0.25, 0.50, 0.75, 1.00])
     eff = np.zeros(load.shape)
     load_check = np.arange(0, 1.001, 0.001)
     while not monotonic:
         load = np.array([0.25, 0.50, 0.75, 1.00])
-        eff = (
-            np.random.rand(4) * (max_efficiency_perc - min_efficiency_perc)
-            + min_efficiency_perc
-        )
+        eff = np.random.rand(4) * (max_efficiency_perc - min_efficiency_perc) + min_efficiency_perc
         eff.sort()
         # Check monotonic mapping
         interp_function = PchipInterpolator(load, eff, extrapolate=True)
@@ -141,12 +139,8 @@ def create_components(
     for i in range(number_components):
         rated_power = np.random.rand() * rated_power_max
         rated_speed = np.random.rand() * rated_speed_max
-        type_ = TypeComponent(
-            np.ceil(np.random.rand() * (len(TypeComponent.__members__) - 1))
-        )
-        components.append(
-            Component("{0}{1}".format(name, i), type_, rated_power, rated_speed)
-        )
+        type_ = TypeComponent(np.ceil(np.random.rand() * (len(TypeComponent.__members__) - 1)))
+        components.append(Component("{0}{1}".format(name, i), type_, rated_power, rated_speed))
     if number_components == 1:
         components[0].name = name
         return components[0]
@@ -157,9 +151,7 @@ def create_components(
 def create_basic_components(
     name, number_components, rated_power_max, rated_speed_max
 ) -> Union[BasicComponent, List[BasicComponent]]:
-    components = create_components(
-        name, number_components, rated_power_max, rated_speed_max
-    )
+    components = create_components(name, number_components, rated_power_max, rated_speed_max)
     basic_components = []
     if type(components) is list:
         for component in components:
@@ -311,35 +303,70 @@ def create_a_propulsion_drive(
             pass
 
 
+def create_multi_fuel_characteristics_sample() -> List[FuelCharacteristics]:
+    return [
+        FuelCharacteristics(
+            main_fuel_type=TypeFuel.NATURAL_GAS,
+            main_fuel_origin=FuelOrigin.FOSSIL,
+            pilot_fuel_type=TypeFuel.DIESEL,
+            pilot_fuel_origin=FuelOrigin.FOSSIL,
+            bsfc_curve=np.array([[0.0, 180.0], [1.0, 180.0]], dtype=float),
+            bspfc_curve=np.array([[0.0, 10.0], [1.0, 10.0]], dtype=float),
+        ),
+        FuelCharacteristics(
+            main_fuel_type=TypeFuel.DIESEL,
+            main_fuel_origin=FuelOrigin.FOSSIL,
+            pilot_fuel_type=None,
+            pilot_fuel_origin=None,
+            bsfc_curve=np.array([[0.0, 210.0], [1.0, 210.0]], dtype=float),
+        ),
+    ]
+
+
 def create_engine_component(
-    name, rated_power_max, rated_speed_max, bsfc_curve=None
-) -> Engine:
+    name,
+    rated_power_max,
+    rated_speed_max,
+    bsfc_curve=None,
+    *,
+    multi_fuel_characteristics: Optional[List[FuelCharacteristics]] = None,
+    engine_type: TypeComponent = TypeComponent.MAIN_ENGINE,
+    fuel_type: TypeFuel = TypeFuel.DIESEL,
+    fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+) -> Union[Engine, EngineMultiFuel]:
     # Create an engine component with a arbitrary bsfc curve
     rated_power = rated_power_max * np.random.rand()
     rated_speed = rated_speed_max * np.random.rand()
+    if multi_fuel_characteristics is not None:
+        return EngineMultiFuel(
+            type_=engine_type,
+            name=name,
+            rated_power=rated_power,
+            rated_speed=rated_speed,
+            multi_fuel_characteristics=multi_fuel_characteristics,
+        )
+
     if bsfc_curve is None:
         bsfc_curve = np.append(
             np.reshape(np.arange(0.1, 1.1, 0.1), (-1, 1)),
             np.random.rand(10, 1) * 200,
             axis=1,
         )
-        logger.warning(
-            "Efficiency of engine is not supplied, using random monotonic curve"
-        )
+        logger.warning("Efficiency of engine is not supplied, using random monotonic curve")
     return Engine(
-        type_=TypeComponent.MAIN_ENGINE,
+        type_=engine_type,
         name=name,
         rated_power=rated_power,
         rated_speed=rated_speed,
         bsfc_curve=bsfc_curve,
         nox_calculation_method=NOxCalculationMethod.TIER_2,
+        fuel_type=fuel_type,
+        fuel_origin=fuel_origin,
     )
 
 
 # noinspection PyTypeChecker
-def create_fuel_cell_system(
-    name: str, rated_power: float, switchboard_id: int
-) -> FuelCellSystem:
+def create_fuel_cell_system(name: str, rated_power: float, switchboard_id: int) -> FuelCellSystem:
     """
     Create a fuel cell system with random monotonic efficiency
     :param name: name
@@ -397,9 +424,7 @@ def create_genset_component(
     """
     if eff_curve_gen is None:
         eff_curve_gen = create_random_monotonic_eff_curve()
-        logger.warning(
-            "Efficiency of generator is not supplied, using random monotonic curve"
-        )
+        logger.warning("Efficiency of generator is not supplied, using random monotonic curve")
 
     # Create a generator component, if not provided or not proper component
     if generator is None or type(generator) is not ElectricMachine:
@@ -434,9 +459,7 @@ def create_dataframe_save_and_return(name, filename, columns):
     # Create a DataFrame and save it to csv
     values = np.append(np.zeros([1, 1]), np.random.rand(1, len(columns) - 1), axis=1)
     eff_curve = create_random_monotonic_eff_curve()
-    columns_eff = [
-        "Efficiency@{}%".format(each_load) for each_load in eff_curve[:, 0].tolist()
-    ]
+    columns_eff = ["Efficiency@{}%".format(each_load) for each_load in eff_curve[:, 0].tolist()]
     columns += columns_eff
     values = np.append(values, np.reshape(eff_curve[:, 1], (1, -1)), axis=1)
     df = pd.DataFrame(values, columns=columns, index=[name])
@@ -477,9 +500,7 @@ def create_switchboard_with_components(
         switchboard_id=switchboard_id,
     )
     electric_components = power_sources + power_consumers + pti_ptos + battery_systems
-    return Switchboard(
-        name="switchboard", idx=switchboard_id, components=electric_components
-    )
+    return Switchboard(name="switchboard", idx=switchboard_id, components=electric_components)
 
 
 def set_random_power_input_consumer_pti_pto_energy_storage(
@@ -515,9 +536,7 @@ def set_random_power_input_consumer_pti_pto_energy_storage(
     # Assign the power input for the consumers, pti/pto, energy storage devices
     # randomly within the total power produced
     no_electric_load_switchboard = (
-        switchboard.no_consumers
-        + switchboard.no_pti_pto
-        + switchboard.no_energy_storage
+        switchboard.no_consumers + switchboard.no_pti_pto + switchboard.no_energy_storage
     )
     count_electric_load = 0
     remaining_power = total_power_produced.copy()
@@ -545,9 +564,7 @@ def set_random_power_input_consumer_pti_pto_energy_storage(
                         / 100
                     )
                     if i in [TypePower.PTI_PTO.value, TypePower.ENERGY_STORAGE.value]:
-                        component.power_input *= (
-                            component.load_sharing_mode * component.status
-                        )
+                        component.power_input *= component.load_sharing_mode * component.status
                     remaining_power -= component.power_input
                 index_overload = remaining_power < 0
                 component.power_input[index_overload] += remaining_power[index_overload]
@@ -555,18 +572,14 @@ def set_random_power_input_consumer_pti_pto_energy_storage(
                 sum_power_input_power_consumer += component.power_input * (
                     i == TypePower.POWER_CONSUMER.value
                 )
-                sum_power_input_pti_pto += component.power_input * (
-                    i == TypePower.PTI_PTO.value
-                )
+                sum_power_input_pti_pto += component.power_input * (i == TypePower.PTI_PTO.value)
                 sum_power_input_energy_storage += component.power_input * (
                     i == TypePower.ENERGY_STORAGE.value
                 )
     # noinspection PyUnresolvedReferences
     if not np.isclose(
         total_power_produced,
-        sum_power_input_power_consumer
-        + sum_power_input_pti_pto
-        + sum_power_input_energy_storage,
+        sum_power_input_power_consumer + sum_power_input_pti_pto + sum_power_input_energy_storage,
     ).all():
         msg = "Power balance is not met between the produced power and consumed power"
         logger.error(msg)
@@ -588,9 +601,7 @@ def set_random_power_input_consumer_pti_pto_energy_storage(
         load_perc_symmetric_loaded_power_source = np.zeros(
             sum_power_avail_from_equally_load_sharing_sources.shape
         )
-        index_no_power_available = (
-            sum_power_avail_from_equally_load_sharing_sources == 0
-        )
+        index_no_power_available = sum_power_avail_from_equally_load_sharing_sources == 0
         if np.bitwise_and(
             sum_power_output_from_equally_load_sharing_sources > 0,
             index_no_power_available,
@@ -681,9 +692,7 @@ def create_electric_components_for_switchboard(
             # Create a power source component
             if type_component == TypeComponent.FUEL_CELL_SYSTEM:
                 # Create a fuel cell system
-                component = create_fuel_cell_system(
-                    name_component, rated_power[i], switchboard_id
-                )
+                component = create_fuel_cell_system(name_component, rated_power[i], switchboard_id)
             else:
                 # Create a generator component
                 component = ElectricMachine(
@@ -807,8 +816,7 @@ def create_cogas_system(
     if steam_turbine_power_curve is None:
         steam_turbine_power_curve = create_random_monotonic_eff_curve()
         steam_turbine_power_curve[:, 1] = (
-            steam_turbine_power_curve[:, 0] * rated_power_kw
-            - gas_turbine_power_curve[:, 1]
+            steam_turbine_power_curve[:, 0] * rated_power_kw - gas_turbine_power_curve[:, 1]
         )
     return COGAS(
         name="COGAS",

@@ -1,14 +1,12 @@
 import random
-from typing import Union, NamedTuple, cast
+from typing import NamedTuple, cast
 from unittest import TestCase
 
 import numpy as np
-from scipy.integrate import simpson
-
 from feems.components_model import (
+    BasicComponent,
     ElectricComponent,
     Genset,
-    BasicComponent,
     MainEngineWithGearBoxForMechanicalPropulsion,
     MechanicalPropulsionComponent,
     ShaftLine,
@@ -17,12 +15,14 @@ from feems.components_model.component_electric import FuelCellSystem
 from feems.components_model.utility import (
     get_list_random_distribution_numbers_for_total_number,
 )
-from feems.types_for_feems import TypePower, TypeComponent
+from feems.types_for_feems import TypeComponent, TypePower
+from scipy.integrate import simpson
+
 from tests.utility import (
+    create_a_pti_pto,
+    create_engine_component,
     create_switchboard_with_components,
     set_random_power_input_consumer_pti_pto_energy_storage,
-    create_engine_component,
-    create_a_pti_pto,
 )
 
 
@@ -46,10 +46,8 @@ class TestSwitchboard(TestCase):
         power_avail_total = 3000
 
         #: Distribute number of components by types
-        number_of_components_list = (
-            get_list_random_distribution_numbers_for_total_number(
-                4, number_of_components
-            )
+        number_of_components_list = get_list_random_distribution_numbers_for_total_number(
+            4, number_of_components
         )
         self.switchboard = create_switchboard_with_components(
             1,
@@ -122,9 +120,7 @@ class TestSwitchboard(TestCase):
         )
 
     def test_initialization(self):
-        power_types = [
-            component.power_type for component in self.switchboard.components
-        ]
+        power_types = [component.power_type for component in self.switchboard.components]
 
         # Test initialization
         self.assertEqual(
@@ -137,9 +133,7 @@ class TestSwitchboard(TestCase):
             power_types.count(TypePower.ENERGY_STORAGE),
             self.switchboard.no_energy_storage,
         )
-        self.assertEqual(
-            power_types.count(TypePower.PTI_PTO), self.switchboard.no_pti_pto
-        )
+        self.assertEqual(power_types.count(TypePower.PTI_PTO), self.switchboard.no_pti_pto)
 
     def test_setting_and_getting_status_power_source(self):
         # Test setting and getting the status of the power source
@@ -154,9 +148,7 @@ class TestSwitchboard(TestCase):
         status_power_source = self.switchboard.get_status_component_by_power_type(
             TypePower.POWER_SOURCE
         )
-        status_pti_pto = self.switchboard.get_status_component_by_power_type(
-            TypePower.PTI_PTO
-        )
+        status_pti_pto = self.switchboard.get_status_component_by_power_type(TypePower.PTI_PTO)
         status_energy_storage = self.switchboard.get_status_component_by_power_type(
             TypePower.ENERGY_STORAGE
         )
@@ -167,9 +159,7 @@ class TestSwitchboard(TestCase):
             ).all()
         )
         self.assertTrue(
-            np.equal(
-                np.array(status_pti_pto).transpose(), new_status.status_pti_pto
-            ).all()
+            np.equal(np.array(status_pti_pto).transpose(), new_status.status_pti_pto).all()
         )
         self.assertTrue(
             np.equal(
@@ -180,18 +170,14 @@ class TestSwitchboard(TestCase):
 
     def test_setting_getting_the_load_sharing_status(self):
         # Test setting and getting the load sharing status of the power source
-        load_sharing_status = (
-            self.switchboard.get_load_sharing_mode_components_by_power_type(
-                TypePower.POWER_SOURCE
-            )
+        load_sharing_status = self.switchboard.get_load_sharing_mode_components_by_power_type(
+            TypePower.POWER_SOURCE
         )
         self.assertEqual(np.abs(np.array(load_sharing_status)).sum(), 0)
         load_sharing_summary = self.set_load_sharing_mode()
 
-        load_sharing_status = (
-            self.switchboard.get_load_sharing_mode_components_by_power_type(
-                TypePower.POWER_SOURCE
-            )
+        load_sharing_status = self.switchboard.get_load_sharing_mode_components_by_power_type(
+            TypePower.POWER_SOURCE
         )
         self.assertTrue(
             np.equal(
@@ -200,10 +186,8 @@ class TestSwitchboard(TestCase):
             ).all()
         )
 
-        load_sharing_status = (
-            self.switchboard.get_load_sharing_mode_components_by_power_type(
-                TypePower.PTI_PTO
-            )
+        load_sharing_status = self.switchboard.get_load_sharing_mode_components_by_power_type(
+            TypePower.PTI_PTO
         )
         self.assertTrue(
             np.equal(
@@ -212,10 +196,8 @@ class TestSwitchboard(TestCase):
             ).all()
         )
 
-        load_sharing_status = (
-            self.switchboard.get_load_sharing_mode_components_by_power_type(
-                TypePower.ENERGY_STORAGE
-            )
+        load_sharing_status = self.switchboard.get_load_sharing_mode_components_by_power_type(
+            TypePower.ENERGY_STORAGE
         )
         self.assertTrue(
             np.equal(
@@ -230,16 +212,12 @@ class TestSwitchboard(TestCase):
         for component in self.switchboard.components:
             if component.power_type == TypePower.POWER_SOURCE:
                 rated_power_list.append(component.rated_power * component.status)
-        rated_power_list_from_class = (
-            self.switchboard.get_power_avail_component_by_power_type(
-                TypePower.POWER_SOURCE
-            )
+        rated_power_list_from_class = self.switchboard.get_power_avail_component_by_power_type(
+            TypePower.POWER_SOURCE
         )
         rated_power_array = np.array(rated_power_list).transpose()
         rated_power_array_from_class = np.array(rated_power_list_from_class).transpose()
-        self.assertEqual(
-            np.sum(np.abs(rated_power_array - rated_power_array_from_class)), 0
-        )
+        self.assertEqual(np.sum(np.abs(rated_power_array - rated_power_array_from_class)), 0)
 
     # noinspection PyTypeChecker
     def test_set_power_load_component_from_power_output_by_type_and_name(self):
@@ -248,12 +226,8 @@ class TestSwitchboard(TestCase):
         # Gets a random component which is not a power source
         component: ElectricComponent = random.choice(self.switchboard.components)
         while isinstance(component, (Genset, FuelCellSystem)):
-            component = cast(
-                ElectricComponent, random.choice(self.switchboard.components)
-            )
-        power_output_ref = (
-            np.random.rand(self.no_points_to_test) * component.rated_power
-        )
+            component = cast(ElectricComponent, random.choice(self.switchboard.components))
+        power_output_ref = np.random.rand(self.no_points_to_test) * component.rated_power
         power_input_ref, load = component.get_power_input_from_bidirectional_output(
             power_output_ref
         )
@@ -305,40 +279,28 @@ class TestSwitchboard(TestCase):
             / sum_power_avail_for_power_sources_symmetric[power_is_available]
         )
 
-        load_perc_symm_power_source = (
-            power_summary.load_perc_symmetric_loaded_power_source
-        )
+        load_perc_symm_power_source = power_summary.load_perc_symmetric_loaded_power_source
         load_perc_symm_power_source_ref[np.isinf(load_perc_symm_power_source_ref)] = 0
         load_perc_symm_power_source[np.isinf(load_perc_symm_power_source)] = 0
         load_perc_symm_power_source_ref[np.isnan(load_perc_symm_power_source_ref)] = 0
         load_perc_symm_power_source[np.isnan(load_perc_symm_power_source)] = 0
-        self.assertTrue(
-            np.allclose(load_perc_symm_power_source, load_perc_symm_power_source_ref)
-        )
+        self.assertTrue(np.allclose(load_perc_symm_power_source, load_perc_symm_power_source_ref))
 
         time_step = 1.0
         self.switchboard.set_power_out_power_sources(load_perc_symm_power_source)
         result = self.switchboard.get_fuel_energy_consumption_running_time(time_step)
-        for power_source in self.switchboard.component_by_power_type[
-            TypePower.POWER_SOURCE.value
-        ]:
+        for power_source in self.switchboard.component_by_power_type[TypePower.POWER_SOURCE.value]:
             index = power_source.load_sharing_mode > 0
             power_output = power_source.rated_power * load_perc_symm_power_source
             power_output *= power_source.status
-            power_output[index] = (
-                power_source.rated_power * power_source.load_sharing_mode[index]
-            )
+            power_output[index] = power_source.rated_power * power_source.load_sharing_mode[index]
             power_output[index] = power_output[index] * power_source.status[index]
             self.assertTrue(
-                np.equal(
-                    np.round(power_output, 3), np.round(power_source.power_output, 3)
-                ).all()
+                np.equal(np.round(power_output, 3), np.round(power_source.power_output, 3)).all()
             )
 
-        results2 = (
-            self.switchboard.get_fuel_energy_consumption_running_time_without_details(
-                time_step
-            )
+        results2 = self.switchboard.get_fuel_energy_consumption_running_time_without_details(
+            time_step
         )
         for key in results2.__dict__:
             if key == "detail_result":
@@ -362,7 +324,6 @@ class TestSwitchboard(TestCase):
 
 class TestShaftLine(TestCase):
     def test_shaft_line(self):
-
         time_step = 1
         number_test_points = 100
         number_main_engines = random.randint(1, 4)
@@ -409,9 +370,7 @@ class TestShaftLine(TestCase):
 
         #: Create a propeller load
         rated_power_propeller = (
-            0.5
-            * (random.random() + 1)
-            * (total_rated_power_main_engine + pti_pto.rated_power)
+            0.5 * (random.random() + 1) * (total_rated_power_main_engine + pti_pto.rated_power)
         )
         propeller_load = MechanicalPropulsionComponent(
             TypeComponent.PROPELLER_LOAD,
@@ -428,9 +387,7 @@ class TestShaftLine(TestCase):
         ShaftLine("Shaft line with only engines", 1, main_engines + [propeller_load])
 
         #: Create a shaft line component
-        shaft_line = ShaftLine(
-            "shaft line 1", 1, main_engines + [pti_pto, propeller_load]
-        )
+        shaft_line = ShaftLine("shaft line 1", 1, main_engines + [pti_pto, propeller_load])
 
         #: Test pure mechanical propulsion mode
         while True:
@@ -469,20 +426,14 @@ class TestShaftLine(TestCase):
         #: Calculate the reference fuel consumption
         fuel_consumption_rate_ref = 0
         for main_engine in main_engines:
-            fuel_consumption_rate_temp = (
-                main_engine.get_engine_run_point_from_power_out_kw(
-                    main_engine.rated_power
-                    * total_load_percentage_ref
-                    * main_engine.status
-                ).fuel_flow_rate_kg_per_s.total_fuel_consumption
-            )
+            fuel_consumption_rate_temp = main_engine.get_engine_run_point_from_power_out_kw(
+                main_engine.rated_power * total_load_percentage_ref * main_engine.status
+            ).fuel_flow_rate_kg_per_s.total_fuel_consumption
             fuel_consumption_rate_ref += fuel_consumption_rate_temp
         fuel_consumption_ref = simpson(fuel_consumption_rate_ref) * time_step
 
         #: Set the PTI/PTO power 0
-        pti_pto.power_input = pti_pto.set_power_output_from_input(
-            np.zeros(number_test_points)
-        )
+        pti_pto.power_input = pti_pto.set_power_output_from_input(np.zeros(number_test_points))
         pti_pto.full_pti_mode = np.zeros(number_test_points).astype(bool)
         #: Do the power balance calculation
         shaft_line.do_power_balance()
@@ -491,9 +442,7 @@ class TestShaftLine(TestCase):
         result = shaft_line.get_fuel_calculation_running_hours(time_step)
 
         #: Check the result
-        self.assertAlmostEqual(
-            result.running_hours_main_engines_hr, total_running_hours_ref
-        )
+        self.assertAlmostEqual(result.running_hours_main_engines_hr, total_running_hours_ref)
         self.assertAlmostEqual(result.fuel_consumption_total_kg, fuel_consumption_ref)
 
         #: Test the hybrid propulsion
@@ -526,38 +475,28 @@ class TestShaftLine(TestCase):
 
         #: Check power balance
         max_power_output_pti_pto = propeller_load.power_input
-        power_output_pti_pto = np.minimum(
-            power_output_pti_pto, max_power_output_pti_pto
-        )
+        power_output_pti_pto = np.minimum(power_output_pti_pto, max_power_output_pti_pto)
         min_power_output_pti_pto = -(
             total_power_available_main_engines - propeller_load.power_input
         )
-        power_output_pti_pto = np.maximum(
-            power_output_pti_pto, min_power_output_pti_pto
-        )
+        power_output_pti_pto = np.maximum(power_output_pti_pto, min_power_output_pti_pto)
         pti_pto.full_pti_mode = power_output_pti_pto == max_power_output_pti_pto
 
         #: Get the reference value for running hours and fuel consumption
-        total_power_output_main_engines = (
-            propeller_load.power_input - power_output_pti_pto
-        )
+        total_power_output_main_engines = propeller_load.power_input - power_output_pti_pto
         status = total_power_output_main_engines > 0
         total_load_percentage_ref = np.zeros(number_test_points)
         total_load_percentage_ref[status] = (
-            total_power_output_main_engines[status]
-            / total_power_available_main_engines[status]
+            total_power_output_main_engines[status] / total_power_available_main_engines[status]
         )
         total_running_hours_ref = 0
         fuel_consumption_ref = 0
         for engine in main_engines:
             engine.status[np.bitwise_not(status)] = False
-            engine.power_output = (
-                total_load_percentage_ref * engine.rated_power * engine.status
-            )
+            engine.power_output = total_load_percentage_ref * engine.rated_power * engine.status
             res_engine = engine.get_engine_run_point_from_power_out_kw()
             fuel_consumption_ref += (
-                simpson(res_engine.fuel_flow_rate_kg_per_s.total_fuel_consumption)
-                * time_step
+                simpson(res_engine.fuel_flow_rate_kg_per_s.total_fuel_consumption) * time_step
             )
             total_running_hours_ref += engine.status.sum() * time_step / 3600
 
@@ -574,7 +513,6 @@ class TestShaftLine(TestCase):
         result = shaft_line.get_fuel_calculation_running_hours(time_step)
         self.assertAlmostEqual(result.fuel_consumption_total_kg, fuel_consumption_ref)
         self.assertAlmostEqual(
-            result.running_hours_main_engines_hr
-            + result.running_hours_pti_pto_total_hr,
+            result.running_hours_main_engines_hr + result.running_hours_pti_pto_total_hr,
             total_running_hours_ref,
         )

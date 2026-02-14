@@ -1,0 +1,66 @@
+[
+  {
+    "type": "AUXILIARY_ENGINE",
+    "name": "Auxiliary engine 700",
+    "rated_power": 700,
+    "rated_speed": 1500,
+    "bsfc_curve": [[0.25, 0.50, 0.75, 1.0], [280.0, 220.0, 200.0, 210.0]]
+  },
+  {
+    "type": "AUXILIARY_ENGINE",
+    "name": "Auxiliary engine 1000",
+    "rated_power": 1000,
+    "rated_speed": 1500,
+    "bsfc_curve": [[0.25, 0.50, 0.75, 0.100], [250.0, 200.0, 180.0, 195.0]]
+  },
+  {
+    "type": "GENERATOR",
+    "name": "Generator A",
+    "rated_power": 665,
+    "rated_speed": 1500,
+    "eff_curve": [[1.0, 0.75, 0.5, 0.25], [0.95, 0.94, 0.92, 0.88]]
+  },
+  {
+    "type": "GENERATOR",
+    "name": "Generator B",
+    "rated_power": 950,
+    "rated_speed": 1500,
+    "eff_curve": [[1.0, 0.75, 0.5, 0.25], [0.95, 0.94, 0.92, 0.88]]
+  },
+  {
+    "type": "ELECTRIC_MOTOR",
+    "name": "Electric Motor A",
+    "rated_power": 800,
+    "rated_speed": 1200,
+    "eff_curve": [[1.0, 0.75, 0.5, 0.25], [0.95, 0.96, 0.91, 0.86]]
+  },
+  {
+    "type": "ELECTRIC_MOTOR",
+    "name": "Electric Motor B",
+    "rated_power": 600,
+    "rated_speed": 1200,
+    "eff_curve": [[1.0, 0.75, 0.5, 0.25], [0.94, 0.96, 0.92, 0.88]]
+  },
+  {
+    "type": "RECTIFIER",
+    "name": "Active Front End Rectifier",
+    "rated_power": 1000,
+    "eff_curve": [[1.0, 0.75, 0.5, 0.25], [0.98, 0.98, 0.97, 0.95]]
+  },
+  {
+    "type": "INVERTER",
+    "name": "Inverter",
+    "rated_power": 1000,
+    "eff_curve": [[1.0, 0.75, 0.5, 0.25], [0.98, 0.98, 0.97, 0.95]]
+  },
+  {
+    "type": "TRANSFORMER",
+    "name": "Transformer",
+    "rated_power": 1000,
+    "eff_curve": [[1.0, 0.0], [0.99, 0.99]]
+  },
+  {
+    "type": "OTHER_LOAD",
+    "name": "Auxiliary loads"
+  }
+]

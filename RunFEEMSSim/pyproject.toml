@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "RunFeemsSim"
+version = "0.4.4"
+description = "A library for running feems simulation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Kevin Koosup Yum", email = "kevinkoosup.yum@gmail.com" }]
+keywords = ['FEEMS,', 'machinery', 'system,', 'fuel,', 'emissions']
+classifiers = [
+  "Natural Language :: English",
+  "Intended Audience :: Developers",
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = ['pandas', 'numpy', 'MachSysS']
+
+[project.urls]
+Repository = "https://github.com/SINTEF/FEEMS"
+Documentation = "https://kevinkoosup.yum@sintef.no.github.io/RunFeemsSim/"
+
+[tool.setuptools.packages.find]
+include = ["RunFeemsSim"]
+
+[tool.uv.sources]
+MachSysS = { workspace = true }

@@ -1,4 +1,3 @@
-from .fuel import TypeFuel
 from .types_for_feems import NOxCalculationMethod
 
 hhv_hydrogen_mj_per_kg = 141.8
