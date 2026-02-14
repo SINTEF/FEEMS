@@ -4,15 +4,181 @@ This document provides a comprehensive reference for the FEEMS API.
 
 ## Table of Contents
 
+- [Overview and Modeling Principles](#overview-and-modeling-principles)
+  - [What is FEEMS?](#what-is-feems)
+  - [Work Process](#work-process)
+  - [System Configuration](#system-configuration)
+  - [Component Class Hierarchy](#component-class-hierarchy)
+  - [Basic Modeling Principles](#basic-modeling-principles)
+  - [Power Balance Calculation](#power-balance-calculation)
 - [Component Models](#component-models)
   - [Base Classes](#base-classes)
   - [Mechanical Components](#mechanical-components)
   - [Electric Components](#electric-components)
   - [Serial Systems](#serial-systems)
+  - [Energy Storage](#energy-storage)
+  - [Fuel Cell](#fuel-cell)
+  - [PTI/PTO](#ptipito)
+  - [Run Point Data Classes](#run-point-data-classes)
+  - [System Types](#system-types)
 - [System Model](#system-model)
 - [Fuel and Emissions](#fuel-and-emissions)
 - [Types](#types)
+  - [TypeComponent](#typecomponent)
+  - [TypePower](#typepower)
+  - [EmissionType](#emissiontype)
+  - [EngineCycleType](#enginecycletype)
+  - [NOxCalculationMethod](#noxcalculationmethod)
 - [Utilities](#utilities)
+
+## Overview and Modeling Principles
+
+### What is FEEMS?
+
+FEEMS (**Fuel, Emissions, Energy Calculation for Machinery System**) is a component-based simulation library for marine power and propulsion systems. It calculates fuel consumption, exhaust emissions, energy balance, and equipment running hours for:
+
+- Conventional diesel-electric propulsion
+- Hybrid propulsion with PTI/PTO (Power Take-In / Power Take-Off)
+- Mechanical propulsion with a separate electric power system
+
+FEEMS was developed at SINTEF Ocean (Kevin Koosup Yum, 2020) and is suited for design studies, operational optimization, and environmental assessment of ship power plants.
+
+---
+
+### Work Process
+
+A FEEMS simulation follows four steps:
+
+```
+1. System Configuration
+       ↓
+2. Load / Operation Mode Parameter Input
+       ↓
+3. Power Balance Calculation
+       ↓
+4. Fuel Consumption / Emissions / Running Hours
+```
+
+| Step | Description |
+|------|-------------|
+| **1. System Configuration** | Assemble a system model from individual components (engines, generators, batteries, etc.) connected through switchboards or shaftlines. |
+| **2. Load / Operation Mode Input** | Provide time-series consumer power loads and control inputs (breaker status, genset on/off). |
+| **3. Power Balance Calculation** | For each time step, distribute load across power sources using the power balance algorithm. |
+| **4. Fuel / Emissions / Running Hours** | Compute fuel consumption and emissions from the operating point of each prime mover; accumulate running hours. |
+
+---
+
+### System Configuration
+
+Build a system model by instantiating components and wiring them together:
+
+```
+Create Components          →  Engine, Generator, Battery, PropulsionDrive, …
+        ↓
+Create Serial Components   →  SerialSystem / SerialSystemElectric
+        ↓
+Create Nodes               →  Switchboard (electric) or Shaftline (mechanical)
+        ↓
+Create System              →  ElectricPowerSystem
+                               MechanicalPropulsionSystem
+                               MechanicalPropulsionSystemWithElectricPowerSystem
+```
+
+> **Topology constraint**: The system uses a **single-level hierarchy**. All components (or serial component chains) connect directly to a switchboard or shaftline. Nested switchboards are not supported.
+
+---
+
+### Component Class Hierarchy
+
+```
+BasicComponent
+├── Component
+│   ├── Engine
+│   │   ├── EngineDualFuel
+│   │   └── EngineMultiFuel
+│   ├── ElectricComponent
+│   │   ├── ElectricMachine
+│   │   │   └── PTIPTO
+│   │   ├── Battery
+│   │   ├── FuelCell
+│   │   └── SuperCapacitor
+│   └── MainEngineForMechanicalPropulsion
+├── SerialSystem
+│   └── SerialSystemElectric
+│       └── Genset  (Engine + Generator in series)
+
+Node
+├── Switchboard  (electric bus)
+└── Shaftline    (mechanical bus)
+```
+
+---
+
+### Basic Modeling Principles
+
+#### Sign Convention
+
+Every component is modelled with an **input port** and an **output port**. Power values carry a sign that encodes the direction of energy flow:
+
+| Condition | P_in | P_out |
+|-----------|------|-------|
+| Forward (normal) operation | > 0 | > 0 |
+| Reverse operation | < 0 | < 0 |
+
+**Load percentage** (used to look up fuel / efficiency curves):
+
+$$PL = \frac{P_{out}}{P_{rated}} \quad \text{(forward)} \qquad PL = \frac{P_{in}}{P_{rated}} \quad \text{(reverse)}$$
+
+**Efficiency**:
+
+$$\eta = \frac{P_{out}}{P_{in}} \quad \text{(forward)} \qquad \eta = \frac{P_{in}}{P_{out}} \quad \text{(reverse)}$$
+
+#### Power-Type Sign Conventions
+
+| `TypePower` | Component examples | P_in (source side) | P_out (bus side) | Notes |
+|---|---|---|---|---|
+| `POWER_SOURCE` | Generator, Genset | Mechanical / fuel energy (+) | Electrical power to switchboard (+) | P_in is fuel equivalent |
+| `POWER_CONSUMER` | Propulsion drive, hotel load | Electrical power from switchboard (+) | Shaft / mechanical power (+) | P_in from bus |
+| `PTI_PTO` | Shaft generator / motor | Motoring: P_in > 0, P_out > 0 | Generating: P_in < 0, P_out < 0 | Bidirectional |
+| `ENERGY_STORAGE` | Battery, Supercapacitor | Charging: P_in > 0 | Discharging: P_out > 0 | P_in/P_out sign changes with mode |
+
+#### Serial Component Efficiency
+
+When multiple components are arranged in series (e.g., engine → gearbox → generator), the output power is:
+
+$$P_{out,n} = \eta_1 \cdot \eta_2 \cdots \eta_n \cdot P_{in,1}$$
+
+and equivalently the combined efficiency is:
+
+$$\eta_{total} = \prod_{i=1}^{n} \eta_i$$
+
+`SerialSystem` and `SerialSystemElectric` implement this calculation transparently.
+
+---
+
+### Power Balance Calculation
+
+At each time step the switchboard / shaftline solves for how much power each source must supply, given the total consumer demand.
+
+**Symmetric load sharing** (equal load *ratio* across all connected sources of the same type):
+
+$$P_{out,k} = \frac{P_{rated,k}}{\sum_j P_{rated,j}} \cdot P_{load,total}$$
+
+where the sum is over all connected, running power sources *j*, and *k* is an individual source.
+
+The algorithm iterates:
+
+```
+1.  Collect consumer loads → total bus load
+2.  Distribute load to power sources (symmetric sharing)
+3.  If any source exceeds its rated power, re-distribute remaining load
+    across sources still within capacity
+4.  Calculate fuel consumption and emissions for each prime mover
+    at its operating point
+5.  Aggregate results into FEEMSResult
+```
+
+---
 
 ## Component Models
 
@@ -33,22 +199,36 @@ Base class for all atomic components.
 
 **Key Methods:**
 - `get_efficiency_from_load_percentage(load: Union[float, np.ndarray]) -> Union[float, np.ndarray]`
-  - Returns efficiency at given load percentage(s)
+  - Returns efficiency at given load percentage(s). Clipped to [0.01, 1.0].
 
-- `get_power_output_from_bidirectional_input(...) -> Tuple[...]]`
-  - Calculates output power from input power considering efficiency
+- `get_load(power=None) -> Union[float, np.ndarray]`
+  - Returns `|power| / rated_power`. Uses `power_input` if `power` is None.
 
-- `get_power_input_from_bidirectional_output(...) -> Tuple[...]`
-  - Calculates input power from output power considering efficiency
+- `get_power_output_from_bidirectional_input(power_input, strict_power_balance=False) -> Tuple[power_output, load]`
+  - Calculates output power from input power accounting for efficiency (bidirectional).
+
+- `get_power_input_from_bidirectional_output(power_output, strict_power_balance=False) -> Tuple[power_input, load]`
+  - Calculates input power from output power accounting for efficiency (bidirectional).
+
+- `set_power_input_from_output(power_output) -> Tuple[power_input, load]`
+  - Sets `self.power_output` and computes/stores `self.power_input`. Returns `(power_input, load)`.
+
+- `set_power_output_from_input(power_input) -> Tuple[power_output, load]`
+  - Sets `self.power_input` and computes/stores `self.power_output`. Returns `(power_output, load)`.
 
 #### `Component`
 
-Enhanced component class with serial system support.
+Base class for all components that carry power state (`power_input`, `power_output`, `status`).
+`Engine`, `Genset`, `MainEngineForMechanicalPropulsion` inherit from this directly.
 
-**Additional Attributes:**
-- `switchboard_id: SwbId` - Connected switchboard identifier
-- `status: np.ndarray` - On/off status array
-- `load_sharing_mode: np.ndarray` - Load sharing configuration
+**Attributes:**
+- `name: str`, `type_: TypeComponent`, `power_type: TypePower`
+- `rated_power: Power_kW`, `rated_speed: Speed_rpm`
+- `status: np.ndarray` - On/off boolean array (length = number of time steps)
+- `power_input: np.ndarray`, `power_output: np.ndarray`
+- `uid: str` - Auto-generated UUID if not provided
+
+> Note: `switchboard_id` and `load_sharing_mode` are defined on `ElectricComponent`, not `Component`.
 
 #### `SerialSystem`
 
@@ -57,9 +237,7 @@ Base class for components arranged in series.
 **Attributes:**
 - `components: List[Component]` - Ordered list of components in series
 
-**Methods:**
-- `get_total_efficiency(...) -> float` - Total efficiency through the chain
-- `set_power_input_from_output(...) -> Tuple[...]` - Calculate input from output power
+**Methods:** Inherits all `BasicComponent` methods including `set_power_input_from_output()` and `set_power_output_from_input()`.
 
 ### Mechanical Components
 
@@ -84,7 +262,10 @@ engine = Engine(
 
 **Attributes:**
 - `bsfc_curve: np.ndarray` - Brake Specific Fuel Consumption curve [[load, bsfc], ...]
-- `fuel_type: FuelType` - Fuel type (default: DIESEL)
+- `fuel_type: TypeFuel` - Fuel type (default: `TypeFuel.DIESEL`)
+- `fuel_origin: FuelOrigin` - Fuel origin (default: `FuelOrigin.FOSSIL`)
+- `engine_cycle_type: EngineCycleType` - Engine cycle (default: `EngineCycleType.DIESEL`)
+- `nox_calculation_method: NOxCalculationMethod` - NOx calculation method (default: `NOxCalculationMethod.TIER_2`)
 
 **Key Methods:**
 - `get_engine_run_point_from_power_out_kw(power_kw: Optional[np.ndarray] = None) -> EngineRunPoint`
@@ -95,50 +276,132 @@ engine = Engine(
 - `fuel_flow_rate_kg_per_s: FuelConsumption` - Fuel consumption
 - `bsfc_g_per_kWh: np.ndarray` - BSFC at operating point
 - `load_ratio: np.ndarray` - Load as fraction of rated power
-- `nox_emission_kg_per_s: np.ndarray` - NOx emissions
+- `emissions_g_per_s: Dict[EmissionType, np.ndarray]` - Emissions per second keyed by `EmissionType` (NOX, SOX, PM, CO, HC, CH4, N2O)
 
 #### `EngineDualFuel`
 
-Engine capable of running on two different fuels.
+Engine that burns a primary fuel (e.g., LNG) with a small diesel pilot injection for ignition.
+Inherits from `Engine`.
 
 ```python
 from feems.components_model.component_mechanical import EngineDualFuel
-from feems.fuel import FuelType
+from feems.fuel import TypeFuel, FuelOrigin
+from feems.types_for_feems import EngineCycleType, NOxCalculationMethod
 
 dual_fuel = EngineDualFuel(
     type_=TypeComponent.MAIN_ENGINE,
     name="Dual Fuel Engine",
     rated_power=Power_kW(5000),
-    rated_speed=Speed_rpm(750),
-    bsfc_curve_fuel_1=bsfc_diesel,
-    bsfc_curve_fuel_2=bsfc_lng,
-    fuel_type_fuel_1=FuelType.DIESEL,
-    fuel_type_fuel_2=FuelType.LNG
+    rated_speed=Speed_rpm(120),
+    bsfc_curve=bsfc_lng,           # Main fuel BSFC curve (g/kWh vs. load)
+    fuel_type=TypeFuel.NATURAL_GAS,
+    fuel_origin=FuelOrigin.FOSSIL,
+    bspfc_curve=bspfc_pilot,        # Pilot fuel BSFC curve (g/kWh vs. load)
+    pilot_fuel_type=TypeFuel.DIESEL,
+    pilot_fuel_origin=FuelOrigin.FOSSIL,
+    engine_cycle_type=EngineCycleType.OTTO,
+    nox_calculation_method=NOxCalculationMethod.TIER_3,
+)
+```
+
+**Additional Attributes (vs `Engine`):**
+- `bspfc_curve: np.ndarray` - Brake Specific Pilot Fuel Consumption curve (g/kWh vs. load)
+- `pilot_fuel_type: TypeFuel` - Pilot fuel type (default: `TypeFuel.DIESEL`)
+- `pilot_fuel_origin: FuelOrigin` - Pilot fuel origin (default: `FuelOrigin.FOSSIL`)
+
+**Returns:** `EngineRunPoint` with `fuel_flow_rate_kg_per_s` containing two fuels (main + pilot).
+The `bspfc_g_per_kWh` field is also populated on the returned `EngineRunPoint`.
+
+#### `EngineMultiFuel`
+
+Engine that can operate on multiple alternative fuel configurations (e.g., diesel, LNG, methanol).
+Each configuration is defined by a `FuelCharacteristics` object.
+
+```python
+from feems.components_model.component_mechanical import EngineMultiFuel, FuelCharacteristics
+from feems.fuel import TypeFuel, FuelOrigin
+from feems.types_for_feems import EngineCycleType, NOxCalculationMethod
+
+fuel_options = [
+    FuelCharacteristics(
+        main_fuel_type=TypeFuel.DIESEL,
+        main_fuel_origin=FuelOrigin.FOSSIL,
+        bsfc_curve=bsfc_diesel,
+    ),
+    FuelCharacteristics(
+        main_fuel_type=TypeFuel.NATURAL_GAS,
+        main_fuel_origin=FuelOrigin.FOSSIL,
+        bsfc_curve=bsfc_lng,
+        bspfc_curve=bspfc_pilot,
+        pilot_fuel_type=TypeFuel.DIESEL,
+        pilot_fuel_origin=FuelOrigin.FOSSIL,
+        engine_cycle_type=EngineCycleType.OTTO,
+        nox_calculation_method=NOxCalculationMethod.TIER_3,
+    ),
+]
+
+engine = EngineMultiFuel(
+    type_=TypeComponent.MAIN_ENGINE,
+    name="Multi-Fuel Engine",
+    rated_power=Power_kW(5000),
+    rated_speed=Speed_rpm(120),
+    multi_fuel_characteristics=fuel_options,
 )
 ```
 
 **Attributes:**
-- `bsfc_curve_fuel_1: np.ndarray` - BSFC curve for fuel 1
-- `bsfc_curve_fuel_2: np.ndarray` - BSFC curve for fuel 2
-- `fuel_type_fuel_1: FuelType` - Primary fuel type
-- `fuel_type_fuel_2: FuelType` - Secondary fuel type
+- `multi_fuel_characteristics: List[FuelCharacteristics]` - Available fuel configurations
+- `fuel_in_use: FuelCharacteristics` - Currently active fuel configuration
 
 **Methods:**
-- `get_engine_run_point_from_power_out_kw(..., fuel_sharing: Optional[np.ndarray] = None)`
-  - `fuel_sharing`: Array specifying fraction of power from each fuel
+- `set_fuel_in_use(fuel_type=None, fuel_origin=None)` - Switch active fuel. Defaults to first.
+- `engine_in_use` *(property)* - Returns the active `Engine` or `EngineDualFuel` object.
+- `get_engine_run_point_from_power_out_kw(...)` - Same signature as `Engine`.
+
+#### `FuelCharacteristics`
+
+Dataclass defining one fuel configuration for `EngineMultiFuel`.
+
+```python
+from feems.components_model.component_mechanical import FuelCharacteristics
+
+FuelCharacteristics(
+    nox_calculation_method=NOxCalculationMethod.TIER_2,  # default
+    main_fuel_type=TypeFuel.DIESEL,                      # default
+    main_fuel_origin=FuelOrigin.FOSSIL,                  # default
+    pilot_fuel_type=None,                                # None for no pilot
+    pilot_fuel_origin=None,
+    bsfc_curve=None,                    # np.ndarray [[load, bsfc_g_per_kWh], ...]
+    bspfc_curve=None,                   # Pilot fuel BSFC curve (optional)
+    emission_curves=None,               # List[EmissionCurve]
+    engine_cycle_type=EngineCycleType.DIESEL,
+)
+```
 
 #### `MainEngineForMechanicalPropulsion`
 
-Main propulsion engine with propeller interaction.
+Wraps an `Engine` / `EngineDualFuel` / `EngineMultiFuel` for use in a mechanical shaftline.
 
-**Additional Attributes:**
-- `propeller: Propeller` - Connected propeller
-- `gearbox: Optional[Gearbox]` - Optional gearbox
+```python
+from feems.components_model.component_mechanical import MainEngineForMechanicalPropulsion
+
+main_engine = MainEngineForMechanicalPropulsion(
+    name="Main Engine",
+    engine=engine,          # Engine / EngineDualFuel / EngineMultiFuel
+    shaft_line_id=1,        # Shaftline ID (default: 1)
+)
+```
+
+**Attributes:**
+- `engine: Union[Engine, EngineDualFuel, EngineMultiFuel]`
+- `shaft_line_id: int`
 
 **Methods:**
-- `get_engine_run_point_from_ship_speed(...)`
-  - Calculate engine operating point from ship speed
-  - Includes propeller loading and water interaction
+- `get_engine_run_point_from_power_out_kw(power=None, fuel_specified_by=..., fuel_type=None, fuel_origin=None) -> EngineRunPoint`
+
+#### `MainEngineWithGearBoxForMechanicalPropulsion`
+
+`MainEngineForMechanicalPropulsion` subclass with an integrated gearbox efficiency model.
 
 ### Electric Components
 
@@ -223,10 +486,16 @@ battery = Battery(
 - `eff_charging: float` - Charging efficiency (0-1)
 - `eff_discharging: float` - Discharging efficiency (0-1)
 
+**Properties:**
+- `max_charging_power_kw: Power_kW` - Maximum charging power in kW (`charging_rate_c × rated_capacity_kwh`)
+- `max_discharging_power_kw: Power_kW` - Maximum discharging power in kW
+
 **Methods:**
-- `get_soc_from_electric_power(...) -> Tuple[np.ndarray, np.ndarray]`
-  - Calculate state of charge from power profile
-  - Returns (SoC array, actual power array)
+- `get_soc(time_interval_s, integration_method, accumulated_time_series=False) -> np.ndarray`
+  - Calculate state of charge from power profile. `power_input` must be set first.
+  - Returns SoC array (initial SoC + integrated charge/discharge)
+- `get_energy_stored_kj(time_interval_s, integration_method, accumulated_time_series=False) -> Union[float, np.ndarray]`
+  - Calculate net energy stored (kJ) from current `power_input`
 
 #### `ShorePowerConnection`
 
@@ -317,19 +586,17 @@ genset = Genset(
 ```
 
 **Attributes:**
-- `aux_engine: Engine` - Auxiliary engine
-- `generator: ElectricMachine` - Generator
-- `fuel_type: FuelType` - Inherited from engine
+- `aux_engine: Union[Engine, EngineDualFuel, EngineMultiFuel]` - Auxiliary engine
+- `generator: ElectricMachine` - Generator (or generator+rectifier serial system for DC gensets)
 
 **Methods:**
-- `get_fuel_cons_load_bsfc_from_power_out_generator_kw(power_kw, fuel_specified_by=...) -> GensetRunPoint`
+- `get_fuel_cons_load_bsfc_from_power_out_generator_kw(power=None, fuel_specified_by=FuelSpecifiedBy.IMO, lhv_mj_per_g=None, ghg_emission_factor_well_to_tank_gco2eq_per_mj=None, ghg_emission_factor_tank_to_wake=None, fuel_type=None, fuel_origin=None) -> GensetRunPoint`
   - Calculate fuel consumption from generator electrical output
-  - Returns complete operating point with fuel, emissions, efficiency
+  - `fuel_type` / `fuel_origin`: override for `EngineMultiFuel` gensets
 
-**Returns:** `GensetRunPoint`
-- `engine: EngineRunPoint` - Engine operating point
-- `generator_load_ratio: np.ndarray` - Generator load
-- `generator_eff: np.ndarray` - Generator efficiency
+**Returns:** `GensetRunPoint` *(NamedTuple)*
+- `genset_load_ratio: np.ndarray` - Generator load as fraction of rated power
+- `engine: EngineRunPoint` - Engine operating point (fuel, BSFC, emissions)
 
 #### `SerialSystemElectric`
 
@@ -356,6 +623,171 @@ propulsion_drive = SerialSystemElectric(
 - `set_power_input_from_output(power_output) -> Tuple[np.ndarray, np.ndarray]`
   - Calculate switchboard power from shaft power
   - Returns (power_input, load_ratio)
+
+### Energy Storage
+
+#### `BatterySystem`
+
+Battery with an integrated DC/DC converter (extends `Battery`).
+
+```python
+from feems.components_model.component_electric import BatterySystem
+
+battery_sys = BatterySystem(
+    name="Battery System",
+    battery=battery,          # Battery object
+    converter=converter,      # ElectricComponent (DC/DC converter)
+    switchboard_id=SwbId(1),
+)
+```
+
+**Attributes:** Same as `Battery` plus:
+- `battery: Battery`
+- `converter: ElectricComponent`
+
+#### `SuperCapacitor`
+
+Supercapacitor energy storage.
+
+```python
+from feems.components_model.component_electric import SuperCapacitor
+
+supercap = SuperCapacitor(
+    name="Supercapacitor",
+    rated_capacity_wh=5000,    # Capacity in Wh
+    rated_power=Power_kW(500),
+    soc0=0.8,
+    eff_charging=0.995,
+    eff_discharging=0.995,
+    switchboard_id=SwbId(1),
+)
+```
+
+**Methods:** Same as `Battery`: `get_soc()`, `get_energy_stored_kj()`.
+
+#### `SuperCapacitorSystem`
+
+`SuperCapacitor` with an integrated converter.
+
+### Fuel Cell
+
+#### `FuelCell`
+
+Hydrogen (or other fuel) fuel cell module.
+
+```python
+from feems.components_model.component_electric import FuelCell
+from feems.fuel import TypeFuel, FuelOrigin
+
+fuel_cell = FuelCell(
+    name="Fuel Cell Module",
+    rated_power=Power_kW(500),
+    eff_curve=np.array([[0.25, 0.5, 0.75, 1.0],
+                        [0.55, 0.58, 0.56, 0.53]]).T,
+    fuel_type=TypeFuel.HYDROGEN,           # default
+    fuel_origin=FuelOrigin.RENEWABLE_NON_BIO,  # default
+)
+```
+
+**Methods:**
+- `get_fuel_cell_run_point(power_out_kw=None, fuel_specified_by=FuelSpecifiedBy.IMO, ...) -> ComponentRunPoint`
+  - Returns fuel consumption and efficiency at the given output power.
+
+#### `FuelCellSystem`
+
+`FuelCell` + DC/DC converter, connected to a switchboard.
+
+```python
+from feems.components_model.component_electric import FuelCellSystem
+
+fc_system = FuelCellSystem(
+    name="Fuel Cell System",
+    fuel_cell_module=fuel_cell,
+    converter=converter,        # ElectricComponent (DC/DC converter)
+    switchboard_id=SwbId(1),
+    number_modules=2,           # Number of parallel fuel cell modules (default: 1)
+)
+```
+
+**Methods:**
+- `get_fuel_cell_run_point(power_out_kw=None, fuel_specified_by=..., ...) -> ComponentRunPoint`
+
+### PTI/PTO
+
+#### `PTIPTO`
+
+Power Take-In / Power Take-Off system — bidirectional shaft-electric connection.
+Extends `SerialSystemElectric` with `power_type=TypePower.PTI_PTO`.
+
+```python
+from feems.components_model.component_electric import PTIPTO
+
+pti_pto = PTIPTO(
+    name="PTI/PTO",
+    components=[converter, electric_machine],  # Ordered from switchboard side
+    switchboard_id=SwbId(1),
+    rated_power=Power_kW(2000),
+    rated_speed=Speed_rpm(150),
+    shaft_line_id=1,            # Shaftline this PTI/PTO is connected to (default: 1)
+)
+```
+
+**Additional Attributes:**
+- `shaft_line_id: int` - ID of the connected mechanical shaftline
+- `full_pti_mode: np.ndarray` - Boolean array, True when operating in full PTI mode
+
+### Run Point Data Classes
+
+#### `ComponentRunPoint`
+
+Generic run point for components that don't produce fuel but consume it (e.g., fuel cells).
+
+**Fields:**
+- `load_ratio: np.ndarray`
+- `efficiency: np.ndarray`
+- `fuel_flow_rate_kg_per_s: FuelConsumption`
+- `emissions_g_per_s: Dict[EmissionType, np.ndarray]` *(default: empty dict)*
+
+### System Types
+
+#### `MechanicalPropulsionSystem`
+
+System for conventional mechanical propulsion (one or more shaftlines with main engines).
+
+```python
+from feems.system_model import MechanicalPropulsionSystem
+
+# components_list can mix main engines, PTI/PTO, and mechanical loads.
+# Categorization is automatic based on component type and shaft_line_id.
+mech_system = MechanicalPropulsionSystem(
+    name="Mechanical Propulsion",
+    components_list=[main_engine_1, propeller_load_1],
+)
+```
+
+**Attributes (auto-populated from `components_list`):**
+- `main_engines: List[MainEngineForMechanicalPropulsion]`
+- `pti_ptos: List[PTIPTO]`
+- `mechanical_loads: List[MechanicalComponent]`
+
+- `get_fuel_energy_consumption_running_time(fuel_specified_by=...) -> FEEMSResult`
+
+#### `MechanicalPropulsionSystemWithElectricPowerSystem`
+
+Combined mechanical propulsion + separate electric system (connected via optional PTI/PTO).
+
+```python
+from feems.system_model import MechanicalPropulsionSystemWithElectricPowerSystem
+
+combined = MechanicalPropulsionSystemWithElectricPowerSystem(
+    name="Combined System",
+    electric_system=electric_power_system,     # ElectricPowerSystem
+    mechanical_system=mechanical_system,       # MechanicalPropulsionSystem
+)
+```
+
+- `get_fuel_energy_consumption_running_time(time_interval_s, fuel_specified_by=...) -> FEEMSResultForMachinerySystem`
+  - Returns `FEEMSResultForMachinerySystem(electric_system: FEEMSResult, mechanical_system: FEEMSResult)`
 
 ## System Model
 
@@ -454,7 +886,7 @@ system = ElectricPowerSystem(
   - Updates `power_output` and `power_input` attributes of all components
   - Automatically handles component efficiency losses through serial system calculations
 
-- `get_fuel_energy_consumption_running_time() -> FEEMSResultForMachinerySystem`
+- `get_fuel_energy_consumption_running_time(fuel_specified_by=FuelSpecifiedBy.IMO, fuel_option=None) -> FEEMSResult`
   - Returns comprehensive results including:
     - Total fuel consumption
     - Total emissions (CO2, NOx, etc.)
@@ -462,7 +894,7 @@ system = ElectricPowerSystem(
     - Operating hours
     - Per-component results
 
-**Returns:** `FEEMSResultForMachinerySystem`
+**Returns:** `FEEMSResult`
 ```python
 result = system.get_fuel_energy_consumption_running_time()
 
@@ -477,11 +909,16 @@ genset_hours = result.running_hours_genset_total_hr
 detail_df = result.detail_result
 ```
 
+> **Note**: For `MechanicalPropulsionSystemWithElectricPowerSystem`, the method returns
+> `FEEMSResultForMachinerySystem` (a NamedTuple with `.electric_system: FEEMSResult` and
+> `.mechanical_system: FEEMSResult`). Access sub-results as
+> `result.electric_system.multi_fuel_consumption_total_kg`, etc.
+
 #### Results Data Structure
 
-**`FEEMSResultForMachinerySystem`**
+**`FEEMSResult`**
 
-Comprehensive results object returned by `get_fuel_energy_consumption_running_time()`. Contains aggregated system-level metrics and detailed per-component breakdowns.
+Comprehensive results object returned by `ElectricPowerSystem.get_fuel_energy_consumption_running_time()`. Contains aggregated system-level metrics and detailed per-component breakdowns.
 
 **System-Level Attributes:**
 
@@ -489,6 +926,7 @@ Comprehensive results object returned by `get_fuel_energy_consumption_running_ti
 - `multi_fuel_consumption_total_kg: FuelConsumption` - Total fuel consumed for all fuel types
   - Access mass: `result.multi_fuel_consumption_total_kg.fuels[0].mass_or_mass_fraction`
   - Supports multiple fuels (diesel, LNG, hydrogen, etc.)
+- `fuel_consumption_total_kg: float` *(property)* - Scalar total fuel consumption in kg
 
 **Emissions:**
 - `co2_emission_total_kg: GHGEmissions` - Total CO2 equivalent emissions
@@ -501,21 +939,23 @@ Comprehensive results object returned by `get_fuel_energy_consumption_running_ti
   - PM: `result.total_emission_kg[EmissionType.PM]`
 
 **Energy Consumption:**
-- `energy_consumption_total_mj: float` - Total energy consumed by all components
-- `energy_consumption_propulsion_total_mj: float` - Energy for propulsion only
+- `energy_consumption_electric_total_mj: float` - Electrical energy consumed
+- `energy_consumption_mechanical_total_mj: float` - Mechanical energy consumed (PTI/PTO)
+- `energy_consumption_propulsion_total_mj: float` - Energy for propulsion shaft
 - `energy_consumption_auxiliary_total_mj: float` - Energy for auxiliary loads
+- `energy_input_mechanical_total_mj: float` - Mechanical energy input (generator/PTO)
+- `energy_input_electric_total_mj: float` - Electrical energy input (shore power)
 
 **Operating Hours:**
 - `running_hours_genset_total_hr: float` - Total genset operating hours (all generators combined)
-- `running_hours_main_engine_total_hr: float` - Total main engine hours
+- `running_hours_main_engines_hr: float` - Total main engine hours
 - `running_hours_fuel_cell_total_hr: float` - Total fuel cell operating hours
-- `running_hours_battery_total_hr: float` - Battery charge/discharge hours
+- `running_hours_pti_pto_total_hr: float` - PTI/PTO operating hours
 
 **Energy Storage:**
-- `net_energy_stored_energy_storage_mj: float` - Net energy change in batteries/storage
-  - Positive: Energy stored
-  - Negative: Energy depleted
-- `net_energy_from_shore_power_mj: float` - Total energy received from shore power
+- `energy_stored_total_mj: float` - Net energy change in batteries/storage
+  - Positive: Energy stored; Negative: Energy depleted
+- `load_ratio_genset: Optional[float]` - Average genset load ratio
 
 **Per-Component Results:**
 - `detail_result: pd.DataFrame` - Detailed breakdown for each component
@@ -547,11 +987,14 @@ result = system.get_fuel_energy_consumption_running_time()
 
 # System totals
 print(f"Total fuel: {result.multi_fuel_consumption_total_kg.fuels[0].mass_or_mass_fraction:.2f} kg")
+print(f"Total fuel (scalar): {result.fuel_consumption_total_kg:.2f} kg")
 print(f"Total CO2 (Tank-to-Wake): {result.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel:.2f} kg")
 print(f"Total CO2 (Well-to-Wake): {result.co2_emission_total_kg.well_to_wake_kg_or_gco2eq_per_gfuel:.2f} kg")
+print(f"Electrical energy: {result.energy_consumption_electric_total_mj:.2f} MJ")
 print(f"Propulsion energy: {result.energy_consumption_propulsion_total_mj:.2f} MJ")
 print(f"Auxiliary energy: {result.energy_consumption_auxiliary_total_mj:.2f} MJ")
 print(f"Genset hours: {result.running_hours_genset_total_hr:.2f} hr")
+print(f"Energy stored: {result.energy_stored_total_mj:.2f} MJ")
 
 # Per-component analysis
 df = result.detail_result
@@ -587,20 +1030,41 @@ plt.show()
 
 ## Fuel and Emissions
 
-### `FuelType`
+### `TypeFuel`
 
 Enumeration of fuel types.
 
 ```python
-from feems.fuel import FuelType
+from feems.fuel import TypeFuel
 
-FuelType.DIESEL
-FuelType.HFO            # Heavy Fuel Oil
-FuelType.LNG            # Liquefied Natural Gas
-FuelType.METHANOL
-FuelType.AMMONIA
-FuelType.HYDROGEN
-FuelType.BATTERY_STORAGE
+TypeFuel.DIESEL
+TypeFuel.HFO            # Heavy Fuel Oil
+TypeFuel.NATURAL_GAS    # Liquefied Natural Gas (LNG)
+TypeFuel.HYDROGEN
+TypeFuel.AMMONIA
+TypeFuel.METHANOL
+TypeFuel.ETHANOL
+TypeFuel.LPG_PROPANE
+TypeFuel.LPG_BUTANE
+TypeFuel.LFO            # Light Fuel Oil
+TypeFuel.LSFO_CRUDE     # Low Sulphur Fuel Oil (Crude)
+TypeFuel.LSFO_BLEND     # Low Sulphur Fuel Oil (Blend)
+TypeFuel.ULSFO          # Ultra Low Sulphur Fuel Oil
+TypeFuel.VLSFO          # Very Low Sulphur Fuel Oil
+TypeFuel.NONE
+```
+
+### `FuelOrigin`
+
+Origin classification for fuel (affects lifecycle GHG emission factors).
+
+```python
+from feems.fuel import FuelOrigin
+
+FuelOrigin.FOSSIL           # Conventional fossil fuel
+FuelOrigin.BIO              # Biofuel
+FuelOrigin.RENEWABLE_NON_BIO  # Renewable non-bio (e.g., e-fuels, RFNBO)
+FuelOrigin.NONE
 ```
 
 ### `FuelSpecifiedBy`
@@ -610,9 +1074,10 @@ Emission calculation methodology.
 ```python
 from feems.fuel import FuelSpecifiedBy
 
-FuelSpecifiedBy.IMO                    # IMO emission factors
-FuelSpecifiedBy.FUEL_EU_MARITIME       # FuelEU Maritime methodology
-FuelSpecifiedBy.USER_DEFINED           # Custom emission factors
+FuelSpecifiedBy.IMO              # IMO emission factors (default)
+FuelSpecifiedBy.FUEL_EU_MARITIME # FuelEU Maritime methodology
+FuelSpecifiedBy.USER             # Custom emission factors (USER-defined)
+FuelSpecifiedBy.NONE
 ```
 
 ### `FuelConsumption`
@@ -623,20 +1088,26 @@ Fuel consumption data structure.
 - `fuels: List[Fuel]` - List of fuel objects with consumption data
 
 Each `Fuel` object contains:
-- `fuel_type: FuelType`
+- `fuel_type: TypeFuel`
 - `mass_or_mass_fraction: float` - Total mass in kg or mass fraction
 - `lhv_mj_per_g: float` - Lower heating value
 
 ### `GHGEmissions`
 
-Greenhouse gas emissions data.
+Greenhouse gas emissions data (dataclass in `feems.fuel`).
 
-**Attributes:**
-- `tank_to_wake_kg_or_gco2eq_per_gfuel: float` - Operational emissions
-- `well_to_tank_kg_or_gco2eq_per_gfuel: float` - Upstream emissions
-- `well_to_wake_kg_or_gco2eq_per_gfuel: float` - Total lifecycle emissions
-- `tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip: float` - Excluding methane slip
-- (Additional attributes for green fuel accounting)
+**Fields:**
+- `tank_to_wake_kg_or_gco2eq_per_gfuel: float` - Operational (combustion) emissions
+- `well_to_tank_kg_or_gco2eq_per_gfuel: float` - Upstream (supply chain) emissions
+- `tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip: float` - Operational emissions excluding methane slip
+- `tank_to_wake_kg_or_gco2eq_per_gfuel_from_green_fuel: float` - Contribution from green fuels
+- `tank_to_wake_kg_or_gco2eq_per_gfuel_without_slip_from_green_fuel: float`
+
+**Properties (computed):**
+- `well_to_wake_kg_or_gco2eq_per_gfuel` - Total lifecycle (tank-to-wake + well-to-tank)
+- `well_to_wake_without_slip_kg_or_gco2eq_per_gfuel` - Lifecycle excluding methane slip
+- `tank_to_wake_emissions_kg_for_ets` - ETS-reportable emissions (excludes green fuel credit)
+- `tank_to_wake_emissions_without_slip_kg_for_ets` - ETS emissions excluding methane slip
 
 ## Types
 
@@ -657,21 +1128,36 @@ Component type enumeration.
 ```python
 from feems.types_for_feems import TypeComponent
 
-TypeComponent.AUXILIARY_ENGINE
+TypeComponent.NONE
 TypeComponent.MAIN_ENGINE
+TypeComponent.AUXILIARY_ENGINE
 TypeComponent.GENERATOR
-TypeComponent.ELECTRIC_MOTOR
-TypeComponent.BATTERY
-TypeComponent.SHORE_POWER
-TypeComponent.TRANSFORMER
-TypeComponent.RECTIFIER
-TypeComponent.INVERTER
-TypeComponent.POWER_CONVERTER
-TypeComponent.GENSET
 TypeComponent.PROPULSION_DRIVE
-TypeComponent.PTI_PTO_SYSTEM
-TypeComponent.COGAS
 TypeComponent.OTHER_LOAD
+TypeComponent.PTI_PTO_SYSTEM
+TypeComponent.BATTERY_SYSTEM
+TypeComponent.FUEL_CELL_SYSTEM
+TypeComponent.RECTIFIER
+TypeComponent.MAIN_ENGINE_WITH_GEARBOX
+TypeComponent.ELECTRIC_MOTOR
+TypeComponent.GENSET
+TypeComponent.TRANSFORMER
+TypeComponent.INVERTER
+TypeComponent.CIRCUIT_BREAKER
+TypeComponent.ACTIVE_FRONT_END
+TypeComponent.POWER_CONVERTER
+TypeComponent.SYNCHRONOUS_MACHINE
+TypeComponent.INDUCTION_MACHINE
+TypeComponent.GEARBOX
+TypeComponent.FUEL_CELL
+TypeComponent.PROPELLER_LOAD
+TypeComponent.OTHER_MECHANICAL_LOAD
+TypeComponent.BATTERY
+TypeComponent.SUPERCAPACITOR
+TypeComponent.SUPERCAPACITOR_SYSTEM
+TypeComponent.SHORE_POWER
+TypeComponent.COGAS
+TypeComponent.COGES
 ```
 
 ### `TypePower`
@@ -681,11 +1167,55 @@ Power type classification.
 ```python
 from feems.types_for_feems import TypePower
 
-TypePower.POWER_SOURCE           # Generates power
-TypePower.POWER_CONSUMER         # Consumes power
-TypePower.POWER_TRANSMISSION     # Transmits power
-TypePower.PTI_PTO                # Bidirectional
-TypePower.ENERGY_STORAGE         # Storage system
+TypePower.NONE
+TypePower.POWER_SOURCE           # Generates power (gensets, shore power, fuel cells)
+TypePower.POWER_CONSUMER         # Consumes power (motors, loads)
+TypePower.PTI_PTO                # Bidirectional (shaft generator/motor)
+TypePower.ENERGY_STORAGE         # Storage system (batteries, supercapacitors)
+TypePower.POWER_TRANSMISSION     # Transmits power (transformers, converters)
+```
+
+### `EmissionType`
+
+Pollutant type enumeration used as keys in `EngineRunPoint.emissions_g_per_s` and
+`FEEMSResult.total_emission_kg`.
+
+```python
+from feems.types_for_feems import EmissionType
+
+EmissionType.SOX   # Sulphur oxides
+EmissionType.NOX   # Nitrogen oxides
+EmissionType.CO    # Carbon monoxide
+EmissionType.PM    # Particulate matter
+EmissionType.HC    # Hydrocarbons
+EmissionType.CH4   # Methane
+EmissionType.N2O   # Nitrous oxide
+```
+
+### `EngineCycleType`
+
+Engine thermodynamic cycle type (affects FuelEU Maritime classification for LNG engines).
+
+```python
+from feems.types_for_feems import EngineCycleType
+
+EngineCycleType.DIESEL                  # Diesel cycle (default)
+EngineCycleType.OTTO                    # Otto cycle
+EngineCycleType.LEAN_BURN_SPARK_IGNITION  # LBSI cycle
+EngineCycleType.NONE
+```
+
+### `NOxCalculationMethod`
+
+Method for calculating NOx emissions.
+
+```python
+from feems.types_for_feems import NOxCalculationMethod
+
+NOxCalculationMethod.TIER_2    # IMO Tier 2 (default)
+NOxCalculationMethod.TIER_1    # IMO Tier 1
+NOxCalculationMethod.TIER_3    # IMO Tier 3
+NOxCalculationMethod.CURVE     # Custom NOx emission curve (requires EmissionType.NOX in emissions_curves)
 ```
 
 ## Utilities
@@ -791,8 +1321,7 @@ system.do_power_balance_calculation()
 result_genset = system.get_fuel_energy_consumption_running_time()
 
 # Compare
-fuel_saved = result_genset.multi_fuel_consumption_total_kg.fuels[0].mass_or_mass_fraction - \
-             result_shore.multi_fuel_consumption_total_kg.fuels[0].mass_or_mass_fraction
+fuel_saved = result_genset.fuel_consumption_total_kg - result_shore.fuel_consumption_total_kg
 ```
 
 ## Error Handling
