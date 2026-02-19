@@ -61,7 +61,7 @@ Medium
 
 ## Status
 <!-- Backlog → Plan → In Progress → Done -->
-Backlog
+In Progress
 
 ## PDCA Links
 - Plan doc: `docs/01-plan/`
