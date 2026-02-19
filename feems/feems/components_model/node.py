@@ -9,6 +9,7 @@ import pandas as pd
 from .. import get_logger
 from ..exceptions import InputError
 from ..fuel import (
+    Fuel,
     FuelConsumerClassFuelEUMaritime,
     FuelConsumption,
     FuelOrigin,
@@ -119,6 +120,7 @@ def get_fuel_emission_energy_balance_for_component(
     isSystemMechanical: bool = False,
     fuel_type: Optional[TypeFuel] = None,
     fuel_origin: Optional[FuelOrigin] = None,
+    user_defined_fuels: Optional[List[Fuel]] = None,
 ) -> FEEMSResult:
     def _resolve_fuel_consumer_class(
         source_component: Union[PowerSource, PowerConsumer],
@@ -175,6 +177,7 @@ def get_fuel_emission_energy_balance_for_component(
             fuel_specified_by=fuel_specified_by,
             fuel_type=fuel_type,
             fuel_origin=fuel_origin,
+            user_defined_fuels=user_defined_fuels,
         )
         fuel_consumption_kg_per_s = engine_run_point.fuel_flow_rate_kg_per_s
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
@@ -204,6 +207,7 @@ def get_fuel_emission_energy_balance_for_component(
             fuel_specified_by=fuel_specified_by,
             fuel_type=fuel_type,
             fuel_origin=fuel_origin,
+            user_defined_fuels=user_defined_fuels,
         )
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
             fuel_consumption_kg_per_s=genset_run_point.engine.fuel_flow_rate_kg_per_s,
@@ -239,6 +243,7 @@ def get_fuel_emission_energy_balance_for_component(
         fuel_cell_run_point = component.get_fuel_cell_run_point(
             power_out_kw=component.power_output,
             fuel_specified_by=fuel_specified_by,
+            user_defined_fuels=user_defined_fuels,
         )
         fuel_consumption_kg_per_s = fuel_cell_run_point.fuel_flow_rate_kg_per_s
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
@@ -838,6 +843,7 @@ class Switchboard(Node):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_type: Optional[TypeFuel] = None,
         fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> FEEMSResult:
         """
         Calculates fuel/energy consumption at the shaftline. Power output of the main engines
@@ -886,6 +892,7 @@ class Switchboard(Node):
                 fuel_specified_by=fuel_specified_by,
                 fuel_type=fuel_type,
                 fuel_origin=fuel_origin,
+                user_defined_fuels=user_defined_fuels,
             )
 
             res = res.sum_with_freeze_duration(res_comp)
@@ -950,6 +957,7 @@ class Switchboard(Node):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_type: Optional[TypeFuel] = None,
         fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> FEEMSResult:
         """Similar function as `get_fuel_energy_consumption_running_time` but this version does not
         supply details.
@@ -993,6 +1001,7 @@ class Switchboard(Node):
                 fuel_specified_by=fuel_specified_by,
                 fuel_type=fuel_type,
                 fuel_origin=fuel_origin,
+                user_defined_fuels=user_defined_fuels,
             )
             res = res.sum_with_freeze_duration(res_component)
 
@@ -1314,6 +1323,7 @@ class ShaftLine(Node):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_type: Optional[TypeFuel] = None,
         fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> FEEMSResult:
         """
         Calculate fuel consumption and running hours.
@@ -1368,6 +1378,7 @@ class ShaftLine(Node):
                 isSystemMechanical=True,
                 fuel_type=fuel_type,
                 fuel_origin=fuel_origin,
+                user_defined_fuels=user_defined_fuels,
             )
             res = res.sum_with_freeze_duration(res_comp)
             if not (

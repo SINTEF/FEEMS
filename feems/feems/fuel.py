@@ -916,3 +916,30 @@ class FuelConsumption:
         return self.total_fuel_consumption * self.fuel_by_mass_fraction.get_kg_co2_per_kg_fuel(
             fuel_consumer_class=fuel_consumer_class
         )
+
+
+def find_user_fuel(
+    user_defined_fuels: Optional[List["Fuel"]],
+    fuel_type: "TypeFuel",
+    origin: "FuelOrigin",
+) -> Optional["Fuel"]:
+    """Look up a user-defined fuel by (fuel_type, origin).
+
+    Returns the first matching entry from *user_defined_fuels*, or ``None`` if
+    the list is empty / ``None`` or no entry matches the given combination.
+
+    Args:
+        user_defined_fuels: List of :class:`Fuel` objects with
+            ``fuel_specified_by == FuelSpecifiedBy.USER``.
+        fuel_type: The fuel type to match.
+        origin: The fuel origin to match.
+
+    Returns:
+        Matching :class:`Fuel` or ``None``.
+    """
+    if not user_defined_fuels:
+        return None
+    return next(
+        (f for f in user_defined_fuels if f.fuel_type == fuel_type and f.origin == origin),
+        None,
+    )

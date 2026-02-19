@@ -18,6 +18,7 @@ from ..fuel import (
     FuelSpecifiedBy,
     GhgEmissionFactorTankToWake,
     TypeFuel,
+    find_user_fuel,
 )
 from ..types_for_feems import (
     EmissionCurve,
@@ -169,6 +170,7 @@ class Engine(Component):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -186,6 +188,9 @@ class Engine(Component):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. When
+                provided, the fuel matching this engine's (fuel_type, fuel_origin) is used for the
+                emission factors, overriding the regulation-table lookup.
 
         Returns:
             EngineRunPoint
@@ -201,15 +206,28 @@ class Engine(Component):
             emissions_per_s[e] = (
                 self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio) * power_kwh_per_s
             )
-        fuel_consumption_component = Fuel(
-            fuel_type=self.fuel_type,
-            origin=self.fuel_origin,
-            fuel_specified_by=fuel_specified_by,
-            lhv_mj_per_g=lhv_mj_per_g,
-            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
-            ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-            mass_or_mass_fraction=fuel_cons_kg_per_s,
-        )
+        matched = find_user_fuel(user_defined_fuels, self.fuel_type, self.fuel_origin)
+        if matched is not None:
+            fuel_consumption_component = Fuel(
+                fuel_type=matched.fuel_type,
+                origin=matched.origin,
+                fuel_specified_by=FuelSpecifiedBy.USER,
+                lhv_mj_per_g=matched.lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=matched.ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=matched.ghg_emission_factor_tank_to_wake,
+                mass_or_mass_fraction=fuel_cons_kg_per_s,
+                name=matched.name,
+            )
+        else:
+            fuel_consumption_component = Fuel(
+                fuel_type=self.fuel_type,
+                origin=self.fuel_origin,
+                fuel_specified_by=fuel_specified_by,
+                lhv_mj_per_g=lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+                mass_or_mass_fraction=fuel_cons_kg_per_s,
+            )
         return EngineRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel_consumption_component]),
@@ -268,6 +286,7 @@ class EngineDualFuel(Engine):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -285,6 +304,9 @@ class EngineDualFuel(Engine):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. When
+                provided, fuels matching (fuel_type, origin) are used for emission factors for both
+                main and pilot fuel.
 
         Returns:
             EngineRunPoint
@@ -294,22 +316,33 @@ class EngineDualFuel(Engine):
         engine_run_point = super().get_engine_run_point_from_power_out_kw(
             power_kw=power_kw,
             fuel_specified_by=fuel_specified_by,
+            user_defined_fuels=user_defined_fuels,
         )
         bspfc = self.specific_pilot_fuel_consumption_interp(engine_run_point.load_ratio)
         pilot_fuel_cons_kg_per_s = bspfc * power_kw / 1000 / 3600
-        engine_run_point.fuel_flow_rate_kg_per_s += FuelConsumption(
-            fuels=[
-                Fuel(
-                    fuel_type=self.pilot_fuel_type,
-                    origin=self.pilot_fuel_origin,
-                    fuel_specified_by=fuel_specified_by,
-                    lhv_mj_per_g=lhv_mj_per_g,
-                    ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
-                    ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-                    mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
-                )
-            ]
-        )
+        pilot_matched = find_user_fuel(user_defined_fuels, self.pilot_fuel_type, self.pilot_fuel_origin)
+        if pilot_matched is not None:
+            pilot_fuel = Fuel(
+                fuel_type=pilot_matched.fuel_type,
+                origin=pilot_matched.origin,
+                fuel_specified_by=FuelSpecifiedBy.USER,
+                lhv_mj_per_g=pilot_matched.lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=pilot_matched.ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=pilot_matched.ghg_emission_factor_tank_to_wake,
+                mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
+                name=pilot_matched.name,
+            )
+        else:
+            pilot_fuel = Fuel(
+                fuel_type=self.pilot_fuel_type,
+                origin=self.pilot_fuel_origin,
+                fuel_specified_by=fuel_specified_by,
+                lhv_mj_per_g=lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+                mass_or_mass_fraction=pilot_fuel_cons_kg_per_s,
+            )
+        engine_run_point.fuel_flow_rate_kg_per_s += FuelConsumption(fuels=[pilot_fuel])
         engine_run_point.bspfc_g_per_kWh = bspfc
         return engine_run_point
 
@@ -428,6 +461,7 @@ class EngineMultiFuel(Engine):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc. If power value is not given, it will
@@ -447,6 +481,8 @@ class EngineMultiFuel(Engine):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], optional):
                 GHG emission factor from tank to wake. Defaults to None. Should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. Passed
+                through to the active engine in use.
 
         Returns:
             EngineRunPoint
@@ -459,6 +495,7 @@ class EngineMultiFuel(Engine):
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            user_defined_fuels=user_defined_fuels,
         )
 
     def get_engine_object(
@@ -525,6 +562,7 @@ class MainEngineForMechanicalPropulsion(Component):
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
         fuel_type: Optional[TypeFuel] = None,
         fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -546,6 +584,8 @@ class MainEngineForMechanicalPropulsion(Component):
                 multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
             fuel_origin (Optional[FuelOrigin], optional): Desired main fuel origin when the engine
                 is a multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. Passed
+                through to the underlying engine.
 
         Returns:
             EngineRunPoint
@@ -569,6 +609,7 @@ class MainEngineForMechanicalPropulsion(Component):
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            user_defined_fuels=user_defined_fuels,
         )
 
 
@@ -628,6 +669,7 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
         fuel_type: Optional[TypeFuel] = None,
         fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> EngineRunPoint:
         """
         Calculate fuel consumption, percentage load and bsfc for the shaft power before the gearbox
@@ -649,6 +691,8 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
                 multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
             fuel_origin (Optional[FuelOrigin], optional): Desired main fuel origin when the engine
                 is a multi-fuel engine. Defaults to the first entry in multi-fuel characteristics.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. Passed
+                through to the underlying engine.
 
         Returns:
             EngineRunPoint
@@ -674,6 +718,7 @@ class MainEngineWithGearBoxForMechanicalPropulsion(MainEngineForMechanicalPropul
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            user_defined_fuels=user_defined_fuels,
         )
 
 

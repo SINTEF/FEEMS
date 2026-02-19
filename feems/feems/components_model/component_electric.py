@@ -12,6 +12,7 @@ from ..fuel import (
     FuelSpecifiedBy,
     GhgEmissionFactorTankToWake,
     TypeFuel,
+    find_user_fuel,
 )
 from ..types_for_feems import (
     Power_kW,
@@ -386,6 +387,7 @@ class FuelCell(BasicComponent):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> ComponentRunPoint:
         """
         Get the fuel cell run point
@@ -403,6 +405,9 @@ class FuelCell(BasicComponent):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], Optional):
                 GHG emission factor from tank to wake in gCO2eq/MJ. It should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. When
+                provided, the fuel matching this cell's (fuel_type, fuel_origin) overrides the
+                regulation-table lookup.
 
         Returns:
             ComponentRunPoint: fuel cell run point
@@ -410,14 +415,26 @@ class FuelCell(BasicComponent):
         if power_out_kw is None:
             power_out_kw = self.power_output
         power_in_kw, load_ratio = self.get_power_input_from_bidirectional_output(power_out_kw)
-        fuel = Fuel(
-            fuel_type=self.fuel_type,
-            origin=self.fuel_origin,
-            fuel_specified_by=fuel_specified_by,
-            lhv_mj_per_g=lhv_mj_per_g,
-            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
-            ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
-        )
+        matched = find_user_fuel(user_defined_fuels, self.fuel_type, self.fuel_origin)
+        if matched is not None:
+            fuel = Fuel(
+                fuel_type=matched.fuel_type,
+                origin=matched.origin,
+                fuel_specified_by=FuelSpecifiedBy.USER,
+                lhv_mj_per_g=matched.lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=matched.ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=matched.ghg_emission_factor_tank_to_wake,
+                name=matched.name,
+            )
+        else:
+            fuel = Fuel(
+                fuel_type=self.fuel_type,
+                origin=self.fuel_origin,
+                fuel_specified_by=fuel_specified_by,
+                lhv_mj_per_g=lhv_mj_per_g,
+                ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
+                ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            )
         fuel.mass_or_mass_fraction = power_in_kw / fuel.lhv_mj_per_g / 1e6
         efficiency = self.get_efficiency_from_load_percentage(load_ratio)
         return ComponentRunPoint(
@@ -470,6 +487,7 @@ class FuelCellSystem(ElectricComponent):
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> ComponentRunPoint:
         """
         Get the fuel cell run point
@@ -487,6 +505,8 @@ class FuelCellSystem(ElectricComponent):
             ghg_emission_factor_tank_to_wake (List[Optional[GhgEmissionFactorTankToWake]], Optional):
                 GHG emission factor from tank to wake in gCO2eq/MJ. It should be provided if
                 fuel_specified_by is FuelSpecifiedBy.USER.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. Passed
+                through to the underlying fuel cell module.
 
         Returns:
             ComponentRunPoint: fuel cell run point
@@ -500,6 +520,7 @@ class FuelCellSystem(ElectricComponent):
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            user_defined_fuels=user_defined_fuels,
         )
         return ComponentRunPoint(
             load_ratio=result_per_module.load_ratio,
@@ -657,6 +678,7 @@ class Genset(Component):
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
         fuel_type: Optional[TypeFuel] = None,
         fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> GensetRunPoint:
         """Calculate fuel consumption, percentage load and bsfc for the shaft power
         before the gearbox. If the power is not given, it will take the value of power output
@@ -667,6 +689,8 @@ class Genset(Component):
                 If not given, it will take the value of power output of the genset.
             fuel_specified_by(FuelSpecifiedBy, Optional): CO2 calculation is calculated based on
                 either IMO or FuelEU Maritime. Default is IMO.
+            user_defined_fuels (Optional[List[Fuel]], optional): List of user-defined fuels. Passed
+                through to the underlying engine.
 
         Returns:
             Fuel consumption (kg/s), load (%), bsfc (g/kWh), generator load
@@ -695,6 +719,7 @@ class Genset(Component):
             lhv_mj_per_g=lhv_mj_per_g,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
+            user_defined_fuels=user_defined_fuels,
         )
         return GensetRunPoint(genset_load_ratio=load_ratio_generator, engine=engine_run_point)
 
