@@ -13,6 +13,7 @@ from feems.fuel import (
     FuelConsumption,
     FuelOrigin,
     FuelSpecifiedBy,
+    GhgEmissionFactorTankToWake,
     TypeFuel,
     get_ghg_factors_for_fuel_eu_maritime,
 )
@@ -295,3 +296,125 @@ def test_fuel_consumption_class():
     assert total_ghg_intensity_gco2_per_mj == pytest.approx(
         total_ghg_intensity_gco2_per_mj_expected
     )
+
+
+# ---------------------------------------------------------------------------
+# Tests for user-defined fuel (FuelSpecifiedBy.USER) with name field
+# ---------------------------------------------------------------------------
+
+def _make_user_fuel(name: str = "my_blend", mass: float = 5.0) -> Fuel:
+    """Helper: create a minimal valid USER fuel."""
+    return Fuel(
+        fuel_type=TypeFuel.DIESEL,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.USER,
+        lhv_mj_per_g=0.043,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj=0.5,
+        ghg_emission_factor_tank_to_wake=[
+            GhgEmissionFactorTankToWake(
+                co2_factor_gco2_per_gfuel=3.206,
+                ch4_factor_gch4_per_gfuel=0.0,
+                n2o_factor_gn2o_per_gfuel=0.0,
+                c_slip_percent=0.0,
+                fuel_consumer_class=None,
+            )
+        ],
+        mass_or_mass_fraction=mass,
+        name=name,
+    )
+
+
+def test_user_fuel_name_required():
+    """Creating a USER fuel without a name must raise ValueError."""
+    with pytest.raises(ValueError, match="name"):
+        Fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            fuel_specified_by=FuelSpecifiedBy.USER,
+            lhv_mj_per_g=0.043,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=0.5,
+            ghg_emission_factor_tank_to_wake=[
+                GhgEmissionFactorTankToWake(
+                    co2_factor_gco2_per_gfuel=3.206,
+                    ch4_factor_gch4_per_gfuel=0.0,
+                    n2o_factor_gn2o_per_gfuel=0.0,
+                    c_slip_percent=0.0,
+                    fuel_consumer_class=None,
+                )
+            ],
+            name="",  # empty — must fail
+        )
+
+
+def test_user_fuel_name_stored_and_copied():
+    """Name is stored on the Fuel instance and preserved by .copy."""
+    fuel = _make_user_fuel(name="blend_A")
+    assert fuel.name == "blend_A"
+
+    copied = fuel.copy
+    assert copied.name == "blend_A"
+    assert copied.mass_or_mass_fraction == fuel.mass_or_mass_fraction
+
+    copied_zero = fuel.copy_except_mass_or_mass_fraction
+    assert copied_zero.name == "blend_A"
+    assert copied_zero.mass_or_mass_fraction == 0.0
+
+
+def test_non_user_fuel_name_defaults_empty():
+    """Non-USER fuels default to name='' without error."""
+    fuel = Fuel(
+        fuel_type=TypeFuel.DIESEL,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.IMO,
+    )
+    assert fuel.name == ""
+
+
+def test_fuel_consumption_add_disambiguates_by_name():
+    """Two USER fuels with the same type/origin but different names must NOT be merged."""
+    fuel_a = _make_user_fuel(name="blend_A", mass=3.0)
+    fuel_b = _make_user_fuel(name="blend_B", mass=7.0)
+
+    fc1 = FuelConsumption(fuels=[fuel_a.copy])
+    fc2 = FuelConsumption(fuels=[fuel_b.copy])
+
+    result = fc1 + fc2
+
+    assert len(result.fuels) == 2
+    names = {f.name for f in result.fuels}
+    assert names == {"blend_A", "blend_B"}
+
+
+def test_fuel_consumption_add_merges_same_name_user_fuel():
+    """Two USER fuels with identical name and type/origin must be summed together."""
+    fuel_a1 = _make_user_fuel(name="blend_A", mass=3.0)
+    fuel_a2 = _make_user_fuel(name="blend_A", mass=7.0)
+
+    fc1 = FuelConsumption(fuels=[fuel_a1.copy])
+    fc2 = FuelConsumption(fuels=[fuel_a2.copy])
+
+    result = fc1 + fc2
+
+    assert len(result.fuels) == 1
+    assert result.fuels[0].name == "blend_A"
+    assert result.fuels[0].mass_or_mass_fraction == pytest.approx(10.0)
+
+
+def test_fuel_consumption_add_non_user_fuel_unaffected():
+    """Non-USER fuels are still merged by type/origin as before (name ignored)."""
+    fuel1 = Fuel(
+        fuel_type=TypeFuel.DIESEL,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.IMO,
+        mass_or_mass_fraction=4.0,
+    )
+    fuel2 = Fuel(
+        fuel_type=TypeFuel.DIESEL,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.IMO,
+        mass_or_mass_fraction=6.0,
+    )
+    result = FuelConsumption(fuels=[fuel1.copy]) + FuelConsumption(fuels=[fuel2.copy])
+
+    assert len(result.fuels) == 1
+    assert result.fuels[0].mass_or_mass_fraction == pytest.approx(10.0)

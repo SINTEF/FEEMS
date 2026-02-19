@@ -159,6 +159,7 @@ class FEEMSResultConverter:
                             fuel_specified_by=fuel.fuel_specified_by.value,
                             mass_or_mass_fraction=fuel.mass_or_mass_fraction.tolist(),
                             lhv_mj_per_g=fuel.lhv_mj_per_g,
+                            name=fuel.name,
                         )
                     )
             elif power_source.type in [
@@ -175,6 +176,7 @@ class FEEMSResultConverter:
                             fuel_specified_by=fuel.fuel_specified_by.value,
                             mass_or_mass_fraction=fuel.mass_or_mass_fraction.tolist(),
                             lhv_mj_per_g=fuel.lhv_mj_per_g,
+                            name=fuel.name,
                         )
                     )
             elif power_source.type in [
@@ -211,6 +213,7 @@ class FEEMSResultConverter:
                         fuel_origin=fuel.origin.value,
                         fuel_specified_by=fuel.fuel_specified_by.value,
                         mass_or_mass_fraction=fuel.mass_or_mass_fraction.tolist(),
+                        name=fuel.name,
                     )
                 )
             self._time_series_data_for_mechanical_component.append(
@@ -263,6 +266,7 @@ class FEEMSResultConverter:
                             fuel_specified_by=fuel.fuel_specified_by.value,
                             mass_or_mass_fraction=fuel.mass_or_mass_fraction,
                             lhv_mj_per_g=fuel.lhv_mj_per_g,
+                            name=fuel.name,
                         )
                     )
                 continue
@@ -314,6 +318,7 @@ class FEEMSResultConverter:
                                         fuel_specified_by=fuel.fuel_specified_by.value,
                                         mass_or_mass_fraction=fuel.mass_or_mass_fraction,
                                         lhv_mj_per_g=fuel.lhv_mj_per_g,
+                                        name=fuel.name,
                                     )
                                 )
                             continue

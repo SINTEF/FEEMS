@@ -366,7 +366,8 @@ class Fuel:
     lhv_mj_per_g: Optional[float] = None
     ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None
     ghg_emission_factor_tank_to_wake: Optional[List[GhgEmissionFactorTankToWake]] = None
-    mass_or_mass_fraction: Union[np.array, float] = 0.0
+    mass_or_mass_fraction: Union[np.ndarray, float] = 0.0
+    name: str = ""
 
     def __init__(
         self,
@@ -376,7 +377,8 @@ class Fuel:
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: Optional[List[GhgEmissionFactorTankToWake]] = None,
-        mass_or_mass_fraction: Union[np.array, float] = 0.0,
+        mass_or_mass_fraction: Union[np.ndarray, float] = 0.0,
+        name: str = "",
     ):
         """Constructor for FuelSpecifications class
 
@@ -391,13 +393,18 @@ class Fuel:
             ghg_emission_factor_tank_to_wake (list, optional): List of GHG emission factors from tank
                 to wake. The value should be provided if 'fuel_specified_by' is 'USER'.
             mass_or_mass_fraction (float, optional): Fuel mass or mass fraction. Defaults to 0.0.
+            name (str, optional): Unique name for the fuel. Required (non-empty) when
+                'fuel_specified_by' is 'USER' to distinguish fuels with the same type/origin.
 
         Raises:
+            ValueError: If name is empty when 'fuel_specified_by' is 'USER'.
             AssertionError: If the GHG emission factor and low heat value of fuel are not
                 provided when 'fuel_specified_by' is 'USER'.
             NotImplementedError: If the fuel is specified by other than 'USER', "FUEL_EU_MARITIME",
                 or "IMO".
         """
+        if fuel_specified_by == FuelSpecifiedBy.USER and not name:
+            raise ValueError("A non-empty 'name' is required when fuel_specified_by is USER.")
         if fuel_specified_by in [FuelSpecifiedBy.USER, FuelSpecifiedBy.NONE]:
             assert (
                 ghg_emission_factor_well_to_tank_gco2eq_per_mj is not None
@@ -420,6 +427,7 @@ class Fuel:
         self.fuel_specified_by = fuel_specified_by
         self.mass_or_mass_fraction = mass_or_mass_fraction
         self.fuel_specified_by = fuel_specified_by
+        self.name = name
         if fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
             self._get_factors_for_fuel_eu_maritime()
         elif fuel_specified_by == FuelSpecifiedBy.IMO:
@@ -454,6 +462,7 @@ class Fuel:
                 self.ghg_emission_factor_tank_to_wake if fuel_specified_by_user else None
             ),
             mass_or_mass_fraction=self.mass_or_mass_fraction,
+            name=self.name,
         )
 
     @property
@@ -795,7 +804,11 @@ class FuelConsumption:
                     filter(
                         lambda x: x.fuel_type == each_fuel.fuel_type
                         and x.origin == each_fuel.origin
-                        and x.fuel_specified_by == each_fuel.fuel_specified_by,
+                        and x.fuel_specified_by == each_fuel.fuel_specified_by
+                        and (
+                            each_fuel.fuel_specified_by != FuelSpecifiedBy.USER
+                            or x.name == each_fuel.name
+                        ),
                         other.fuels,
                     )
                 )
