@@ -5,6 +5,14 @@ All notable changes to the MachSysS (Machinery System Structure) package will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.9.4...MachSysS-v0.10.0) (2026-02-20)
+
+
+### Features
+
+* **fuel:** support user-defined fuel with name field ([#80](https://github.com/SINTEF/FEEMS/issues/80)) ([075a559](https://github.com/SINTEF/FEEMS/commit/075a559142024e21e9cac1d761b8d55ddf4dbd0d))
+* user-defined fuel support with per-component override ([#80](https://github.com/SINTEF/FEEMS/issues/80)) ([9333703](https://github.com/SINTEF/FEEMS/commit/9333703d84b4840eaae5182a4921024ce1c2b1b5))
+
 ## [0.9.4](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.9.3...MachSysS-v0.9.4) (2026-02-11)
 
 
