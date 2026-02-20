@@ -205,12 +205,14 @@ class Gear(_message.Message):
     def __init__(self, name: _Optional[str] = ..., gear_ratio: _Optional[float] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., efficiency: _Optional[_Union[Efficiency, _Mapping]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., unit_price_usd: _Optional[float] = ..., uid: _Optional[str] = ...) -> None: ...
 
 class Fuel(_message.Message):
-    __slots__ = ("fuel_type", "fuel_origin")
+    __slots__ = ("fuel_type", "fuel_origin", "name")
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
     fuel_type: FuelType
     fuel_origin: FuelOrigin
-    def __init__(self, fuel_type: _Optional[_Union[FuelType, str]] = ..., fuel_origin: _Optional[_Union[FuelOrigin, str]] = ...) -> None: ...
+    name: str
+    def __init__(self, fuel_type: _Optional[_Union[FuelType, str]] = ..., fuel_origin: _Optional[_Union[FuelOrigin, str]] = ..., name: _Optional[str] = ...) -> None: ...
 
 class Engine(_message.Message):
     __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "bsfc", "main_fuel", "order_from_switchboard_or_shaftline", "pilot_bsfc", "pilot_fuel", "nox_calculation_method", "emission_curves", "engine_cycle_type", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid")

@@ -7,7 +7,7 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class FuelScalar(_message.Message):
-    __slots__ = ("fuel_type", "fuel_origin", "fuel_specified_by", "mass_or_mass_fraction", "lhv_mj_per_g", "ghg_emission_factor_well_to_tank_gco2eq_per_mj", "ghg_emission_factor_tank_to_wake")
+    __slots__ = ("fuel_type", "fuel_origin", "fuel_specified_by", "mass_or_mass_fraction", "lhv_mj_per_g", "ghg_emission_factor_well_to_tank_gco2eq_per_mj", "ghg_emission_factor_tank_to_wake", "name")
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     FUEL_SPECIFIED_BY_FIELD_NUMBER: _ClassVar[int]
@@ -15,6 +15,7 @@ class FuelScalar(_message.Message):
     LHV_MJ_PER_G_FIELD_NUMBER: _ClassVar[int]
     GHG_EMISSION_FACTOR_WELL_TO_TANK_GCO2EQ_PER_MJ_FIELD_NUMBER: _ClassVar[int]
     GHG_EMISSION_FACTOR_TANK_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
     fuel_type: _system_structure_pb2.FuelType
     fuel_origin: _system_structure_pb2.FuelOrigin
     fuel_specified_by: _system_structure_pb2.FuelSpecifiedBy
@@ -22,10 +23,11 @@ class FuelScalar(_message.Message):
     lhv_mj_per_g: float
     ghg_emission_factor_well_to_tank_gco2eq_per_mj: float
     ghg_emission_factor_tank_to_wake: float
-    def __init__(self, fuel_type: _Optional[_Union[_system_structure_pb2.FuelType, str]] = ..., fuel_origin: _Optional[_Union[_system_structure_pb2.FuelOrigin, str]] = ..., fuel_specified_by: _Optional[_Union[_system_structure_pb2.FuelSpecifiedBy, str]] = ..., mass_or_mass_fraction: _Optional[float] = ..., lhv_mj_per_g: _Optional[float] = ..., ghg_emission_factor_well_to_tank_gco2eq_per_mj: _Optional[float] = ..., ghg_emission_factor_tank_to_wake: _Optional[float] = ...) -> None: ...
+    name: str
+    def __init__(self, fuel_type: _Optional[_Union[_system_structure_pb2.FuelType, str]] = ..., fuel_origin: _Optional[_Union[_system_structure_pb2.FuelOrigin, str]] = ..., fuel_specified_by: _Optional[_Union[_system_structure_pb2.FuelSpecifiedBy, str]] = ..., mass_or_mass_fraction: _Optional[float] = ..., lhv_mj_per_g: _Optional[float] = ..., ghg_emission_factor_well_to_tank_gco2eq_per_mj: _Optional[float] = ..., ghg_emission_factor_tank_to_wake: _Optional[float] = ..., name: _Optional[str] = ...) -> None: ...
 
 class FuelArray(_message.Message):
-    __slots__ = ("fuel_type", "fuel_origin", "fuel_specified_by", "mass_or_mass_fraction", "lhv_mj_per_g", "ghg_emission_factor_well_to_tank_gco2eq_per_mj", "ghg_emission_factor_tank_to_wake")
+    __slots__ = ("fuel_type", "fuel_origin", "fuel_specified_by", "mass_or_mass_fraction", "lhv_mj_per_g", "ghg_emission_factor_well_to_tank_gco2eq_per_mj", "ghg_emission_factor_tank_to_wake", "name")
     FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
     FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     FUEL_SPECIFIED_BY_FIELD_NUMBER: _ClassVar[int]
@@ -33,6 +35,7 @@ class FuelArray(_message.Message):
     LHV_MJ_PER_G_FIELD_NUMBER: _ClassVar[int]
     GHG_EMISSION_FACTOR_WELL_TO_TANK_GCO2EQ_PER_MJ_FIELD_NUMBER: _ClassVar[int]
     GHG_EMISSION_FACTOR_TANK_TO_WAKE_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
     fuel_type: _system_structure_pb2.FuelType
     fuel_origin: _system_structure_pb2.FuelOrigin
     fuel_specified_by: _system_structure_pb2.FuelSpecifiedBy
@@ -40,7 +43,8 @@ class FuelArray(_message.Message):
     lhv_mj_per_g: float
     ghg_emission_factor_well_to_tank_gco2eq_per_mj: float
     ghg_emission_factor_tank_to_wake: float
-    def __init__(self, fuel_type: _Optional[_Union[_system_structure_pb2.FuelType, str]] = ..., fuel_origin: _Optional[_Union[_system_structure_pb2.FuelOrigin, str]] = ..., fuel_specified_by: _Optional[_Union[_system_structure_pb2.FuelSpecifiedBy, str]] = ..., mass_or_mass_fraction: _Optional[_Iterable[float]] = ..., lhv_mj_per_g: _Optional[float] = ..., ghg_emission_factor_well_to_tank_gco2eq_per_mj: _Optional[float] = ..., ghg_emission_factor_tank_to_wake: _Optional[float] = ...) -> None: ...
+    name: str
+    def __init__(self, fuel_type: _Optional[_Union[_system_structure_pb2.FuelType, str]] = ..., fuel_origin: _Optional[_Union[_system_structure_pb2.FuelOrigin, str]] = ..., fuel_specified_by: _Optional[_Union[_system_structure_pb2.FuelSpecifiedBy, str]] = ..., mass_or_mass_fraction: _Optional[_Iterable[float]] = ..., lhv_mj_per_g: _Optional[float] = ..., ghg_emission_factor_well_to_tank_gco2eq_per_mj: _Optional[float] = ..., ghg_emission_factor_tank_to_wake: _Optional[float] = ..., name: _Optional[str] = ...) -> None: ...
 
 class FuelConsumptionScalar(_message.Message):
     __slots__ = ("fuels",)

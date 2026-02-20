@@ -123,6 +123,7 @@ enum FuelSpecifiedBy {
 message Fuel {
   FuelType fuel_type = 1;
   FuelOrigin fuel_origin = 2;
+  string name = 3;
 }
 
 message Engine {

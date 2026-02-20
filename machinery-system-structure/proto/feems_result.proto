@@ -13,6 +13,7 @@ message FuelScalar {
     double lhv_mj_per_g = 5;
     double ghg_emission_factor_well_to_tank_gco2eq_per_mj = 6;
     double ghg_emission_factor_tank_to_wake = 7;
+    string name = 8;
 }
 
 message FuelArray {
@@ -23,6 +24,7 @@ message FuelArray {
     double lhv_mj_per_g = 5;
     double ghg_emission_factor_well_to_tank_gco2eq_per_mj = 6;
     double ghg_emission_factor_tank_to_wake = 7;
+    string name = 8;
 }
 
 message FuelConsumptionScalar {

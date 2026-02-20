@@ -109,6 +109,28 @@ Higher-level simulation interface with power management logic.
 
 **Dependencies**: RunFeemsSim → MachSysS (for data structures)
 
+## Development Workflow Rule
+
+**Everything starts from the backlog** — except bug fixes and hot fixes, which may proceed directly.
+
+| Work type       | Backlog required? |
+|-----------------|-------------------|
+| Feature         | ✅ Yes             |
+| Refactor        | ✅ Yes             |
+| Documentation   | ✅ Yes             |
+| Bug fix         | ❌ No              |
+| Hot fix         | ❌ No              |
+
+1. Create a backlog item in `docs/backlog/` using the `write-backlog` skill (`.github/skills/write-backlog/`)
+2. **Immediately open a GitHub issue** with the same title and record the issue number in the backlog file
+3. Define acceptance criteria before moving to Plan
+4. `git checkout main && git pull` then `git checkout -b feature/issue-{id}-{slug}`
+5. Follow the PDCA flow: `backlog/ → docs/01-plan/ → docs/02-design/ → implementation → docs/03-analysis/ → docs/04-report/`
+6. **Commit after each phase's report** if the feature is divided into phases
+7. When the feature is complete, `git push` and open a Pull Request against `main`
+
+See `docs/README.md` for the full documentation structure.
+
 ## Important Notes
 
 - Python version: 3.10-3.12 supported

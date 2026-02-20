@@ -308,7 +308,7 @@ The framework's ability to handle 100,000+ data points in time-series simulation
   - `01_Running_simulation.ipynb`: Time-series simulations
   - `02_Shore_Power_Example.ipynb`: Shore power integration
 
-- **API Reference**: See [API_REFERENCE.md](API_REFERENCE.md)
+- **API Reference**: See [../docs/api/feems/API_REFERENCE.md](../docs/api/feems/API_REFERENCE.md)
 
 - **Project Guide**: See `../CLAUDE.md` for development guidelines
 
