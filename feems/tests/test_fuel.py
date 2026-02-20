@@ -15,6 +15,7 @@ from feems.fuel import (
     FuelSpecifiedBy,
     GhgEmissionFactorTankToWake,
     TypeFuel,
+    find_user_fuel,
     get_ghg_factors_for_fuel_eu_maritime,
 )
 from pytest_subtests import SubTests
@@ -418,3 +419,57 @@ def test_fuel_consumption_add_non_user_fuel_unaffected():
 
     assert len(result.fuels) == 1
     assert result.fuels[0].mass_or_mass_fraction == pytest.approx(10.0)
+
+
+# ---------------------------------------------------------------------------
+# Tests for find_user_fuel
+# ---------------------------------------------------------------------------
+
+
+def test_find_user_fuel_returns_none_for_none_list():
+    """find_user_fuel(None, ...) must return None."""
+    assert find_user_fuel(None, TypeFuel.DIESEL, FuelOrigin.FOSSIL) is None
+
+
+def test_find_user_fuel_returns_none_for_empty_list():
+    """find_user_fuel([], ...) must return None."""
+    assert find_user_fuel([], TypeFuel.DIESEL, FuelOrigin.FOSSIL) is None
+
+
+def test_find_user_fuel_returns_matching_fuel():
+    """find_user_fuel returns the fuel whose (fuel_type, origin) matches."""
+    target = _make_user_fuel(name="blend_target")
+    other = Fuel(
+        fuel_type=TypeFuel.NATURAL_GAS,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.USER,
+        lhv_mj_per_g=0.050,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj=0.3,
+        ghg_emission_factor_tank_to_wake=[
+            GhgEmissionFactorTankToWake(
+                co2_factor_gco2_per_gfuel=2.75,
+                ch4_factor_gch4_per_gfuel=0.0,
+                n2o_factor_gn2o_per_gfuel=0.0,
+                c_slip_percent=0.0,
+                fuel_consumer_class=None,
+            )
+        ],
+        name="lng_custom",
+    )
+    result = find_user_fuel([other, target], TypeFuel.DIESEL, FuelOrigin.FOSSIL)
+    assert result is target
+
+
+def test_find_user_fuel_returns_none_when_no_match():
+    """find_user_fuel returns None when no entry matches (fuel_type, origin)."""
+    user_fuel = _make_user_fuel()  # DIESEL / FOSSIL
+    assert find_user_fuel([user_fuel], TypeFuel.NATURAL_GAS, FuelOrigin.FOSSIL) is None
+    assert find_user_fuel([user_fuel], TypeFuel.DIESEL, FuelOrigin.RENEWABLE_NON_BIO) is None
+
+
+def test_find_user_fuel_returns_first_on_duplicate_type_origin():
+    """When multiple entries share (fuel_type, origin), the first is returned."""
+    fuel_a = _make_user_fuel(name="blend_A")
+    fuel_b = _make_user_fuel(name="blend_B")
+    result = find_user_fuel([fuel_a, fuel_b], TypeFuel.DIESEL, FuelOrigin.FOSSIL)
+    assert result is fuel_a

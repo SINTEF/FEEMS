@@ -912,6 +912,7 @@ class ElectricPowerSystem(MachinerySystem):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -927,6 +928,8 @@ class ElectricPowerSystem(MachinerySystem):
             fuel_option: Optional fuel selection to apply to all multi-fuel engines.
             user_defined_fuels: Optional list of user-defined Fuel objects. When provided, fuels
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
+            user_defined_fuels_by_component: Optional dict mapping component name to a list of
+                Fuel objects. Takes priority over user_defined_fuels for named components.
 
         Returns:
             FEEMSResult
@@ -953,6 +956,7 @@ class ElectricPowerSystem(MachinerySystem):
                 fuel_type=fuel_type,
                 fuel_origin=fuel_origin,
                 user_defined_fuels=user_defined_fuels,
+                user_defined_fuels_by_component=user_defined_fuels_by_component,
             )
             result_swb.detail_result["switchboard id"] = switchboard.id
             res = res.sum_with_freeze_duration(result_swb)
@@ -964,6 +968,7 @@ class ElectricPowerSystem(MachinerySystem):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -979,6 +984,8 @@ class ElectricPowerSystem(MachinerySystem):
             fuel_option: Optional fuel selection to apply to all multi-fuel engines.
             user_defined_fuels: Optional list of user-defined Fuel objects. When provided, fuels
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
+            user_defined_fuels_by_component: Optional dict mapping component name to a list of
+                Fuel objects. Takes priority over user_defined_fuels for named components.
 
         Returns:
             FEEMSResult
@@ -1003,6 +1010,7 @@ class ElectricPowerSystem(MachinerySystem):
                     fuel_type=fuel_type,
                     fuel_origin=fuel_origin,
                     user_defined_fuels=user_defined_fuels,
+                    user_defined_fuels_by_component=user_defined_fuels_by_component,
                 )
             )
             res = res.sum_with_freeze_duration(result_swb)
@@ -1419,6 +1427,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -1431,6 +1440,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
             fuel_option: Optional fuel selection to apply to all multi-fuel engines.
             user_defined_fuels: Optional list of user-defined Fuel objects. When provided, fuels
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
+            user_defined_fuels_by_component: Optional dict mapping component name to a list of
+                Fuel objects. Takes priority over user_defined_fuels for named components.
 
         Returns:
             FEEMSResult
@@ -1465,6 +1476,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
                 fuel_type=fuel_type,
                 fuel_origin=fuel_origin,
                 user_defined_fuels=user_defined_fuels,
+                user_defined_fuels_by_component=user_defined_fuels_by_component,
             )
             result_shaft_line.detail_result["shaftline id"] = shaft_line.id
             res = res.sum_with_freeze_duration(result_shaft_line)
@@ -1576,6 +1588,7 @@ class HybridPropulsionSystem(MachinerySystem):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1587,6 +1600,8 @@ class HybridPropulsionSystem(MachinerySystem):
             fuel_option: Optional fuel selection to apply across both subsystems.
             user_defined_fuels: Optional list of user-defined Fuel objects. When provided, fuels
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
+            user_defined_fuels_by_component: Optional dict mapping component name to a list of
+                Fuel objects. Takes priority over user_defined_fuels for named components.
         Returns:
             FEEMSResultForMachinerySystem
         """
@@ -1616,6 +1631,7 @@ class HybridPropulsionSystem(MachinerySystem):
             fuel_specified_by=fuel_specified_by,
             fuel_option=mechanical_option,
             user_defined_fuels=user_defined_fuels,
+            user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
         self.electric_system.set_time_interval(
             time_interval_s=time_interval_s, integration_method=integration_method
@@ -1624,6 +1640,7 @@ class HybridPropulsionSystem(MachinerySystem):
             fuel_specified_by=fuel_specified_by,
             fuel_option=electric_option,
             user_defined_fuels=user_defined_fuels,
+            user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
@@ -1675,6 +1692,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1687,6 +1705,8 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             fuel_option: Optional fuel selection to apply across both subsystems.
             user_defined_fuels: Optional list of user-defined Fuel objects. When provided, fuels
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
+            user_defined_fuels_by_component: Optional dict mapping component name to a list of
+                Fuel objects. Takes priority over user_defined_fuels for named components.
         Returns:
             Tuple of FEEMSResult for mechanical system and electric system, respectively
         """
@@ -1716,6 +1736,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             fuel_specified_by=fuel_specified_by,
             fuel_option=mechanical_option,
             user_defined_fuels=user_defined_fuels,
+            user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
         self.electric_system.set_time_interval(
             time_interval_s=time_interval_s, integration_method=integration_method
@@ -1724,6 +1745,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             fuel_specified_by=fuel_specified_by,
             fuel_option=electric_option,
             user_defined_fuels=user_defined_fuels,
+            user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,

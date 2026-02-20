@@ -31,7 +31,14 @@ from feems.components_model.utility import (
     get_efficiency_curve_from_points,
 )
 from feems.constant import nox_factor_imo_medium_speed_g_hWh
-from feems.fuel import Fuel, FuelOrigin, FuelSpecifiedBy, TypeFuel
+from feems.fuel import (
+    Fuel,
+    FuelConsumerClassFuelEUMaritime,
+    FuelOrigin,
+    FuelSpecifiedBy,
+    GhgEmissionFactorTankToWake,
+    TypeFuel,
+)
 from feems.types_for_feems import (
     EmissionType,
     NOxCalculationMethod,
@@ -1352,3 +1359,416 @@ class TestComponent(TestCase):
             res_coges.cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
             res_cogas.fuel_flow_rate_kg_per_s.total_fuel_consumption,
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tests for user_defined_fuels threading through the component calculation stack
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestUserDefinedFuels(TestCase):
+    """Verify that user_defined_fuels are correctly applied (or ignored when no
+    match) at every layer of the fuel-consumption calculation stack."""
+
+    _BSFC_CURVE = np.array([[0.25, 200.0], [0.5, 190.0], [0.75, 185.0], [1.0, 190.0]])
+
+    def _make_user_fuel(
+        self,
+        fuel_type: TypeFuel = TypeFuel.DIESEL,
+        origin: FuelOrigin = FuelOrigin.FOSSIL,
+        name: str = "custom_blend",
+        lhv_mj_per_g: float = 0.042,
+        ghg_wtt: float = 1.5,
+        co2_ttw: float = 3.1,
+    ) -> Fuel:
+        return Fuel(
+            fuel_type=fuel_type,
+            origin=origin,
+            fuel_specified_by=FuelSpecifiedBy.USER,
+            lhv_mj_per_g=lhv_mj_per_g,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_wtt,
+            ghg_emission_factor_tank_to_wake=[
+                GhgEmissionFactorTankToWake(
+                    co2_factor_gco2_per_gfuel=co2_ttw,
+                    ch4_factor_gch4_per_gfuel=0.0,
+                    n2o_factor_gn2o_per_gfuel=0.0,
+                    c_slip_percent=0.0,
+                    fuel_consumer_class=None,
+                )
+            ],
+            name=name,
+        )
+
+    def _make_engine(
+        self,
+        fuel_type: TypeFuel = TypeFuel.DIESEL,
+        fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+        rated_power: float = 1000.0,
+    ) -> Engine:
+        return Engine(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="test engine",
+            rated_power=Power_kW(rated_power),
+            rated_speed=Speed_rpm(750.0),
+            bsfc_curve=self._BSFC_CURVE,
+            nox_calculation_method=NOxCalculationMethod.TIER_2,
+            fuel_type=fuel_type,
+            fuel_origin=fuel_origin,
+        )
+
+    # ------------------------------------------------------------------
+    # Engine
+    # ------------------------------------------------------------------
+
+    def test_engine_uses_user_defined_fuel_factors(self):
+        """Engine uses user-defined LHV, WTT factor and name when a matching
+        user fuel is provided."""
+        engine = self._make_engine()
+        user_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            name="my_diesel_blend",
+            lhv_mj_per_g=0.042,
+            ghg_wtt=1.5,
+        )
+        power = np.array([500.0])
+        run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power, user_defined_fuels=[user_fuel]
+        )
+        fuel_out = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.USER)
+        self.assertAlmostEqual(fuel_out.lhv_mj_per_g, 0.042)
+        self.assertAlmostEqual(fuel_out.ghg_emission_factor_well_to_tank_gco2eq_per_mj, 1.5)
+        self.assertEqual(fuel_out.name, "my_diesel_blend")
+        # Fuel consumption mass must still be correct (unaffected by emission-factor source)
+        expected_mass = run_point.bsfc_g_per_kWh * power / 3600 / 1000
+        np.testing.assert_allclose(fuel_out.mass_or_mass_fraction, expected_mass)
+
+    def test_engine_falls_back_to_imo_when_no_user_fuel_match(self):
+        """Engine falls back to IMO factors when user_defined_fuels contains no
+        entry for the engine's (fuel_type, origin)."""
+        engine = self._make_engine(fuel_type=TypeFuel.DIESEL, fuel_origin=FuelOrigin.FOSSIL)
+        # Provide a user fuel for a *different* type — should not match
+        user_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.NATURAL_GAS,
+            origin=FuelOrigin.FOSSIL,
+            name="lng_blend",
+        )
+        power = np.array([500.0])
+        run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power, user_defined_fuels=[user_fuel]
+        )
+        fuel_out = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+
+        self.assertEqual(fuel_out.fuel_type, TypeFuel.DIESEL)
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.IMO)
+
+    # ------------------------------------------------------------------
+    # EngineDualFuel
+    # ------------------------------------------------------------------
+
+    def test_dual_fuel_engine_applies_user_defined_fuels_to_main_and_pilot(self):
+        """When user_defined_fuels covers both main and pilot types, both
+        entries in the run-point must carry user-defined factors."""
+        engine = EngineDualFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            nox_calculation_method=NOxCalculationMethod.TIER_2,
+            name="df engine",
+            rated_power=Power_kW(1000.0),
+            rated_speed=Speed_rpm(750.0),
+            bsfc_curve=np.array([[0.1, 180.0], [1.0, 180.0]]),
+            fuel_type=TypeFuel.NATURAL_GAS,
+            bspfc_curve=np.array([[0.1, 10.0], [1.0, 10.0]]),
+            pilot_fuel_type=TypeFuel.DIESEL,
+        )
+        user_lng = self._make_user_fuel(
+            fuel_type=TypeFuel.NATURAL_GAS, origin=FuelOrigin.FOSSIL, name="lng_custom"
+        )
+        user_diesel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL, origin=FuelOrigin.FOSSIL, name="diesel_custom"
+        )
+        power = np.array([500.0])
+        run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power, user_defined_fuels=[user_lng, user_diesel]
+        )
+        fuels = run_point.fuel_flow_rate_kg_per_s.fuels
+
+        specified_by_values = {f.fuel_specified_by for f in fuels}
+        self.assertEqual(specified_by_values, {FuelSpecifiedBy.USER})
+        fuel_names = {f.name for f in fuels}
+        self.assertIn("lng_custom", fuel_names)
+        self.assertIn("diesel_custom", fuel_names)
+
+    def test_dual_fuel_engine_pilot_falls_back_when_only_main_matched(self):
+        """When only the main fuel matches user_defined_fuels, the pilot fuel
+        must fall back to the default IMO factors."""
+        engine = EngineDualFuel(
+            type_=TypeComponent.MAIN_ENGINE,
+            nox_calculation_method=NOxCalculationMethod.TIER_2,
+            name="df engine 2",
+            rated_power=Power_kW(1000.0),
+            rated_speed=Speed_rpm(750.0),
+            bsfc_curve=np.array([[0.1, 180.0], [1.0, 180.0]]),
+            fuel_type=TypeFuel.NATURAL_GAS,
+            bspfc_curve=np.array([[0.1, 10.0], [1.0, 10.0]]),
+            pilot_fuel_type=TypeFuel.DIESEL,
+        )
+        # Only provide LNG — no diesel entry in the list
+        user_lng = self._make_user_fuel(
+            fuel_type=TypeFuel.NATURAL_GAS, origin=FuelOrigin.FOSSIL, name="lng_custom"
+        )
+        power = np.array([500.0])
+        run_point = engine.get_engine_run_point_from_power_out_kw(
+            power_kw=power, user_defined_fuels=[user_lng]
+        )
+        fuels_by_type = {f.fuel_type: f for f in run_point.fuel_flow_rate_kg_per_s.fuels}
+
+        self.assertEqual(fuels_by_type[TypeFuel.NATURAL_GAS].fuel_specified_by, FuelSpecifiedBy.USER)
+        self.assertEqual(fuels_by_type[TypeFuel.NATURAL_GAS].name, "lng_custom")
+        self.assertEqual(fuels_by_type[TypeFuel.DIESEL].fuel_specified_by, FuelSpecifiedBy.IMO)
+
+    # ------------------------------------------------------------------
+    # FuelCell
+    # ------------------------------------------------------------------
+
+    def test_fuel_cell_uses_user_defined_fuel_factors(self):
+        """FuelCell.get_fuel_cell_run_point applies user-defined factors when
+        a fuel with the matching (fuel_type, origin) is provided."""
+        fuel_cell = FuelCell(
+            name="fc_test",
+            rated_power=Power_kW(200.0),
+            eff_curve=np.array([[0.25, 0.50], [0.5, 0.55], [0.75, 0.57], [1.0, 0.55]]),
+            fuel_type=TypeFuel.HYDROGEN,
+            fuel_origin=FuelOrigin.RENEWABLE_NON_BIO,
+        )
+        fuel_cell.power_output = np.array([100.0])
+        user_h2 = self._make_user_fuel(
+            fuel_type=TypeFuel.HYDROGEN,
+            origin=FuelOrigin.RENEWABLE_NON_BIO,
+            name="green_h2",
+            lhv_mj_per_g=0.120,
+            ghg_wtt=0.1,
+        )
+        run_point = fuel_cell.get_fuel_cell_run_point(user_defined_fuels=[user_h2])
+        fuel_out = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.USER)
+        self.assertAlmostEqual(fuel_out.lhv_mj_per_g, 0.120)
+        self.assertEqual(fuel_out.name, "green_h2")
+
+    def test_fuel_cell_falls_back_when_no_user_fuel_match(self):
+        """FuelCell falls back to IMO factors when user_defined_fuels contains
+        no entry for the cell's (fuel_type, origin)."""
+        fuel_cell = FuelCell(
+            name="fc_test2",
+            rated_power=Power_kW(200.0),
+            eff_curve=np.array([[0.25, 0.50], [0.5, 0.55], [0.75, 0.57], [1.0, 0.55]]),
+            fuel_type=TypeFuel.HYDROGEN,
+            fuel_origin=FuelOrigin.RENEWABLE_NON_BIO,
+        )
+        fuel_cell.power_output = np.array([100.0])
+        # Diesel user fuel — does NOT match the H2 fuel cell
+        user_diesel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL, origin=FuelOrigin.FOSSIL, name="diesel_blend"
+        )
+        run_point = fuel_cell.get_fuel_cell_run_point(user_defined_fuels=[user_diesel])
+        fuel_out = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+
+        self.assertEqual(fuel_out.fuel_type, TypeFuel.HYDROGEN)
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.IMO)
+
+    # ------------------------------------------------------------------
+    # Genset
+    # ------------------------------------------------------------------
+
+    def test_genset_passes_user_defined_fuels_to_engine(self):
+        """Genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw passes
+        user_defined_fuels down to its underlying engine so the returned
+        GensetRunPoint carries user-defined emission factors."""
+        engine = self._make_engine(rated_power=2700.0)
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name="generator",
+            rated_power=Power_kW(2500.0),
+            rated_speed=Speed_rpm(1500.0),
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(1),
+            eff_curve=np.array([[0.25, 0.94], [0.5, 0.96], [0.75, 0.961], [1.0, 0.96]]),
+        )
+        genset = Genset("test genset", engine, generator)
+        user_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            name="special_diesel",
+            lhv_mj_per_g=0.041,
+            ghg_wtt=2.0,
+        )
+        power = np.array([1250.0])
+        run_point = genset.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+            power=power, user_defined_fuels=[user_fuel]
+        )
+        fuel_out = run_point.engine.fuel_flow_rate_kg_per_s.fuels[0]
+
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.USER)
+        self.assertAlmostEqual(fuel_out.lhv_mj_per_g, 0.041)
+        self.assertEqual(fuel_out.name, "special_diesel")
+
+    # ------------------------------------------------------------------
+    # get_fuel_emission_energy_balance_for_component — by-component dict
+    # ------------------------------------------------------------------
+
+    def _make_ice_user_fuel(
+        self,
+        name: str = "custom_diesel",
+        lhv_mj_per_g: float = 0.042,
+        ghg_wtt: float = 1.5,
+        co2_ttw: float = 3.1,
+    ) -> Fuel:
+        """Create a USER-specified diesel/fossil fuel with the ICE consumer class needed
+        for CO2 calculation through get_fuel_emission_energy_balance_for_component."""
+        return Fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            fuel_specified_by=FuelSpecifiedBy.USER,
+            lhv_mj_per_g=lhv_mj_per_g,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_wtt,
+            ghg_emission_factor_tank_to_wake=[
+                GhgEmissionFactorTankToWake(
+                    co2_factor_gco2_per_gfuel=co2_ttw,
+                    ch4_factor_gch4_per_gfuel=0.0,
+                    n2o_factor_gn2o_per_gfuel=0.0,
+                    c_slip_percent=0.0,
+                    fuel_consumer_class=FuelConsumerClassFuelEUMaritime.ICE,
+                )
+            ],
+            name=name,
+        )
+
+    def _make_genset(self, name: str, rated_power: float = 2700.0) -> Genset:
+        engine = Engine(
+            type_=TypeComponent.MAIN_ENGINE,
+            name=f"{name}_engine",
+            rated_power=Power_kW(rated_power),
+            rated_speed=Speed_rpm(750.0),
+            bsfc_curve=self._BSFC_CURVE,
+            nox_calculation_method=NOxCalculationMethod.TIER_2,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        generator = ElectricMachine(
+            type_=TypeComponent.GENERATOR,
+            name=f"{name}_gen",
+            rated_power=Power_kW(rated_power),
+            rated_speed=Speed_rpm(750.0),
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=SwbId(0),
+            number_poles=4,
+            eff_curve=np.array([[0.25, 0.95], [0.5, 0.96], [0.75, 0.97], [1.0, 0.96]]),
+        )
+        return Genset(name, engine, generator)
+
+    def test_by_component_dict_overrides_for_named_component(self):
+        """user_defined_fuels_by_component applies the per-component list when the
+        component name is present in the dict."""
+        genset = self._make_genset("genset_a")
+        genset.power_output = np.array([1000.0])
+        time_interval_s = np.array([3600.0])
+
+        per_component_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            name="per_component_diesel",
+            lhv_mj_per_g=0.040,
+            ghg_wtt=2.0,
+        )
+        result = get_fuel_emission_energy_balance_for_component(
+            component=genset,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            user_defined_fuels_by_component={"genset_a": [per_component_fuel]},
+        )
+
+        fuel_out = result.multi_fuel_consumption_total_kg.fuels[0]
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.USER)
+        self.assertAlmostEqual(fuel_out.lhv_mj_per_g, 0.040)
+        self.assertEqual(fuel_out.name, "per_component_diesel")
+        # CO2 pipeline should work for USER fuels regardless of consumer class
+        self.assertGreater(result.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel, 0)
+
+    def test_by_component_dict_falls_back_to_global_for_unmatched_component(self):
+        """When a component name is NOT in user_defined_fuels_by_component, the
+        global user_defined_fuels list is used."""
+        genset = self._make_genset("genset_b")
+        genset.power_output = np.array([1000.0])
+        time_interval_s = np.array([3600.0])
+
+        global_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            name="global_diesel",
+            lhv_mj_per_g=0.041,
+            ghg_wtt=1.2,
+        )
+        # per-component dict has a different component name — should not match
+        result = get_fuel_emission_energy_balance_for_component(
+            component=genset,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            user_defined_fuels=[global_fuel],
+            user_defined_fuels_by_component={"genset_other": []},
+        )
+
+        fuel_out = result.multi_fuel_consumption_total_kg.fuels[0]
+        self.assertEqual(fuel_out.fuel_specified_by, FuelSpecifiedBy.USER)
+        self.assertEqual(fuel_out.name, "global_diesel")
+        self.assertAlmostEqual(fuel_out.lhv_mj_per_g, 0.041)
+
+    def test_by_component_wins_over_global_for_named_component(self):
+        """When both user_defined_fuels and user_defined_fuels_by_component are
+        provided, the per-component entry wins for the named component while the
+        global list applies to other components."""
+        genset_named = self._make_genset("genset_named")
+        genset_named.power_output = np.array([800.0])
+        time_interval_s = np.array([3600.0])
+
+        global_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            name="global_fuel",
+            lhv_mj_per_g=0.042,
+            ghg_wtt=1.0,
+        )
+        per_component_fuel = self._make_user_fuel(
+            fuel_type=TypeFuel.DIESEL,
+            origin=FuelOrigin.FOSSIL,
+            name="per_component_fuel",
+            lhv_mj_per_g=0.039,
+            ghg_wtt=3.0,
+        )
+
+        # Named component should use per-component fuel, not global
+        result_named = get_fuel_emission_energy_balance_for_component(
+            component=genset_named,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            user_defined_fuels=[global_fuel],
+            user_defined_fuels_by_component={"genset_named": [per_component_fuel]},
+        )
+        fuel_named = result_named.multi_fuel_consumption_total_kg.fuels[0]
+        self.assertEqual(fuel_named.name, "per_component_fuel")
+        self.assertAlmostEqual(fuel_named.lhv_mj_per_g, 0.039)
+
+        # Un-named component uses the global list
+        genset_other = self._make_genset("genset_other")
+        genset_other.power_output = np.array([800.0])
+        result_other = get_fuel_emission_energy_balance_for_component(
+            component=genset_other,
+            time_interval_s=time_interval_s,
+            integration_method=IntegrationMethod.simpson,
+            user_defined_fuels=[global_fuel],
+            user_defined_fuels_by_component={"genset_named": [per_component_fuel]},
+        )
+        fuel_other = result_other.multi_fuel_consumption_total_kg.fuels[0]
+        self.assertEqual(fuel_other.name, "global_fuel")
+        self.assertAlmostEqual(fuel_other.lhv_mj_per_g, 0.042)

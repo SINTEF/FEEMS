@@ -493,6 +493,12 @@ class Fuel:
         """
         if self.fuel_specified_by == FuelSpecifiedBy.IMO:
             return self.ghg_emission_factor_tank_to_wake[0].ghg_emission_factor_gco2eq_per_gfuel
+        if self.fuel_specified_by == FuelSpecifiedBy.USER:
+            # User-defined fuels provide a single universal TTW factor; fuel_consumer_class is irrelevant.
+            ghg_emission_factor_ttw = self.ghg_emission_factor_tank_to_wake[0]
+            if exclude_slip:
+                return ghg_emission_factor_ttw.co2_factor_gco2_per_gfuel
+            return ghg_emission_factor_ttw.ghg_emission_factor_gco2eq_per_gfuel
         ghg_emission_factor_ttw = next(
             filter(
                 lambda x: x.fuel_consumer_class == fuel_consumer_class,
