@@ -5,6 +5,16 @@ All notable changes to the FEEMS package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.13.4...feems-v0.14.0) (2026-02-20)
+
+
+### Features
+
+* add per-component fuel override and fix USER fuel TTW GHG factor ([#80](https://github.com/SINTEF/FEEMS/issues/80)) ([af0a554](https://github.com/SINTEF/FEEMS/commit/af0a554ee3365626d4a8b32a6aa54a8f9ce70d5b))
+* **fuel:** support user-defined fuel with name field ([#80](https://github.com/SINTEF/FEEMS/issues/80)) ([075a559](https://github.com/SINTEF/FEEMS/commit/075a559142024e21e9cac1d761b8d55ddf4dbd0d))
+* thread user_defined_fuels through fuel consumption calculation stack ([06f4b4f](https://github.com/SINTEF/FEEMS/commit/06f4b4f0e151543bd671bf697b056d185d92582b)), closes [#80](https://github.com/SINTEF/FEEMS/issues/80)
+* user-defined fuel support with per-component override ([#80](https://github.com/SINTEF/FEEMS/issues/80)) ([9333703](https://github.com/SINTEF/FEEMS/commit/9333703d84b4840eaae5182a4921024ce1c2b1b5))
+
 ## [0.13.4](https://github.com/SINTEF/FEEMS/compare/feems-v0.13.3...feems-v0.13.4) (2026-02-11)
 
 
