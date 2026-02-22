@@ -54,16 +54,6 @@ cd machinery-system-structure
 
 This generates Python bindings (`*_pb2.py` and `*_pb2.pyi`) and fixes imports for relative module references.
 
-### nbdev Workflow (RunFEEMSSim)
-RunFEEMSSim uses notebook-driven development. The source of truth is the Jupyter notebooks:
-- `00_machinery_calculation.ipynb` → `RunFeemsSim/machinery_calculation.py`
-- `01_pms_basic.ipynb` → `RunFeemsSim/pms_basic.py`
-
-**Important**: Edit the notebooks, not the generated Python files. After modifying notebooks, regenerate modules:
-```bash
-nbdev_export  # Regenerates Python modules from notebooks
-```
-
 ## Architecture
 
 ### FEEMS Core (`feems/`)
