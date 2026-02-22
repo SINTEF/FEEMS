@@ -18,6 +18,10 @@ This skill outlines the standard operating procedure for resolving GitHub issues
 - **Code**: Write the minimal code necessary to pass the test.
 - **Style**: Follow the Google Python Style Guide for docstrings and naming.
 - **Refactor**: Optimize the code while keeping tests green.
+- **API Docs**: If the change adds or modifies any public method, class, parameter, or type, update the corresponding API reference document:
+  - `feems` changes → `docs/api/feems/API_REFERENCE.md`
+  - `machinery-system-structure` changes → `docs/api/machinery-system-structure/API_REFERENCE.md`
+  - `RunFEEMSSim` changes → `docs/api/RunFEEMSSim/API_REFERENCE.md`
 
 ## 4. Verification
 - **Virtual Env**: Ensure you are in the correct virtual environment using `source <your-virtual-env>/bin/activate`.
@@ -25,8 +29,8 @@ This skill outlines the standard operating procedure for resolving GitHub issues
 - **Lint**: Run `ruff check .` to ensure code quality.
 
 ## 5. Submission
-- **Version Bump**: If the changes are significant or ready for release, update the `version` in `pyproject.toml`.
-- **Commit**: Commit changes with a descriptive message referencing the issue (e.g., "Feat: Add chart visualization (#4)").
+- **Version & Changelog**: Do **not** manually edit `CHANGELOG.md` or `pyproject.toml` version — both are managed automatically by `release-please` based on conventional commit prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, etc.). Use the correct prefix in your commit message and the tooling handles the rest.
+- **Commit**: Commit changes with a conventional-commit message referencing the issue (e.g., `feat: add chart visualization (#4)`).
 - **Push**: Push the branch to origin.
 - **Pull Request**: Create a PR against `main`.
   - Link the issue in the PR description (e.g., "Closes #4").

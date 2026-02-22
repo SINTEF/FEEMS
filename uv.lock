@@ -578,7 +578,7 @@ wheels = [
 
 [[package]]
 name = "feems"
-version = "0.13.4"
+version = "0.14.0"
 source = { editable = "feems" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1348,7 +1348,7 @@ wheels = [
 
 [[package]]
 name = "machsyss"
-version = "0.9.4"
+version = "0.10.0"
 source = { editable = "machinery-system-structure" }
 dependencies = [
     { name = "feems" },

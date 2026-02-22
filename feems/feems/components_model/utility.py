@@ -195,13 +195,13 @@ def get_emission_curve_from_points(
         return lambda x: emission[0].emission_g_per_kwh
     else:
         power = np.array([point.load_ratio for point in emission])
-        emission = np.array([point.emission_g_per_kwh for point in emission])
-        return PchipInterpolator(power, emission, extrapolate=True)
+        emission_factor = np.array([point.emission_g_per_kwh for point in emission])
+        return PchipInterpolator(power, emission_factor, extrapolate=True)
 
 
 def get_efficiency_curve_from_dataframe(
     df: pd.DataFrame, key_word: str = "efficiency"
-) -> Union[PchipInterpolator, np.ndarray]:
+) -> Tuple[PchipInterpolator, np.ndarray]:
     """
     Returns the efficiency interpolating class object from the DataFrame provided
     :param df: DataFrame for the component information
