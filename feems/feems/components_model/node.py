@@ -1,59 +1,61 @@
 import logging
 from collections import defaultdict
 from functools import reduce
-from typing import Dict, Tuple, List, Union, cast, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
 
+from .. import get_logger
+from ..exceptions import InputError
+from ..fuel import (
+    Fuel,
+    FuelConsumerClassFuelEUMaritime,
+    FuelConsumption,
+    FuelOrigin,
+    FuelSpecifiedBy,
+    TypeFuel,
+)
+from ..types_for_feems import (
+    FEEMSResult,
+    Numeric,
+    SwbId,
+    TimeIntervalList,
+    TypeComponent,
+    TypeNode,
+    TypePower,
+)
 from .component_base import Component
 from .component_electric import (
     COGES,
+    PTIPTO,
+    Battery,
+    BatterySystem,
     ElectricComponent,
+    ElectricMachine,
+    FuelCell,
     FuelCellSystem,
     Genset,
     MechanicalComponent,
     SerialSystemElectric,
-    FuelCell,
-    Battery,
-    BatterySystem,
-    SuperCapacitor,
-    SuperCapacitorSystem,
-    PTIPTO,
     ShorePowerConnection,
     ShorePowerConnectionSystem,
-    ElectricMachine,
+    SuperCapacitor,
+    SuperCapacitorSystem,
 )
 from .component_mechanical import (
-    MainEngineForMechanicalPropulsion,
-    MainEngineWithGearBoxForMechanicalPropulsion,
-    EngineRunPoint,
     Engine,
     EngineDualFuel,
+    EngineMultiFuel,
+    EngineRunPoint,
+    MainEngineForMechanicalPropulsion,
+    MainEngineWithGearBoxForMechanicalPropulsion,
 )
 from .utility import (
-    integrate_data,
-    IntegrationMethod,
-    integrate_multi_fuel_consumption,
     IntegrationError,
-)
-from .. import get_logger
-from ..exceptions import InputError
-from ..fuel import (
-    FuelConsumption,
-    FuelByMassFraction,
-    FuelSpecifiedBy,
-    FuelConsumerClassFuelEUMaritime,
-)
-from ..types_for_feems import (
-    FEEMSResult,
-    TypeNode,
-    TypePower,
-    TypeComponent,
-    TimeIntervalList,
-    SwbId,
-    EmissionType,
-    Numeric,
+    IntegrationMethod,
+    integrate_data,
+    integrate_multi_fuel_consumption,
 )
 
 # Define logger
@@ -63,6 +65,7 @@ logger = get_logger(__name__)
 PowerSource = Union[
     Engine,
     EngineDualFuel,
+    EngineMultiFuel,
     Genset,
     ElectricMachine,
     FuelCellSystem,
@@ -115,7 +118,49 @@ def get_fuel_emission_energy_balance_for_component(
     integration_method: IntegrationMethod,
     fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
     isSystemMechanical: bool = False,
+    fuel_type: Optional[TypeFuel] = None,
+    fuel_origin: Optional[FuelOrigin] = None,
+    user_defined_fuels: Optional[List[Fuel]] = None,
+    user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
 ) -> FEEMSResult:
+    def _resolve_fuel_consumer_class(
+        source_component: Union[PowerSource, PowerConsumer],
+        fuel_consumption: FuelConsumption,
+    ) -> Optional[FuelConsumerClassFuelEUMaritime]:
+        engine_candidate: Union[Engine, EngineDualFuel, EngineMultiFuel, None]
+        if isinstance(source_component, Genset):
+            engine_candidate = source_component.aux_engine
+        elif hasattr(source_component, "engine"):
+            engine_candidate = cast(
+                Union[Engine, EngineDualFuel, EngineMultiFuel], getattr(source_component, "engine")
+            )
+        else:
+            engine_candidate = cast(
+                Union[Engine, EngineDualFuel, EngineMultiFuel], source_component
+            )
+
+        if isinstance(engine_candidate, EngineMultiFuel):
+            if not fuel_consumption.fuels:
+                raise ValueError(
+                    "Fuel consumption data is required to resolve fuel consumer class for EngineMultiFuel components."
+                )
+            primary_fuel = fuel_consumption.fuels[0]
+            engine_candidate.set_fuel_in_use(
+                fuel_type=primary_fuel.fuel_type, fuel_origin=primary_fuel.origin
+            )
+            return engine_candidate.engine_in_use.fuel_consumer_type_fuel_eu_maritime
+
+        if isinstance(engine_candidate, (Engine, EngineDualFuel)):
+            return engine_candidate.fuel_consumer_type_fuel_eu_maritime
+
+        return None
+
+    effective_user_fuels = (
+        user_defined_fuels_by_component.get(component.name) if user_defined_fuels_by_component else None
+    )
+    if effective_user_fuels is None:
+        effective_user_fuels = user_defined_fuels
+
     res = FEEMSResult(
         duration_s=0,
         running_hours_genset_total_hr=0,
@@ -126,14 +171,10 @@ def get_fuel_emission_energy_balance_for_component(
         energy_stored_total_mj=0,
     )
     running_hours = (
-        (np.atleast_1d(component.power_output)[0] != 0)
-        * np.atleast_1d(time_interval_s)[0]
-        / 3600
+        (np.atleast_1d(component.power_output)[0] != 0) * np.atleast_1d(time_interval_s)[0] / 3600
     )
     if len(np.atleast_1d(component.power_output)) > 1:
-        running_hours = (
-            np.dot((component.power_output != 0), time_interval_s).sum() / 3600
-        )
+        running_hours = np.dot((component.power_output != 0), time_interval_s).sum() / 3600
     # Calculate fuel consumption for engines
     if component.type in [
         TypeComponent.MAIN_ENGINE,
@@ -141,6 +182,9 @@ def get_fuel_emission_energy_balance_for_component(
     ]:
         engine_run_point = component.get_engine_run_point_from_power_out_kw(
             fuel_specified_by=fuel_specified_by,
+            fuel_type=fuel_type,
+            fuel_origin=fuel_origin,
+            user_defined_fuels=effective_user_fuels,
         )
         fuel_consumption_kg_per_s = engine_run_point.fuel_flow_rate_kg_per_s
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
@@ -148,11 +192,13 @@ def get_fuel_emission_energy_balance_for_component(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = (
-            res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-                fuel_consumer_class=component.fuel_consumer_type_fuel_eu_maritime
+        fuel_consumer_class = _resolve_fuel_consumer_class(component, fuel_consumption_kg_per_s)
+        if fuel_consumer_class is not None:
+            res.co2_emission_total_kg = (
+                res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+                    fuel_consumer_class=fuel_consumer_class
+                )
             )
-        )
         set_emission(
             engine_out=engine_run_point,
             integration_method=integration_method,
@@ -163,20 +209,27 @@ def get_fuel_emission_energy_balance_for_component(
     # Calculate fuel consumption for genset
     elif component.type == TypeComponent.GENSET:
         component = cast(Genset, component)
-        genset_run_point = (
-            component.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
-                power=component.power_output,
-                fuel_specified_by=fuel_specified_by,
-            )
+        genset_run_point = component.get_fuel_cons_load_bsfc_from_power_out_generator_kw(
+            power=component.power_output,
+            fuel_specified_by=fuel_specified_by,
+            fuel_type=fuel_type,
+            fuel_origin=fuel_origin,
+            user_defined_fuels=effective_user_fuels,
         )
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
             fuel_consumption_kg_per_s=genset_run_point.engine.fuel_flow_rate_kg_per_s,
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-            fuel_consumer_class=component.aux_engine.fuel_consumer_type_fuel_eu_maritime,
+        fuel_consumer_class = _resolve_fuel_consumer_class(
+            component, genset_run_point.engine.fuel_flow_rate_kg_per_s
         )
+        if fuel_consumer_class is not None:
+            res.co2_emission_total_kg = (
+                res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+                    fuel_consumer_class=fuel_consumer_class,
+                )
+            )
 
         if (
             np.isscalar(genset_run_point.genset_load_ratio)
@@ -197,6 +250,7 @@ def get_fuel_emission_energy_balance_for_component(
         fuel_cell_run_point = component.get_fuel_cell_run_point(
             power_out_kw=component.power_output,
             fuel_specified_by=fuel_specified_by,
+            user_defined_fuels=effective_user_fuels,
         )
         fuel_consumption_kg_per_s = fuel_cell_run_point.fuel_flow_rate_kg_per_s
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
@@ -204,10 +258,8 @@ def get_fuel_emission_energy_balance_for_component(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = (
-            res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-                fuel_consumer_class=FuelConsumerClassFuelEUMaritime.FUEL_CELL,
-            )
+        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+            fuel_consumer_class=FuelConsumerClassFuelEUMaritime.FUEL_CELL,
         )
         res.running_hours_fuel_cell_total_hr = running_hours
 
@@ -227,18 +279,22 @@ def get_fuel_emission_energy_balance_for_component(
     # Calculate electric energy input / consumption for PTI/PTO
     elif component.type == TypeComponent.PTI_PTO_SYSTEM:
         power_input = component.power_input.copy()
-        power_input[power_input < 0] = 0  # PTI mode
+        power_output = component.power_output.copy()
+        index_pti_mode = power_input > 0
+        index_pto_mode = power_input < 0
+        power_input[index_pto_mode] = 0  # PTI mode
+        power_output[index_pto_mode] = 0  # PTI mode
         if isSystemMechanical:
             res.energy_input_mechanical_total_mj = (
                 integrate_data(
-                    data_to_integrate=power_input,
+                    data_to_integrate=power_output,
                     time_interval_s=time_interval_s,
                     integration_method=integration_method,
                 )
                 / 1000
             )
         else:
-            res.energy_consumption_mechanical_total_mj = (
+            res.energy_consumption_electric_total_mj = (
                 integrate_data(
                     data_to_integrate=power_input,
                     time_interval_s=time_interval_s,
@@ -247,18 +303,20 @@ def get_fuel_emission_energy_balance_for_component(
                 / 1000
             )
         power_input = component.power_input.copy()
-        power_input[power_input > 0] = 0  # PTO mode
+        power_output = component.power_output.copy()
+        power_input[index_pti_mode] = 0  # PTO mode
+        power_output[index_pti_mode] = 0  # PTO mode
         if isSystemMechanical:
             res.energy_consumption_mechanical_total_mj = (
                 integrate_data(
-                    data_to_integrate=power_input,
+                    data_to_integrate=power_output,
                     time_interval_s=time_interval_s,
                     integration_method=integration_method,
                 )
                 / 1000
             )
         else:
-            res.energy_input_mechanical_total_mj = (
+            res.energy_input_electric_total_mj = (
                 integrate_data(
                     data_to_integrate=-power_input,
                     time_interval_s=time_interval_s,
@@ -284,9 +342,7 @@ def get_fuel_emission_energy_balance_for_component(
 
     #: Calculate electric energy input for shore power
     elif component.type == TypeComponent.SHORE_POWER:
-        component = cast(
-            Union[ShorePowerConnection, ShorePowerConnectionSystem], component
-        )
+        component = cast(Union[ShorePowerConnection, ShorePowerConnectionSystem], component)
         res.energy_input_electric_total_mj = (
             integrate_data(
                 data_to_integrate=component.power_input,
@@ -333,10 +389,8 @@ def get_fuel_emission_energy_balance_for_component(
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = (
-            res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-                component.cogas.fuel_consumer_type_fuel_eu_maritime
-            )
+        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+            component.cogas.fuel_consumer_type_fuel_eu_maritime
         )
 
         if (
@@ -397,44 +451,31 @@ class Switchboard(Node):
         #: Categorize the components by its power type
         for component in components:
             self.component_by_power_type[component.power_type.value].append(component)
-            self.name_component_by_power_type[component.power_type.value].append(
-                component.name
-            )
+            self.name_component_by_power_type[component.power_type.value].append(component.name)
         #: Check if the names are duplicates in each category
         for i, name_list in enumerate(self.name_component_by_power_type):
             name_list_unique = list(set(name_list))
             if len(name_list) != len(name_list_unique):
                 raise NameError(
                     "There are duplicates in the component name for {0} "
-                    "category for the switchboard no. {1}".format(
-                        TypePower(i).name, self.id
-                    )
+                    "category for the switchboard no. {1}".format(TypePower(i).name, self.id)
                 )
         #: Rated power for the bus (summing all the rated power of the power sources)
         self.rated_power = sum(
             [
                 component.rated_power
-                for component in self.component_by_power_type[
-                    TypePower.POWER_SOURCE.value
-                ]
+                for component in self.component_by_power_type[TypePower.POWER_SOURCE.value]
             ]
         )
-        self.no_power_sources = len(
-            self.component_by_power_type[TypePower.POWER_SOURCE.value]
-        )
-        self.no_consumers = len(
-            self.component_by_power_type[TypePower.POWER_CONSUMER.value]
-        )
+        self.no_power_sources = len(self.component_by_power_type[TypePower.POWER_SOURCE.value])
+        self.no_consumers = len(self.component_by_power_type[TypePower.POWER_CONSUMER.value])
         self.no_pti_pto = len(self.component_by_power_type[TypePower.PTI_PTO.value])
-        self.no_energy_storage = len(
-            self.component_by_power_type[TypePower.ENERGY_STORAGE.value]
-        )
+        self.no_energy_storage = len(self.component_by_power_type[TypePower.ENERGY_STORAGE.value])
 
     def get_status_component_by_power_type(self, type_: TypePower) -> List[np.ndarray]:
         #: Check if the length of the values for different components are the same
         len_status = [
-            len(component.status)
-            for component in self.component_by_power_type[type_.value]
+            len(component.status) for component in self.component_by_power_type[type_.value]
         ]
         if not len_status:
             return [False]
@@ -445,13 +486,9 @@ class Switchboard(Node):
             )
             logger.error(err_msg)
             raise InputError(err_msg)
-        return [
-            component.status for component in self.component_by_power_type[type_.value]
-        ]
+        return [component.status for component in self.component_by_power_type[type_.value]]
 
-    def get_load_sharing_mode_components_by_power_type(
-        self, type_: TypePower
-    ) -> List[np.ndarray]:
+    def get_load_sharing_mode_components_by_power_type(self, type_: TypePower) -> List[np.ndarray]:
         #: Check if the length of the values for different components are the same
         len_load_sharing = [
             len(component.load_sharing_mode)
@@ -467,23 +504,18 @@ class Switchboard(Node):
             logger.error(err_msg)
             raise InputError(err_msg)
         return [
-            component.load_sharing_mode
-            for component in self.component_by_power_type[type_.value]
+            component.load_sharing_mode for component in self.component_by_power_type[type_.value]
         ]
 
     def get_power_rated_component_by_power_type(self, type_: TypePower) -> List[float]:
         return [
-            power_source.rated_power
-            for power_source in self.component_by_power_type[type_.value]
+            power_source.rated_power for power_source in self.component_by_power_type[type_.value]
         ]
 
-    def get_power_avail_component_by_power_type(
-        self, type_: TypePower
-    ) -> List[np.ndarray]:
+    def get_power_avail_component_by_power_type(self, type_: TypePower) -> List[np.ndarray]:
         #: Check if the length of the values for different components are the same
         len_status = [
-            len(component.status)
-            for component in self.component_by_power_type[type_.value]
+            len(component.status) for component in self.component_by_power_type[type_.value]
         ]
         if not len_status:
             return []
@@ -552,9 +584,7 @@ class Switchboard(Node):
             idx = self.name_component_by_power_type[power_type.value].index(name)
             return self.component_by_power_type[power_type.value][idx]
         except ValueError:
-            raise ValueError(
-                "The name does not match the components for the given type"
-            )
+            raise ValueError("The name does not match the components for the given type")
 
     def set_power_load_component_from_power_input_by_type_and_name(
         self, name: str, power_type: TypePower, power_input: np.ndarray
@@ -569,7 +599,7 @@ class Switchboard(Node):
         """
         component = self._get_component_by_type_and_name(name, power_type)
         if component is not None and not isinstance(component, Genset):
-            component.set_power_input_from_output(power_input)
+            component.set_power_output_from_input(power_input)
             return 1
         else:
             return 0
@@ -592,9 +622,7 @@ class Switchboard(Node):
         else:
             return 0
 
-    def set_status_components_by_power_type(
-        self, type_: TypePower, status: np.ndarray
-    ) -> None:
+    def set_status_components_by_power_type(self, type_: TypePower, status: np.ndarray) -> None:
         """
         Set the status of all the power sources
 
@@ -607,9 +635,7 @@ class Switchboard(Node):
             raise ValueError("The status input should be a 2D matrix")
         elif status.shape[1] != no_components:
             if status.shape[0] == no_components:
-                raise ValueError(
-                    "The dimension of the status input should be transposed"
-                )
+                raise ValueError("The dimension of the status input should be transposed")
             else:
                 raise ValueError(
                     "The dimension of the status input does not match the number of power sources"
@@ -617,9 +643,7 @@ class Switchboard(Node):
         for i, component in enumerate(self.component_by_power_type[type_.value]):
             component.status = status[:, i]
 
-    def set_status_component_by_power_type_name(
-        self, status: np.ndarray, name: str
-    ) -> int:
+    def set_status_component_by_power_type_name(self, status: np.ndarray, name: str) -> int:
         """
         Sets the status of the power source specified by the name
         :param status: 1d array of bool
@@ -627,16 +651,10 @@ class Switchboard(Node):
         :return: 1 for success, 0 for error
         """
         try:
-            index = self.name_component_by_power_type[
-                TypePower.POWER_SOURCE.value
-            ].index(name)
+            index = self.name_component_by_power_type[TypePower.POWER_SOURCE.value].index(name)
         except ValueError:
-            raise ValueError(
-                "The name given for the power source is not found in the switchboard"
-            )
-        self.component_by_power_type[TypePower.POWER_SOURCE.value][
-            index
-        ].status = status
+            raise ValueError("The name given for the power source is not found in the switchboard")
+        self.component_by_power_type[TypePower.POWER_SOURCE.value][index].status = status
         return 1
 
     def set_status_components_by_power_type_and_index(
@@ -664,14 +682,8 @@ class Switchboard(Node):
 
     def get_sum_power_out_power_sources_asymmetric(self) -> np.ndarray:
         return (
-            np.array(
-                self.get_load_sharing_mode_components_by_power_type(
-                    TypePower.POWER_SOURCE
-                )
-            )
-            * np.array(
-                self.get_power_avail_component_by_power_type(TypePower.POWER_SOURCE)
-            )
+            np.array(self.get_load_sharing_mode_components_by_power_type(TypePower.POWER_SOURCE))
+            * np.array(self.get_power_avail_component_by_power_type(TypePower.POWER_SOURCE))
         ).sum(axis=0)
 
     def get_sum_power_avail_for_power_sources_asymmetric_by_type(
@@ -679,18 +691,14 @@ class Switchboard(Node):
     ) -> np.ndarray:
         return (
             np.ceil(
-                np.absolute(
-                    np.array(self.get_load_sharing_mode_components_by_power_type(type_))
-                )
+                np.absolute(np.array(self.get_load_sharing_mode_components_by_power_type(type_)))
             )
             * np.array(self.get_power_avail_component_by_power_type(type_))
         ).sum(axis=0)
 
     def get_sum_power_avail_for_power_sources_symmetric(self) -> np.ndarray:
         sum_power_avail_power_sources = (
-            np.array(
-                self.get_power_avail_component_by_power_type(TypePower.POWER_SOURCE)
-            )
+            np.array(self.get_power_avail_component_by_power_type(TypePower.POWER_SOURCE))
             .sum(axis=0)
             .astype(float)
         )
@@ -700,26 +708,18 @@ class Switchboard(Node):
             .astype(float)
         )
         sum_power_avail_energy_storage = (
-            np.array(
-                self.get_power_avail_component_by_power_type(TypePower.ENERGY_STORAGE)
-            )
+            np.array(self.get_power_avail_component_by_power_type(TypePower.ENERGY_STORAGE))
             .sum(axis=0)
             .astype(float)
         )
         sum_power_avail_power_source_asymm = (
-            self.get_sum_power_avail_for_power_sources_asymmetric_by_type(
-                TypePower.POWER_SOURCE
-            )
+            self.get_sum_power_avail_for_power_sources_asymmetric_by_type(TypePower.POWER_SOURCE)
         )
         sum_power_avail_pti_pto_asymm = (
-            self.get_sum_power_avail_for_power_sources_asymmetric_by_type(
-                TypePower.PTI_PTO
-            )
+            self.get_sum_power_avail_for_power_sources_asymmetric_by_type(TypePower.PTI_PTO)
         )
         sum_power_avail_energy_storage_asymm = (
-            self.get_sum_power_avail_for_power_sources_asymmetric_by_type(
-                TypePower.ENERGY_STORAGE
-            )
+            self.get_sum_power_avail_for_power_sources_asymmetric_by_type(TypePower.ENERGY_STORAGE)
         )
         return np.round(
             sum_power_avail_power_sources
@@ -736,15 +736,11 @@ class Switchboard(Node):
         Calculate the sum of power loads on the power sources in a symmetric load sharing mode
         :return: sum of the power loads
         """
-        sum_power_consumption = self.get_sum_power_input_by_power_type(
-            TypePower.POWER_CONSUMER
-        )
+        sum_power_consumption = self.get_sum_power_input_by_power_type(TypePower.POWER_CONSUMER)
         sum_power_pti_pto = self.get_sum_power_input_by_power_type(TypePower.PTI_PTO)
         if sum_power_pti_pto.size == 0:
             sum_power_pti_pto = 0
-        sum_power_energy_storage = self.get_sum_power_input_by_power_type(
-            TypePower.ENERGY_STORAGE
-        )
+        sum_power_energy_storage = self.get_sum_power_input_by_power_type(TypePower.ENERGY_STORAGE)
         if sum_power_energy_storage.size == 0:
             sum_power_energy_storage = 0
         sum_power_power_source_asymm = self.get_sum_power_out_power_sources_asymmetric()
@@ -766,8 +762,7 @@ class Switchboard(Node):
         """
         #: Check if the length of the values for different components are the same
         len_power_values = [
-            len(component.power_output)
-            for component in self.component_by_power_type[type_.value]
+            len(component.power_output) for component in self.component_by_power_type[type_.value]
         ]
         if not len_power_values:
             return np.zeros(1)
@@ -846,15 +841,17 @@ class Switchboard(Node):
                 (
                     component.power_output,
                     load_perc,
-                ) = component.get_power_output_from_bidirectional_input(
-                    component.power_input
-                )
+                ) = component.get_power_output_from_bidirectional_input(component.power_input)
 
     def get_fuel_energy_consumption_running_time(
         self,
         time_interval_s: TimeIntervalList,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResult:
         """
         Calculates fuel/energy consumption at the shaftline. Power output of the main engines
@@ -887,6 +884,7 @@ class Switchboard(Node):
             "component type",
             "rated capacity",
             "rated capacity unit",
+            "fuel consumer type",
         ]
         res = FEEMSResult(
             detail_result=pd.DataFrame(columns=column_names),
@@ -900,6 +898,10 @@ class Switchboard(Node):
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
+                user_defined_fuels=user_defined_fuels,
+                user_defined_fuels_by_component=user_defined_fuels_by_component,
             )
 
             res = res.sum_with_freeze_duration(res_comp)
@@ -928,14 +930,17 @@ class Switchboard(Node):
                 component.type.name,
                 component.rated_capacity,
                 component.rated_capacity_unit,
+                (
+                    component.fuel_consumer_type_fuel_eu_maritime.name
+                    if component.fuel_consumer_type_fuel_eu_maritime
+                    else "None"
+                ),
             ]
 
             res.detail_result = pd.concat(
                 [
                     res.detail_result,
-                    pd.Series(data_to_add, index=column_names, name=component.name)
-                    .to_frame()
-                    .T,
+                    pd.Series(data_to_add, index=column_names, name=component.name).to_frame().T,
                 ]
             )
 
@@ -945,9 +950,7 @@ class Switchboard(Node):
                 f"'{self.name}' for fuel calculation"
             )
 
-        if isinstance(component.power_input, float) and isinstance(
-            component.power_output, float
-        ):
+        if isinstance(component.power_input, float) and isinstance(component.power_output, float):
             n_steps = 1
         else:
             n_steps = max(len(component.power_input), len(component.power_output))
@@ -961,6 +964,10 @@ class Switchboard(Node):
         time_interval_s: TimeIntervalList,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResult:
         """Similar function as `get_fuel_energy_consumption_running_time` but this version does not
         supply details.
@@ -969,6 +976,8 @@ class Switchboard(Node):
             time_interval_s: time interval for power output data
             integration_method: 'simpson' or 'trapezoid'. 'simpson' is default value
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
+            fuel_type: Optional[TypeFuel] = None
+            fuel_origin: Optional[FuelOrigin] = None
 
         Returns:
             FEEMSResult
@@ -1000,11 +1009,15 @@ class Switchboard(Node):
                 time_interval_s=time_interval_s,
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
+                user_defined_fuels=user_defined_fuels,
+                user_defined_fuels_by_component=user_defined_fuels_by_component,
             )
             res = res.sum_with_freeze_duration(res_component)
 
         def get_length(
-            v: Union[float, int, List[float], np.ndarray, np.float64]
+            v: Union[float, int, List[float], np.ndarray, np.float64],
         ) -> int:
             if isinstance(v, float) or isinstance(v, int) or np.isscalar(v):
                 return 1
@@ -1013,9 +1026,7 @@ class Switchboard(Node):
             else:
                 return len(v)
 
-        n_steps = max(
-            get_length(component.power_input), get_length(component.power_output)
-        )
+        n_steps = max(get_length(component.power_input), get_length(component.power_output))
         res.duration_s = get_duration_s(integration_method, n_steps, time_interval_s)
 
         return res
@@ -1070,9 +1081,7 @@ class ShaftLine(Node):
     class for main interface for the mechanical propulsion system.
     """
 
-    def __init__(
-        self, name: str, shaft_line_id: int, component_list: List[MechanicalComponent]
-    ):
+    def __init__(self, name: str, shaft_line_id: int, component_list: List[MechanicalComponent]):
         super(ShaftLine, self).__init__(name, TypeNode.SHAFTLINE, component_list)
         self.id = shaft_line_id
         self.component_by_power_type: Dict[TypePower, List[MechanicalComponent]] = {
@@ -1085,28 +1094,20 @@ class ShaftLine(Node):
         #: Categorize the components by its power type
         for component in component_list:
             self.component_by_power_type[component.power_type].append(component)
-            self.name_component_by_power_type[component.power_type].append(
-                component.name
-            )
+            self.name_component_by_power_type[component.power_type].append(component.name)
 
         #: Check if the names are duplicates in each category
         for power_type, name_list in self.name_component_by_power_type.items():
             name_list_unique = list(set(name_list))
             if len(name_list) != len(name_list_unique):
-                msg = (
-                    "There are duplicates in the component name for %s"
-                    "category for the %s"
-                    % (
-                        power_type,
-                        self.name,
-                    )
+                msg = "There are duplicates in the component name for %scategory for the %s" % (
+                    power_type,
+                    self.name,
                 )
                 raise NameError(msg)
 
         #: Get the summary of the system
-        self.no_power_sources = len(
-            self.component_by_power_type[TypePower.POWER_SOURCE]
-        )
+        self.no_power_sources = len(self.component_by_power_type[TypePower.POWER_SOURCE])
         self.no_consumers = len(self.component_by_power_type[TypePower.POWER_CONSUMER])
         self.no_pti_pto = len(self.component_by_power_type[TypePower.PTI_PTO])
 
@@ -1116,9 +1117,7 @@ class ShaftLine(Node):
         #: Find the component by the given name. If not found, log it as error and return 0
         name_component_list = self.name_component_by_power_type[power_type]
         try:
-            return self.component_by_power_type[power_type][
-                name_component_list.index(name)
-            ]
+            return self.component_by_power_type[power_type][name_component_list.index(name)]
         except ValueError:
             raise ValueError(
                 "The given name is not found among the power consumer components in the %s."
@@ -1135,24 +1134,18 @@ class ShaftLine(Node):
         :return: 1 for success 0 for error
         """
         #: Get the load component from the name
-        component = self.get_component_by_name_power_type(
-            name, TypePower.POWER_CONSUMER
-        )
+        component = self.get_component_by_name_power_type(name, TypePower.POWER_CONSUMER)
 
         #: Set the power_input
         if component is not None:
             component.power_input = (
-                np.array([power_input])
-                if type(component.power_input) is float
-                else power_input
+                np.array([power_input]) if type(component.power_input) is float else power_input
             )
             return 1
         else:
             return 0
 
-    def set_status_main_engine_by_name(
-        self, name: str, status: Union[bool, np.ndarray]
-    ) -> int:
+    def set_status_main_engine_by_name(self, name: str, status: Union[bool, np.ndarray]) -> int:
         """
         Sets the status of main engine (0: off, 1: on) of the given name
         :param name: name of the main engine as in the component instance
@@ -1164,9 +1157,7 @@ class ShaftLine(Node):
 
         #: Set the status of the main engine
         if component is not None:
-            component.status = (
-                np.array([status]) if type(component.status) is bool else status
-            )
+            component.status = np.array([status]) if type(component.status) is bool else status
             return 1
         else:
             return 0
@@ -1193,9 +1184,7 @@ class ShaftLine(Node):
         #: Set the power output
         if isinstance(pti_pto, PTIPTO):
             pti_pto.power_output = (
-                np.array([power_output])
-                if type(power_output) is float
-                else power_output
+                np.array([power_output]) if type(power_output) is float else power_output
             )
             (
                 pti_pto.power_input,
@@ -1272,9 +1261,7 @@ class ShaftLine(Node):
         else:
             #: For full PTI mode, PTI covers all the load. Set the power input accordingly
             power_output_pti_pto = pti_pto.power_output
-            power_output_pti_pto[pti_pto.full_pti_mode] = total_power_load[
-                pti_pto.full_pti_mode
-            ]
+            power_output_pti_pto[pti_pto.full_pti_mode] = total_power_load[pti_pto.full_pti_mode]
             pti_pto.set_power_input_from_output(power_output_pti_pto)
 
         #: Calculate the main engine power output
@@ -1301,9 +1288,7 @@ class ShaftLine(Node):
             # noinspection PyUnresolvedReferences
             load_perc = np.zeros(total_power_load.shape)
             is_power_available = total_power_avail > 0
-            if np.bitwise_and(
-                power_output_main_engine > 0, total_power_avail == 0
-            ).any():
+            if np.bitwise_and(power_output_main_engine > 0, total_power_avail == 0).any():
                 logger.warning(
                     "There are cases where the sum of power output of the main "
                     "engines are greater than 0 when there is no available power."
@@ -1330,9 +1315,7 @@ class ShaftLine(Node):
 
         #: Set all the power output of the main engine
         for main_engine in self.component_by_power_type[TypePower.POWER_SOURCE]:
-            main_engine.power_output = (
-                main_engine.rated_power * load_perc * main_engine.status
-            )
+            main_engine.power_output = main_engine.rated_power * load_perc * main_engine.status
 
             #: Set the status false(off) if the power output is 0
             main_engine.status[main_engine.power_output == 0] = False
@@ -1349,6 +1332,10 @@ class ShaftLine(Node):
         time_step: float,
         integration_method: IntegrationMethod = IntegrationMethod.simpson,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_type: Optional[TypeFuel] = None,
+        fuel_origin: Optional[FuelOrigin] = None,
+        user_defined_fuels: Optional[List[Fuel]] = None,
+        user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
     ) -> FEEMSResult:
         """
         Calculate fuel consumption and running hours.
@@ -1358,6 +1345,8 @@ class ShaftLine(Node):
             time_step: time step for the time series in seconds
             integration_method: 'simpson' or 'trapezoid'. 'simpson' is the default method.
             fuel_specified_by: 'IMO' or 'EU'. 'IMO' is the default method.
+            fuel_type: Optional[TypeFuel] = None
+            fuel_origin: Optional[FuelOrigin] = None
 
         Returns: FEEMResult with total fuel consumption [kg], total_mechanical_energy_input [MJ],
             total running hours for engines[hours], CO2 emissions [kg], NOx emissions [kg] and
@@ -1386,6 +1375,7 @@ class ShaftLine(Node):
             "component type",
             "rated capacity",
             "rated capacity unit",
+            "fuel consumer type",
         ]
         res = FEEMSResult(detail_result=pd.DataFrame(columns=column_names))
 
@@ -1397,11 +1387,15 @@ class ShaftLine(Node):
                 time_interval_s=time_step,
                 integration_method=integration_method,
                 fuel_specified_by=fuel_specified_by,
+                isSystemMechanical=True,
+                fuel_type=fuel_type,
+                fuel_origin=fuel_origin,
+                user_defined_fuels=user_defined_fuels,
+                user_defined_fuels_by_component=user_defined_fuels_by_component,
             )
             res = res.sum_with_freeze_duration(res_comp)
             if not (
                 isinstance(component, MainEngineForMechanicalPropulsion)
-                or isinstance(component, MainEngineWithGearBoxForMechanicalPropulsion)
                 or isinstance(component, PTIPTO)
             ):
                 continue
@@ -1419,20 +1413,22 @@ class ShaftLine(Node):
                     )
                     / 1000
                 )
-
             # Add the calculation to the result_dataframe
             data_to_add = [
                 *res_comp.to_list_for_mechanical_component(),
                 component.type.name,
                 component.rated_capacity,
                 component.rated_capacity_unit,
+                (
+                    component.fuel_consumer_type_fuel_eu_maritime.name
+                    if component.fuel_consumer_type_fuel_eu_maritime
+                    else "None"
+                ),
             ]
             res.detail_result = pd.concat(
                 [
                     res.detail_result,
-                    pd.Series(data_to_add, index=column_names, name=component.name)
-                    .to_frame()
-                    .T,
+                    pd.Series(data_to_add, index=column_names, name=component.name).to_frame().T,
                 ]
             )
 
@@ -1442,9 +1438,7 @@ class ShaftLine(Node):
                 f"'{self.name}' for fuel calculation"
             )
 
-        if isinstance(component.power_input, float) and isinstance(
-            component.power_output, float
-        ):
+        if isinstance(component.power_input, float) and isinstance(component.power_output, float):
             n_steps = 1
         else:
             n_steps = max(len(component.power_input), len(component.power_output))

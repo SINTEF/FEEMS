@@ -1,53 +1,57 @@
-Table starts at,9,,,,,,,
-Header at,10,,,,,,,
-unit at,11,,,,,,,
-Values start at,12,,,,,,,
-Data sources,,,,,,,,
-Base,FuelEU Maritime,,,,,,,
-Bio fuel,Directive (EU) 2018/2001 of the European Parliament and of the Council of 11 December 2018 on the promotion of the use of energy from renewable sources,,,,,,,
-RFNBO,JEC Well-to-Tank report v5,,,,,,,
-1,2,3,4,5,6,7,8,9
-fuel_class,pathway_name,LCV,CO2_WtT,fuel_consumer_unit_class,Cf_CO2,Cf_CH4,Cf_N2O,C_slip
-,,MJ/g,gCO2eq/MJ,,gCO2/gFuel,gCH4/gFuel,gN2O/gFuel,%
-Fossil,HFO,0.0405,13.5,ALL ICEs,3.114,0.00005,0.00018,0
-Fossil,LFO,0.041,13.2,ALL ICEs,3.151,0.00005,0.00018,0
-Fossil,Diesel,0.0427,14.4,ALL ICEs,3.206,0.00005,0.00018,0
-Fossil,LNG,0.0491,18.5,LNG otto (medium speed),2.75,0,0.00011,3.1
-Fossil,LNG,0.0491,18.5,LNG otto (slow speed),2.75,0,0.00011,1.7
-Fossil,LNG,0.0491,18.5,LNG diesel (slow speed),2.75,0,0.00011,0.2
-Fossil,LNG,0.0491,18.5,LBSI,2.75,0,0.00011,2.6
-Fossil,LNG,0.0491,18.5,Fuel Cells,2.75,0,0.00011,0
-Fossil,LPG (Butane),0.046,7.8,ALL ICEs,3.03,,,
-Fossil,LPG (Propane),0.046,7.8,ALL ICEs,3,,,
-Fossil,H2,0.12,132,Fuel Cells,0,0,0,0
-Fossil,H2,0.12,132,ICE,0,0,,0
-Fossil,NH3,0.0186,121,Fuel Cells,0,,,
-Fossil,NH3,0.0186,121,ICE,0,,,
-Fossil,Methanol,0.0199,31.3,ALL ICEs,1.375,,,0
-BIO,Ethanol,0.027,,ALL ICEs,1.913,,,0
-BIO,Diesel,0.044,,ALL ICEs,2.834,,,0
-BIO,HVO,,,ALL ICEs,3.115,0.00005,0.00018,0
-BIO,LNG,0.05,,LNG otto (medium speed),2.75,0,0.00011,3.1
-BIO,LNG,0.05,,LNG diesel (slow speed),2.75,0,0.00011,1.7
-BIO,LNG,0.05,,LNG diesel (slow speed),2.75,0,0.00011,0.2
-BIO,LNG,0.05,,LBSI,2.75,0,0.00011,2.6
-BIO,LNG,0.02,,ALL ICEs,1.375,,,0
-BIO,LNG,0.0491,18.5,Fuel Cells,2.75,0,0.00011,0
-BIO,Other,,,ALL ICEs,3.115,0.00005,0.00018,0
-BIO,H2,0.12,,Fuel Cells,0,0,0,0
-BIO,H2,0.12,,ALL ICEs,0,0,,0
-RFNBO,Diesel,0.0427,0.9,ALL ICEs,3.206,0.00005,0.00018,0
-RFNBO,Methanol,0.0199,1.78,ALL ICEs,1.375,0.00005,0.00018,0
-RFNBO,LNG,0.0491,6.7,LNG otto (medium speed),2.75,0,0.00011,3.1
-RFNBO,LNG,0.0491,6.7,LNG otto (slow speed),2.75,0,0.00011,1.7
-RFNBO,LNG,0.0491,6.7,LNG diesel (slow speed),2.75,0,0.00011,0.2
-RFNBO,LNG,0.0491,6.7,LBSI,2.75,0,0.00011,2.6
-RFNBO,LNG,0.0491,6.7,Fuel Cells,2.75,0,0.00011,0
-RFNBO,H2,0.12,3.6,Fuel Cells,0,0,0,0
-RFNBO,H2,0.12,3.6,ALL ICEs,0,0,,0
-RFNBO,NH3,0.0186,10,Fuel Cells,0,,,
-RFNBO,NH3,0.0186,10,ALL ICEs,0,,,
-RFNBO,LPG (Butane),0.046,0,ALL ICEs,,,,
-RFNBO,LPG (Propane),0.046,0,ALL ICEs,,,,
-RFNBO,DME,,1.7,ALL ICEs,,,,
-Electricity,Electricity,,70.55555556,On-shore power supply,0,0,0,0
+Table starts at,9,,,,,,,,,,
+Header at,10,,,,,,,,,,
+unit at,11,,,,,,,,,,
+Values start at,12,,,,,,,,,,
+Data sources,,,,,,,,,,,
+Base,FuelEU Maritime,,,,,,,,,,
+Bio fuel,Directive (EU) 2018/2001 of the European Parliament and of the Council of 11 December 2018 on the promotion of the use of energy from renewable sources,,,,,,,,,,
+RFNBO,JEC Well-to-Tank report v5,,,,,,,,,,
+1,2,3,4,5,6,7,8,9,10,11,12
+fuel_class,pathway_name,LCV,CO2_WtT,fuel_consumer_unit_class,Cf_CO2,Cf_CH4,Cf_N2O,C_slip,TtW_energy,TtW_mass,WTW_energy
+,,MJ/g,gCO2eq/MJ,,gCO2/gFuel,gCH4/gFuel,gN2O/gFuel,%,gCO2eq/MJ,gCO2eq/gFuel,gCO2eq/MJ
+Fossil,HFO,0.0405,13.5,ALL ICEs,3.114,0.00005,0.00018,0,78.13555556,3.16449,91.63555556
+Fossil,LSFO (Crude),0.0405,13.2,ALL ICEs,3.151,0.00005,0.00018,0,79.0491358,3.20149,92.2491358
+Fossil,LSFO (Blend),0.0405,13.7,ALL ICEs,3.151,0.00005,0.00018,0,79.0491358,3.20149,92.7491358
+Fossil,ULSFO,0.0405,13.2,ALL ICEs,3.114,0.00005,0.00018,0,78.13555556,3.16449,91.33555556
+Fossil,VLSFO,0.041,13.2,ALL ICEs,3.206,0.00005,0.00018,0,79.42658537,3.25649,92.62658537
+Fossil,LFO,0.041,13.2,ALL ICEs,3.151,0.00005,0.00018,0,78.08512195,3.20149,91.28512195
+Fossil,Diesel,0.0427,14.4,ALL ICEs,3.206,0.00005,0.00018,0,76.26440281,3.25649,90.66440281
+Fossil,LNG,0.048,18.5,LNG otto (medium speed),2.75,0,0.00011,3.1,73.55935563,3.53084907,92.05935563
+Fossil,LNG,0.048,18.5,LNG otto (slow speed),2.75,0,0.00011,1.7,66.49519771,3.19176949,84.99519771
+Fossil,LNG,0.048,18.5,LNG diesel (slow speed),2.75,0,0.00011,0.2,58.92645708,2.82846994,77.42645708
+Fossil,LNG,0.048,18.5,LBSI,2.75,0,0.00011,2.6,71.03644208,3.40974922,89.53644208
+Fossil,LNG,0.048,18.5,Fuel Cells,2.75,0,0,0,57.29166667,2.75,75.79166667
+Fossil,LPG (Butane),0.046,7.8,ALL ICEs,3.03,0,0,0,65.86956522,3.03,73.66956522
+Fossil,LPG (Propane),0.046,7.8,ALL ICEs,3,0,0,0,65.2173913,3,73.0173913
+Fossil,H2,0.12,132,Fuel Cells,0,0,0,0,0,0,132
+Fossil,H2,0.12,132,ALL ICEs,0,0,0,0,0,0,132
+Fossil,NH3,0.0186,121,Fuel Cells,0,0,0,0,0,0,121
+Fossil,NH3,0.0186,121,ALL ICEs,0,0,0,0,0,0,121
+Fossil,Methanol,0.0199,31.3,ALL ICEs,1.375,0.00005,0.00018,0,71.63266332,1.42549,102.9326633
+BIO,Methanol,0.0199,-58.35376884,ALL ICEs,1.375,0.00005,0.00018,0,71.63266332,1.42549,13.27889448
+BIO,Ethanol,0.0268,-33.2,ALL ICEs,1.913,0,0,0,71.38059701,1.913,38.18059701
+BIO,Diesel,0.0372,-26.1,ALL ICEs,2.834,0.00005,0.00018,0,77.54005376,2.88449,51.44005376
+BIO,HVO,0.044,-20.7,ALL ICEs,3.115,0.00005,0.00018,0,71.94295455,3.16549,51.24295455
+BIO,LNG,0.05,-38.9,LNG otto (medium speed),2.75,0,0.00011,3.1,70.6169814,3.53084907,31.7169814
+BIO,LNG,0.05,-38.9,LNG otto (slow speed),2.75,0,0.00011,1.7,63.8353898,3.19176949,24.9353898
+BIO,LNG,0.05,-38.9,LNG diesel (slow speed),2.75,0,0.00011,0.2,56.5693988,2.82846994,17.6693988
+BIO,LNG,0.05,-38.9,LBSI,2.75,0,0.00011,2.6,68.1949844,3.40974922,29.2949844
+BIO,LNG,0.05,-38.9,Fuel Cells,2.75,0,0,0,55,2.75,16.1
+BIO,Other,,,ALL ICEs,3.115,0.00005,0.00018,0,,,
+BIO,H2,0.12,0,Fuel Cells,0,0,0,0,0,0,0
+BIO,H2,0.12,0,ALL ICEs,0,0,0,0,0,0,0
+RFNBO,Diesel,0.0427,-47.6,ALL ICEs,3.206,0.00005,0.00018,0,76.26440281,3.25649,28.66440281
+RFNBO,Methanol,0.0199,-67.1,ALL ICEs,1.375,0.00005,0.00018,0,71.63266332,1.42549,4.532663317
+RFNBO,LNG,0.0491,-26.6,LNG otto (medium speed),2.75,0,0.00011,3.1,71.91138635,3.53084907,45.31138635
+RFNBO,LNG,0.0491,-26.6,LNG otto (slow speed),2.75,0,0.00011,1.7,65.00548859,3.19176949,38.40548859
+RFNBO,LNG,0.0491,-26.6,LNG diesel (slow speed),2.75,0,0.00011,0.2,57.60631242,2.82846994,31.00631242
+RFNBO,LNG,0.0491,-26.6,LBSI,2.75,0,0.00011,2.6,69.4449943,3.40974922,42.8449943
+RFNBO,LNG,0.0491,-26.6,Fuel Cells,2.75,0,0,0,56.00814664,2.75,29.40814664
+RFNBO,H2,0.12,3.6,Fuel Cells,0,0,0,0,0,0,3.6
+RFNBO,H2,0.12,3.6,ALL ICEs,0,0,0,0,0,0,3.6
+RFNBO,NH3,0.0186,0,Fuel Cells,0,0,0,0,0,0,0
+RFNBO,NH3,0.0186,0,ALL ICEs,0,0,0,0,0,0,0
+RFNBO,LPG (Butane),0.046,0,ALL ICEs,,,,,,,
+RFNBO,LPG (Propane),0.046,0,ALL ICEs,,,,,,,
+RFNBO,DME,,1.7,ALL ICEs,,,,,,,
+Electricity,Electricity,,70.55555556,On-shore power supply,0,0,0,0,,,

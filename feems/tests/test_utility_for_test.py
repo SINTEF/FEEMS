@@ -2,11 +2,11 @@ import random
 import unittest
 
 import numpy as np
-
 from feems.components_model.utility import (
     get_list_random_distribution_numbers_for_total_number,
 )
 from feems.types_for_feems import TypePower
+
 from tests.utility import (
     create_random_monotonic_eff_curve,
     create_switchboard_with_components,
@@ -45,13 +45,10 @@ class TestUtilityForTest(unittest.TestCase):
         for _ in range(100):
             #: Set the random parameters for creating the switchboard component
             number_components = random.randint(4, 100)
-            number_components_list = (
-                get_list_random_distribution_numbers_for_total_number(
-                    4, number_components
-                )
+            number_components_list = get_list_random_distribution_numbers_for_total_number(
+                4, number_components
             )
             rated_power_avail = random.random() * 5000
-            rated_speed_max = random.random() * 1000
             switchboard_id = random.randint(1, 10)
 
             #: Create a switchboard component
@@ -65,7 +62,6 @@ class TestUtilityForTest(unittest.TestCase):
             )
 
             #: Check if the number of components created is correct
-            type_power = [type_power for type_power in TypePower]
             self.assertEqual(switchboard.no_power_sources, number_components_list[0])
             self.assertEqual(switchboard.no_consumers, number_components_list[1])
             self.assertEqual(switchboard.no_pti_pto, number_components_list[2])

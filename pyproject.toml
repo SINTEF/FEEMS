@@ -1,0 +1,43 @@
+[project]
+name = "feems-workspace"
+version = "0.1.0"
+description = "FEEMS Workspace"
+requires-python = ">=3.10"
+dependencies = [
+    "feems",
+    "MachSysS",
+    "RunFeemsSim",
+]
+
+[tool.uv.workspace]
+members = ["feems", "machinery-system-structure", "RunFEEMSSim"]
+
+[tool.uv.sources]
+feems = { workspace = true }
+MachSysS = { workspace = true }
+RunFeemsSim = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+    "deepdiff",
+    "pytest-subtests",
+    "jupyter>=1.1.1",
+    "plotly>=6.5.2",
+    "matplotlib>=3.10.8",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+    "*_pb2.py",
+    "*_pb2.pyi",
+    "_modidx.py",
+]
+
+[tool.ruff.lint]
+per-file-ignores = { "*.ipynb" = ["F811", "F403", "E501"] }
+
+select = ["E", "F", "I"]

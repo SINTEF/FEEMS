@@ -1,5 +1,5 @@
 {
-  "feems": "0.10.4",
-  "MachSysS": "0.6.2",
-  "RunFeemsSim": "0.2.1a"
+  "feems": "0.15.0",
+  "machinery-system-structure": "0.10.0",
+  "RunFEEMSSim": "0.4.4"
 }
