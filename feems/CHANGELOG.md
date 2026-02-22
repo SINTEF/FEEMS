@@ -5,6 +5,14 @@ All notable changes to the FEEMS package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.14.0...feems-v0.15.0) (2026-02-22)
+
+
+### Features
+
+* add array support for engine emission-curve GHG override ([#85](https://github.com/SINTEF/FEEMS/issues/85)) ([bae5e76](https://github.com/SINTEF/FEEMS/commit/bae5e763f6ebf07fdeacd4e02d04628f8c1de2a6))
+* engine emission-curve GHG override with numpy array support ([#85](https://github.com/SINTEF/FEEMS/issues/85)) ([cb8347a](https://github.com/SINTEF/FEEMS/commit/cb8347ad1e5b95ad59cca13ea82a9432c91ad357))
+
 ## [0.14.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.13.4...feems-v0.14.0) (2026-02-20)
 
 
