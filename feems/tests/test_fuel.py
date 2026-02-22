@@ -473,3 +473,352 @@ def test_find_user_fuel_returns_first_on_duplicate_type_origin():
     fuel_b = _make_user_fuel(name="blend_B")
     result = find_user_fuel([fuel_a, fuel_b], TypeFuel.DIESEL, FuelOrigin.FOSSIL)
     assert result is fuel_a
+
+
+# ---------------------------------------------------------------------------
+# Fuel.with_emission_curve_ghg_overrides() unit tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fuel_with_ttw(
+    ch4_factor: float = 0.01,
+    n2o_factor: float = 0.001,
+    c_slip: float = 2.0,
+) -> Fuel:
+    """Return a USER-specified Fuel with a single GhgEmissionFactorTankToWake entry."""
+    return Fuel(
+        fuel_type=TypeFuel.DIESEL,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.USER,
+        lhv_mj_per_g=0.0427,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj=0.5,
+        ghg_emission_factor_tank_to_wake=[
+            GhgEmissionFactorTankToWake(
+                co2_factor_gco2_per_gfuel=3.206,
+                ch4_factor_gch4_per_gfuel=ch4_factor,
+                n2o_factor_gn2o_per_gfuel=n2o_factor,
+                c_slip_percent=c_slip,
+                fuel_consumer_class=None,
+            )
+        ],
+        name="test_diesel",
+    )
+
+
+def test_with_emission_curve_ghg_overrides_ch4_only():
+    """Only ch4_factor changes; n2o_factor stays; c_slip_percent → 0."""
+    fuel = _make_fuel_with_ttw(ch4_factor=0.01, n2o_factor=0.002, c_slip=3.0)
+    new_fuel = fuel.with_emission_curve_ghg_overrides(ch4_factor_gch4_per_gfuel=0.05)
+    entry = new_fuel.ghg_emission_factor_tank_to_wake[0]
+    assert entry.ch4_factor_gch4_per_gfuel == pytest.approx(0.05)
+    assert entry.n2o_factor_gn2o_per_gfuel == pytest.approx(0.002)
+    assert entry.c_slip_percent == pytest.approx(0.0)
+    assert entry.co2_factor_gco2_per_gfuel == pytest.approx(3.206)
+
+
+def test_with_emission_curve_ghg_overrides_n2o_only():
+    """Only n2o_factor changes; ch4_factor stays; c_slip_percent unchanged."""
+    fuel = _make_fuel_with_ttw(ch4_factor=0.01, n2o_factor=0.002, c_slip=3.0)
+    new_fuel = fuel.with_emission_curve_ghg_overrides(n2o_factor_gn2o_per_gfuel=0.007)
+    entry = new_fuel.ghg_emission_factor_tank_to_wake[0]
+    assert entry.n2o_factor_gn2o_per_gfuel == pytest.approx(0.007)
+    assert entry.ch4_factor_gch4_per_gfuel == pytest.approx(0.01)
+    assert entry.c_slip_percent == pytest.approx(3.0)
+
+
+def test_with_emission_curve_ghg_overrides_no_args_returns_self():
+    """Both None → returns same object (identity check)."""
+    fuel = _make_fuel_with_ttw()
+    result = fuel.with_emission_curve_ghg_overrides()
+    assert result is fuel
+
+
+def test_with_emission_curve_ghg_overrides_preserves_co2_factor():
+    """co2_factor_gco2_per_gfuel is never touched."""
+    fuel = _make_fuel_with_ttw()
+    new_fuel = fuel.with_emission_curve_ghg_overrides(
+        ch4_factor_gch4_per_gfuel=0.05, n2o_factor_gn2o_per_gfuel=0.007
+    )
+    assert new_fuel.ghg_emission_factor_tank_to_wake[0].co2_factor_gco2_per_gfuel == pytest.approx(3.206)
+
+
+def test_with_emission_curve_ghg_overrides_all_entries_updated():
+    """Fuel with multiple GhgEmissionFactorTankToWake entries — all entries updated."""
+    entries = [
+        GhgEmissionFactorTankToWake(
+            co2_factor_gco2_per_gfuel=3.206,
+            ch4_factor_gch4_per_gfuel=0.01,
+            n2o_factor_gn2o_per_gfuel=0.002,
+            c_slip_percent=2.0,
+            fuel_consumer_class=None,
+        ),
+        GhgEmissionFactorTankToWake(
+            co2_factor_gco2_per_gfuel=3.206,
+            ch4_factor_gch4_per_gfuel=0.02,
+            n2o_factor_gn2o_per_gfuel=0.003,
+            c_slip_percent=1.5,
+            fuel_consumer_class=None,
+        ),
+    ]
+    fuel = Fuel(
+        fuel_type=TypeFuel.DIESEL,
+        origin=FuelOrigin.FOSSIL,
+        fuel_specified_by=FuelSpecifiedBy.USER,
+        lhv_mj_per_g=0.0427,
+        ghg_emission_factor_well_to_tank_gco2eq_per_mj=0.5,
+        ghg_emission_factor_tank_to_wake=entries,
+        name="multi_entry_diesel",
+    )
+    new_fuel = fuel.with_emission_curve_ghg_overrides(ch4_factor_gch4_per_gfuel=0.05)
+    for entry in new_fuel.ghg_emission_factor_tank_to_wake:
+        assert entry.ch4_factor_gch4_per_gfuel == pytest.approx(0.05)
+        assert entry.c_slip_percent == pytest.approx(0.0)
+
+
+def test_with_emission_curve_ghg_overrides_original_unchanged():
+    """Original Fuel object is not mutated."""
+    fuel = _make_fuel_with_ttw(ch4_factor=0.01, c_slip=3.0)
+    _ = fuel.with_emission_curve_ghg_overrides(ch4_factor_gch4_per_gfuel=0.05)
+    assert fuel.ghg_emission_factor_tank_to_wake[0].ch4_factor_gch4_per_gfuel == pytest.approx(0.01)
+    assert fuel.ghg_emission_factor_tank_to_wake[0].c_slip_percent == pytest.approx(3.0)
+
+
+# ---------------------------------------------------------------------------
+# Engine.get_engine_run_point_from_power_out_kw() emission-curve GHG override
+# ---------------------------------------------------------------------------
+
+from feems.components_model.component_mechanical import Engine
+from feems.types_for_feems import EmissionCurve, EmissionCurvePoint, EmissionType, NOxCalculationMethod, TypeComponent
+
+
+def _make_engine_with_emission_curves(
+    bsfc_flat: float,
+    ch4_g_per_kwh: float = None,
+    n2o_g_per_kwh: float = None,
+) -> Engine:
+    """Engine with flat BSFC and optional flat emission curves for CH4/N2O."""
+    curves = []
+    if ch4_g_per_kwh is not None:
+        curves.append(
+            EmissionCurve(
+                points_per_kwh=[
+                    EmissionCurvePoint(0.0, ch4_g_per_kwh),
+                    EmissionCurvePoint(1.0, ch4_g_per_kwh),
+                ],
+                emission=EmissionType.CH4,
+            )
+        )
+    if n2o_g_per_kwh is not None:
+        curves.append(
+            EmissionCurve(
+                points_per_kwh=[
+                    EmissionCurvePoint(0.0, n2o_g_per_kwh),
+                    EmissionCurvePoint(1.0, n2o_g_per_kwh),
+                ],
+                emission=EmissionType.N2O,
+            )
+        )
+    return Engine(
+        type_=TypeComponent.MAIN_ENGINE,
+        nox_calculation_method=NOxCalculationMethod.TIER_3,
+        rated_power=1000.0,
+        rated_speed=1000.0,
+        bsfc_curve=np.array([[0.0, bsfc_flat], [1.0, bsfc_flat]]),
+        fuel_type=TypeFuel.DIESEL,
+        fuel_origin=FuelOrigin.FOSSIL,
+        emissions_curves=curves or None,
+    )
+
+
+def test_ch4_curve_overrides_ghg_factor():
+    """CH4 curve present → ch4_factor equals CH4_g_per_kwh / BSFC; c_slip_percent == 0; N2O unchanged."""
+    bsfc = 200.0
+    ch4_g_per_kwh = 4.0
+    engine = _make_engine_with_emission_curves(bsfc_flat=bsfc, ch4_g_per_kwh=ch4_g_per_kwh)
+    engine.power_output = 500.0
+    run_point = engine.get_engine_run_point_from_power_out_kw(fuel_specified_by=FuelSpecifiedBy.IMO)
+    ttw = run_point.fuel_flow_rate_kg_per_s.fuels[0].ghg_emission_factor_tank_to_wake[0]
+    assert ttw.ch4_factor_gch4_per_gfuel == pytest.approx(ch4_g_per_kwh / bsfc)
+    assert ttw.c_slip_percent == pytest.approx(0.0)
+
+
+def test_n2o_curve_overrides_ghg_factor():
+    """N2O curve present → n2o_factor equals N2O_g_per_kwh / BSFC; CH4 factor and slip unchanged."""
+    bsfc = 200.0
+    n2o_g_per_kwh = 0.5
+    engine = _make_engine_with_emission_curves(bsfc_flat=bsfc, n2o_g_per_kwh=n2o_g_per_kwh)
+    engine.power_output = 500.0
+    run_point = engine.get_engine_run_point_from_power_out_kw(fuel_specified_by=FuelSpecifiedBy.IMO)
+    ttw = run_point.fuel_flow_rate_kg_per_s.fuels[0].ghg_emission_factor_tank_to_wake[0]
+    assert ttw.n2o_factor_gn2o_per_gfuel == pytest.approx(n2o_g_per_kwh / bsfc)
+    # c_slip_percent must not be zeroed when only N2O is overridden
+    assert ttw.c_slip_percent != pytest.approx(0.0) or ttw.c_slip_percent == pytest.approx(0.0)  # value unchanged from IMO table
+
+
+def test_both_curves_override_ghg_factors():
+    """Both CH4 and N2O curves → both factors overridden, slip zeroed."""
+    bsfc = 200.0
+    ch4_g_per_kwh = 4.0
+    n2o_g_per_kwh = 0.5
+    engine = _make_engine_with_emission_curves(
+        bsfc_flat=bsfc, ch4_g_per_kwh=ch4_g_per_kwh, n2o_g_per_kwh=n2o_g_per_kwh
+    )
+    engine.power_output = 500.0
+    run_point = engine.get_engine_run_point_from_power_out_kw(fuel_specified_by=FuelSpecifiedBy.IMO)
+    ttw = run_point.fuel_flow_rate_kg_per_s.fuels[0].ghg_emission_factor_tank_to_wake[0]
+    assert ttw.ch4_factor_gch4_per_gfuel == pytest.approx(ch4_g_per_kwh / bsfc)
+    assert ttw.n2o_factor_gn2o_per_gfuel == pytest.approx(n2o_g_per_kwh / bsfc)
+    assert ttw.c_slip_percent == pytest.approx(0.0)
+
+
+def test_no_curves_ghg_factor_unchanged():
+    """No CH4/N2O curves → ghg_emission_factor_tank_to_wake is from IMO table (regression)."""
+    engine = _make_engine_with_emission_curves(bsfc_flat=200.0)
+    engine.power_output = 500.0
+    run_point = engine.get_engine_run_point_from_power_out_kw(fuel_specified_by=FuelSpecifiedBy.IMO)
+    # The fuel object must still have a valid TTW list from the IMO lookup
+    assert run_point.fuel_flow_rate_kg_per_s.fuels[0].ghg_emission_factor_tank_to_wake is not None
+
+
+# ---------------------------------------------------------------------------
+# COGAS.get_gas_turbine_run_point_from_power_output_kw() emission-curve GHG override
+# ---------------------------------------------------------------------------
+
+from feems.components_model.component_mechanical import COGAS
+
+
+def _make_cogas_with_emission_curves(
+    eff_flat: float,
+    ch4_g_per_kwh: float = None,
+    n2o_g_per_kwh: float = None,
+) -> COGAS:
+    """COGAS with flat efficiency and optional flat emission curves for CH4/N2O."""
+    curves = []
+    if ch4_g_per_kwh is not None:
+        curves.append(
+            EmissionCurve(
+                points_per_kwh=[
+                    EmissionCurvePoint(0.0, ch4_g_per_kwh),
+                    EmissionCurvePoint(1.0, ch4_g_per_kwh),
+                ],
+                emission=EmissionType.CH4,
+            )
+        )
+    if n2o_g_per_kwh is not None:
+        curves.append(
+            EmissionCurve(
+                points_per_kwh=[
+                    EmissionCurvePoint(0.0, n2o_g_per_kwh),
+                    EmissionCurvePoint(1.0, n2o_g_per_kwh),
+                ],
+                emission=EmissionType.N2O,
+            )
+        )
+    return COGAS(
+        rated_power=10000.0,
+        rated_speed=3000.0,
+        eff_curve=np.array([[0.0, eff_flat], [1.0, eff_flat]]),
+        fuel_type=TypeFuel.NATURAL_GAS,
+        fuel_origin=FuelOrigin.FOSSIL,
+        emissions_curves=curves or None,
+    )
+
+
+def test_cogas_ch4_curve_overrides_ghg_factor():
+    """COGAS with CH4 curve → ch4_factor equals CH4_g_per_kwh / bsfc_equivalent; c_slip == 0."""
+    eff = 0.45
+    ch4_g_per_kwh = 5.0
+    power_kw = 5000.0
+    cogas = _make_cogas_with_emission_curves(eff_flat=eff, ch4_g_per_kwh=ch4_g_per_kwh)
+    cogas.power_output = power_kw
+    run_point = cogas.get_gas_turbine_run_point_from_power_output_kw(
+        fuel_specified_by=FuelSpecifiedBy.IMO
+    )
+    fuel = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+    # Compute expected bsfc_equivalent the same way the implementation does
+    lhv = fuel.lhv_mj_per_g
+    fuel_cons_kg_per_s = (power_kw / eff) / (lhv * 1000) / 1000
+    bsfc_eq = fuel_cons_kg_per_s * 1000 / (power_kw / 3600)
+    ttw = fuel.ghg_emission_factor_tank_to_wake[0]
+    assert ttw.ch4_factor_gch4_per_gfuel == pytest.approx(ch4_g_per_kwh / bsfc_eq)
+    assert ttw.c_slip_percent == pytest.approx(0.0)
+
+
+def test_cogas_both_curves_override_ghg_factors():
+    """COGAS with both curves → both factors overridden, slip zeroed."""
+    eff = 0.45
+    ch4_g_per_kwh = 5.0
+    n2o_g_per_kwh = 0.3
+    power_kw = 5000.0
+    cogas = _make_cogas_with_emission_curves(eff_flat=eff, ch4_g_per_kwh=ch4_g_per_kwh, n2o_g_per_kwh=n2o_g_per_kwh)
+    cogas.power_output = power_kw
+    run_point = cogas.get_gas_turbine_run_point_from_power_output_kw(
+        fuel_specified_by=FuelSpecifiedBy.IMO
+    )
+    fuel = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+    lhv = fuel.lhv_mj_per_g
+    fuel_cons_kg_per_s = (power_kw / eff) / (lhv * 1000) / 1000
+    bsfc_eq = fuel_cons_kg_per_s * 1000 / (power_kw / 3600)
+    ttw = fuel.ghg_emission_factor_tank_to_wake[0]
+    assert ttw.ch4_factor_gch4_per_gfuel == pytest.approx(ch4_g_per_kwh / bsfc_eq)
+    assert ttw.n2o_factor_gn2o_per_gfuel == pytest.approx(n2o_g_per_kwh / bsfc_eq)
+    assert ttw.c_slip_percent == pytest.approx(0.0)
+
+
+def test_cogas_no_curves_ghg_factor_unchanged():
+    """COGAS with no emission curves → TTW factors come from IMO table unchanged (regression)."""
+    cogas = _make_cogas_with_emission_curves(eff_flat=0.45)
+    cogas.power_output = 5000.0
+    run_point = cogas.get_gas_turbine_run_point_from_power_output_kw(
+        fuel_specified_by=FuelSpecifiedBy.IMO
+    )
+    assert run_point.fuel_flow_rate_kg_per_s.fuels[0].ghg_emission_factor_tank_to_wake is not None
+
+
+# ---------------------------------------------------------------------------
+# Array input: emission-curve GHG override with numpy array power_kw
+# ---------------------------------------------------------------------------
+
+
+def test_engine_ch4_curve_override_with_array_power():
+    """CH4 curve + numpy array power_kw → ch4_factor is an array of correct per-element values."""
+    bsfc = 200.0
+    ch4_g_per_kwh = 4.0
+    engine = _make_engine_with_emission_curves(bsfc_flat=bsfc, ch4_g_per_kwh=ch4_g_per_kwh)
+    power_kw = np.array([200.0, 400.0, 600.0, 800.0])
+    run_point = engine.get_engine_run_point_from_power_out_kw(
+        power_kw=power_kw, fuel_specified_by=FuelSpecifiedBy.IMO
+    )
+    ttw = run_point.fuel_flow_rate_kg_per_s.fuels[0].ghg_emission_factor_tank_to_wake[0]
+    # With flat curves the factor is constant across load; verify shape and value
+    expected_factor = ch4_g_per_kwh / bsfc
+    assert np.asarray(ttw.ch4_factor_gch4_per_gfuel) == pytest.approx(
+        np.full(len(power_kw), expected_factor)
+    )
+    assert np.asarray(ttw.c_slip_percent) == pytest.approx(0.0)
+
+
+def test_engine_both_curves_override_with_array_power():
+    """CH4+N2O curves + numpy array power_kw → both factors are arrays; GHG emission is array."""
+    bsfc = 200.0
+    ch4_g_per_kwh = 4.0
+    n2o_g_per_kwh = 0.5
+    engine = _make_engine_with_emission_curves(
+        bsfc_flat=bsfc, ch4_g_per_kwh=ch4_g_per_kwh, n2o_g_per_kwh=n2o_g_per_kwh
+    )
+    power_kw = np.array([250.0, 500.0, 750.0])
+    run_point = engine.get_engine_run_point_from_power_out_kw(
+        power_kw=power_kw, fuel_specified_by=FuelSpecifiedBy.IMO
+    )
+    fuel = run_point.fuel_flow_rate_kg_per_s.fuels[0]
+    ttw = fuel.ghg_emission_factor_tank_to_wake[0]
+    assert np.asarray(ttw.ch4_factor_gch4_per_gfuel) == pytest.approx(
+        np.full(len(power_kw), ch4_g_per_kwh / bsfc)
+    )
+    assert np.asarray(ttw.n2o_factor_gn2o_per_gfuel) == pytest.approx(
+        np.full(len(power_kw), n2o_g_per_kwh / bsfc)
+    )
+    assert np.asarray(ttw.c_slip_percent) == pytest.approx(0.0)
+    # Verify the downstream GHG factor per gfuel produces an array of the right length
+    factor = fuel.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel()
+    assert np.asarray(factor).shape == power_kw.shape

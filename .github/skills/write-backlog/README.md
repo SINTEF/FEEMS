@@ -109,6 +109,15 @@ If a feature is divided into phases:
 
 When all phases are done and all phase commits are in place:
 
+1. **API Docs** — if the implementation added or changed public methods, classes, parameters, or types, update the relevant API reference doc before the final commit:
+   - `feems` changes → `docs/api/feems/API_REFERENCE.md`
+   - `machinery-system-structure` changes → `docs/api/machinery-system-structure/API_REFERENCE.md`
+   - `RunFEEMSSim` changes → `docs/api/RunFEEMSSim/API_REFERENCE.md`
+
+2. **Changelog & version** — do **not** edit `CHANGELOG.md` or `pyproject.toml` version manually. Both are managed automatically by `release-please` via conventional commit prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`).
+
+3. **Push and open PR**:
+
 ```bash
 git push origin feature/issue-{id}-{short-slug}
 # Open a Pull Request against main

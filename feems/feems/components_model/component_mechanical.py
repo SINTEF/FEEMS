@@ -46,7 +46,7 @@ class EngineRunPoint:
     fuel_flow_rate_kg_per_s: FuelConsumption
     bsfc_g_per_kWh: np.ndarray
     emissions_g_per_s: Dict[EmissionType, np.ndarray]
-    bspfc_g_per_kWh: np.ndarray = None
+    bspfc_g_per_kWh: np.ndarray | None = None
 
 
 T = TypeVar("T", float, np.ndarray)
@@ -56,7 +56,6 @@ class Engine(Component):
     """
     Engine class for basic information and fuel consumption interpolation
     """
-
     def __init__(
         self,
         *,
@@ -65,11 +64,11 @@ class Engine(Component):
         name: str = "",
         rated_power: Power_kW = Power_kW(0.0),
         rated_speed: Speed_rpm = Speed_rpm(0.0),
-        bsfc_curve: np.ndarray = None,
+        bsfc_curve: np.ndarray | None = None,
         fuel_type: TypeFuel = TypeFuel.DIESEL,
         fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
-        file_name: str = None,
-        emissions_curves: List[EmissionCurve] = None,
+        file_name: str | None = None,
+        emissions_curves: List[EmissionCurve] | None = None,
         engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL,
         uid: Optional[str] = None,
     ):
@@ -88,9 +87,9 @@ class Engine(Component):
         self._setup_emissions(emissions_curves)
         self._setup_nox(nox_calculation_method, rated_speed)
 
-    def _setup_emissions(self, emissions_curves) -> None:
+    def _setup_emissions(self, emissions_curves: List[EmissionCurve] | None) -> None:
         self.emission_curves = emissions_curves
-        self._emissions_per_kwh_interp: Dict[EmissionType, Callable[[T], T]] = {}
+        self._emissions_per_kwh_interp: Dict[EmissionType, Callable[[float], float]] = {}
         if emissions_curves is not None:
             e: EmissionCurve
             for e in emissions_curves:
@@ -99,21 +98,24 @@ class Engine(Component):
                         e.points_per_kwh
                     )
 
-    def _setup_bsfc(self, bsfc_curve, file_name) -> None:
+    def _setup_bsfc(self, bsfc_curve: np.ndarray | None, file_name: str | None) -> None:
+        self.specific_fuel_consumption_interp: Callable[[float], float] = lambda x: 0.0
+        self.specific_fuel_consumption_points: np.ndarray | None = None
         if file_name is not None:
             df = pd.read_csv(file_name, index_col=0)
             self.rated_power = df["Rated Power"].values[0]
             self.rated_speed = df["Rated Speed"].values[0]
             (
                 self.specific_fuel_consumption_interp,
-                self.specific_fuel_consumption_points,
-            ) = get_efficiency_curve_from_dataframe(df, "BSFC")
+                self.specific_fuel_consumption_points,            ) = get_efficiency_curve_from_dataframe(df, "BSFC")
             self.name = df.index[0]
-        else:
+        elif bsfc_curve is not None:
             (
                 self.specific_fuel_consumption_interp,
                 self.specific_fuel_consumption_points,
             ) = get_efficiency_curve_from_points(bsfc_curve)
+        else:
+            raise ValueError("Either bsfc_curve or file_name must be provided for Engine.")
 
     @property
     def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
@@ -165,11 +167,11 @@ class Engine(Component):
 
     def get_engine_run_point_from_power_out_kw(
         self,
-        power_kw: np.ndarray = None,
+        power_kw: np.ndarray | None= None,
         fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
         lhv_mj_per_g: Optional[float] = None,
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
-        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
+        ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] | None = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
     ) -> EngineRunPoint:
         """
@@ -228,6 +230,27 @@ class Engine(Component):
                 ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
                 mass_or_mass_fraction=fuel_cons_kg_per_s,
             )
+        # --- emission-curve GHG override -------------------------------------------
+        _ch4_g_per_kwh = (
+            self.emissions_g_per_kwh(EmissionType.CH4, load_ratio)
+            if EmissionType.CH4 in self._emissions_per_kwh_interp
+            else None
+        )
+        _n2o_g_per_kwh = (
+            self.emissions_g_per_kwh(EmissionType.N2O, load_ratio)
+            if EmissionType.N2O in self._emissions_per_kwh_interp
+            else None
+        )
+        if _ch4_g_per_kwh is not None or _n2o_g_per_kwh is not None:
+            fuel_consumption_component = fuel_consumption_component.with_emission_curve_ghg_overrides(
+                ch4_factor_gch4_per_gfuel=(
+                    _ch4_g_per_kwh / bsfc_g_per_kwh if _ch4_g_per_kwh is not None else None
+                ),
+                n2o_factor_gn2o_per_gfuel=(
+                    _n2o_g_per_kwh / bsfc_g_per_kwh if _n2o_g_per_kwh is not None else None
+                ),
+            )
+        # ---------------------------------------------------------------------------
         return EngineRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel_consumption_component]),
@@ -237,7 +260,7 @@ class Engine(Component):
 
 
 class EngineDualFuel(Engine):
-    bspfc_curve: np.ndarray = None  # Brake specific pilot fuel consumption curve
+    bspfc_curve: np.ndarray | None = None  # Brake specific pilot fuel consumption curve
     pilot_fuel_type: TypeFuel = TypeFuel.DIESEL  # Pilot fuel type
 
     def __init__(
@@ -880,6 +903,29 @@ class COGAS(BasicComponent):
         fuel_power_kw = power_kw / eff
         fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000) / 1000
         fuel.mass_or_mass_fraction = fuel_consumption_kg_per_s
+        # --- emission-curve GHG override -------------------------------------------
+        _ch4_g_per_kwh = (
+            self.emissions_g_per_kwh(EmissionType.CH4, load_ratio)
+            if EmissionType.CH4 in self._emissions_per_kwh_interp
+            else None
+        )
+        _n2o_g_per_kwh = (
+            self.emissions_g_per_kwh(EmissionType.N2O, load_ratio)
+            if EmissionType.N2O in self._emissions_per_kwh_interp
+            else None
+        )
+        if _ch4_g_per_kwh is not None or _n2o_g_per_kwh is not None:
+            _power_kwh_per_s = power_kw / 3600
+            _bsfc_eq_g_per_kwh = fuel_consumption_kg_per_s * 1000 / _power_kwh_per_s
+            fuel = fuel.with_emission_curve_ghg_overrides(
+                ch4_factor_gch4_per_gfuel=(
+                    _ch4_g_per_kwh / _bsfc_eq_g_per_kwh if _ch4_g_per_kwh is not None else None
+                ),
+                n2o_factor_gn2o_per_gfuel=(
+                    _n2o_g_per_kwh / _bsfc_eq_g_per_kwh if _n2o_g_per_kwh is not None else None
+                ),
+            )
+        # ---------------------------------------------------------------------------
         emissionn_per_s = {}
         power_kwh_per_s = power_kw / 3600
         for e in self._emissions_per_kwh_interp:

@@ -1,25 +1,26 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-02-20T13:01:39.916Z",
+  "lastUpdated": "2026-02-22T13:15:58.876Z",
   "activeFeatures": [
     "tests",
     "components_model",
-    "feems"
+    "feems",
+    "engine-emission-curve-ghg-override"
   ],
   "primaryFeature": "tests",
   "features": {
     "tests": {
-      "phase": "completed",
-      "phaseNumber": 5,
+      "phase": "do",
+      "phaseNumber": 3,
       "matchRate": 95,
       "iterationCount": 0,
       "requirements": [],
       "documents": {},
       "timestamps": {
         "started": "2026-02-20T09:37:32.482Z",
-        "lastUpdated": "2026-02-20T13:01:39.915Z"
+        "lastUpdated": "2026-02-22T13:11:17.880Z"
       },
-      "lastFile": "/home/keviny/development/FEEMS/feems/tests/test_components.py"
+      "lastFile": "/home/keviny/development/FEEMS/feems/tests/test_fuel.py"
     },
     "components_model": {
       "phase": "do",
@@ -30,9 +31,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-02-20T10:05:15.369Z",
-        "lastUpdated": "2026-02-20T10:06:31.959Z"
+        "lastUpdated": "2026-02-22T13:09:35.623Z"
       },
-      "lastFile": "/home/keviny/development/FEEMS/feems/feems/components_model/node.py"
+      "lastFile": "/home/keviny/development/FEEMS/feems/feems/components_model/component_mechanical.py"
     },
     "feems": {
       "phase": "do",
@@ -43,9 +44,23 @@
       "documents": {},
       "timestamps": {
         "started": "2026-02-20T10:06:50.891Z",
-        "lastUpdated": "2026-02-20T12:59:42.718Z"
+        "lastUpdated": "2026-02-22T13:15:58.876Z"
       },
       "lastFile": "/home/keviny/development/FEEMS/feems/feems/fuel.py"
+    },
+    "engine-emission-curve-ghg-override": {
+      "phase": "act",
+      "phaseNumber": 5,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-02-22T03:19:40.321Z",
+        "lastUpdated": "2026-02-22T03:19:40.321Z"
+      },
+      "previousPhase": "check",
+      "autoAdvanced": true
     }
   },
   "pipeline": {
@@ -56,7 +71,7 @@
   "session": {
     "startedAt": "2026-02-20T09:32:32.496Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-02-20T13:01:39.916Z"
+    "lastActivity": "2026-02-22T13:15:58.876Z"
   },
   "history": [
     {
@@ -236,6 +251,102 @@
     {
       "timestamp": "2026-02-20T13:01:39.915Z",
       "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T02:52:36.386Z",
+      "feature": "feems",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T02:52:45.500Z",
+      "feature": "components_model",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T02:53:23.321Z",
+      "feature": "components_model",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T02:54:33.354Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T02:54:51.846Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T02:54:56.381Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T03:14:35.751Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T03:19:40.321Z",
+      "feature": "engine-emission-curve-ghg-override",
+      "phase": "act",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:09:14.377Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:09:35.623Z",
+      "feature": "components_model",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:10:40.833Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:11:17.880Z",
+      "feature": "tests",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:15:34.733Z",
+      "feature": "feems",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:15:39.862Z",
+      "feature": "feems",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:15:44.350Z",
+      "feature": "feems",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-22T13:15:58.876Z",
+      "feature": "feems",
       "phase": "do",
       "action": "updated"
     }

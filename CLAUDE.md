@@ -117,7 +117,13 @@ Higher-level simulation interface with power management logic.
 4. `git checkout main && git pull` then `git checkout -b feature/issue-{id}-{slug}`
 5. Follow the PDCA flow: `backlog/ → docs/01-plan/ → docs/02-design/ → implementation → docs/03-analysis/ → docs/04-report/`
 6. **Commit after each phase's report** if the feature is divided into phases
-7. When the feature is complete, `git push` and open a Pull Request against `main`
+7. **Before the final commit**, if the implementation adds or changes any public method, class, parameter, or type, update the API reference for the affected package(s):
+   - `feems` → `docs/api/feems/API_REFERENCE.md`
+   - `machinery-system-structure` → `docs/api/machinery-system-structure/API_REFERENCE.md`
+   - `RunFEEMSSim` → `docs/api/RunFEEMSSim/API_REFERENCE.md`
+8. When the feature is complete, `git push` and open a Pull Request against `main`
+
+**CHANGELOG and version** are managed automatically by `release-please` via conventional commit prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`). Never edit `CHANGELOG.md` or `pyproject.toml` version manually.
 
 See `docs/README.md` for the full documentation structure.
 

@@ -23,6 +23,8 @@ This document provides a comprehensive reference for the FEEMS API.
   - [System Types](#system-types)
 - [System Model](#system-model)
 - [Fuel and Emissions](#fuel-and-emissions)
+  - [GhgEmissionFactorTankToWake](#ghgemissionfactortanktowake)
+  - [Fuel](#fuel)
 - [Types](#types)
   - [TypeComponent](#typecomponent)
   - [TypePower](#typepower)
@@ -1080,17 +1082,53 @@ FuelSpecifiedBy.USER             # Custom emission factors (USER-defined)
 FuelSpecifiedBy.NONE
 ```
 
+### `GhgEmissionFactorTankToWake`
+
+Dataclass holding tank-to-wake GHG emission factors for one fuel/consumer-class combination.
+
+**Fields:**
+- `co2_factor_gco2_per_gfuel: float` - CO₂ emission factor (gCO₂/gfuel)
+- `ch4_factor_gch4_per_gfuel: Union[float, np.ndarray]` - CH₄ emission factor (gCH₄/gfuel). May be a numpy array when overridden by a load-dependent engine emission curve.
+- `n2o_factor_gn2o_per_gfuel: Union[float, np.ndarray]` - N₂O emission factor (gN₂O/gfuel). May be a numpy array when overridden by a load-dependent engine emission curve.
+- `c_slip_percent: Union[float, np.ndarray]` - Methane slip as a percentage of fuel mass. Set to `0.0` when `ch4_factor_gch4_per_gfuel` is curve-derived (the curve already accounts for total methane including slip).
+- `fuel_consumer_class: Optional[Union[FuelConsumerClassFuelEUMaritime, str]]` - Consumer class for FuelEU Maritime lookup; `None` for IMO/USER fuels.
+
+**Properties:**
+- `ghg_emission_factor_gco2eq_per_gfuel: Union[float, np.ndarray]` - Combined GHG factor in gCO₂eq/gfuel, accounting for CO₂, CH₄ (×GWP100), N₂O (×GWP100), and methane slip.
+
+### `Fuel`
+
+A single fuel with its GHG emission factors and consumption quantity.
+
+**Key Attributes:**
+- `fuel_type: TypeFuel`
+- `origin: FuelOrigin`
+- `fuel_specified_by: FuelSpecifiedBy`
+- `mass_or_mass_fraction: Union[float, np.ndarray]` - Mass in kg or kg/s (or mass fraction)
+- `lhv_mj_per_g: float` - Lower heating value in MJ/g
+- `ghg_emission_factor_tank_to_wake: List[GhgEmissionFactorTankToWake]`
+
+**Key Methods:**
+- `get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(fuel_consumer_class=None, exclude_slip=False) -> Union[float, np.ndarray]`
+  - Returns the tank-to-wake GHG factor in gCO₂eq/gfuel for the given consumer class.
+  - Returns a `np.ndarray` when the stored `ch4_factor_gch4_per_gfuel` / `n2o_factor_gn2o_per_gfuel` fields are arrays (i.e., when set via engine emission curves over multiple load points).
+
+- `with_emission_curve_ghg_overrides(ch4_factor_gch4_per_gfuel=None, n2o_factor_gn2o_per_gfuel=None) -> Fuel`
+  - Returns a copy with CH₄ and/or N₂O GHG factors replaced by engine-curve-derived values.
+  - **Parameters accept `Union[float, np.ndarray]`** — when `power_kw` is a numpy array the engine computes per-timestep factors as arrays, and this method propagates them correctly through element-wise arithmetic.
+  - When `ch4_factor_gch4_per_gfuel` is provided, `c_slip_percent` is zeroed in all `GhgEmissionFactorTankToWake` entries (the curve already captures total methane including slip).
+  - Returns `self` unchanged when both arguments are `None`.
+
 ### `FuelConsumption`
 
 Fuel consumption data structure.
 
 **Attributes:**
-- `fuels: List[Fuel]` - List of fuel objects with consumption data
+- `fuels: List[Fuel]` - List of `Fuel` objects with consumption data
 
-Each `Fuel` object contains:
-- `fuel_type: TypeFuel`
-- `mass_or_mass_fraction: float` - Total mass in kg or mass fraction
-- `lhv_mj_per_g: float` - Lower heating value
+**Methods:**
+- `get_total_co2_emissions(fuel_consumer_class=None) -> GHGEmissions`
+  - Returns total GHG emissions in kg (or kg/s), aggregated across all fuels.
 
 ### `GHGEmissions`
 

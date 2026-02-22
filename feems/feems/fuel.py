@@ -217,9 +217,9 @@ class GhgEmissionFactorTankToWake:
     """
 
     co2_factor_gco2_per_gfuel: float
-    ch4_factor_gch4_per_gfuel: float
-    n2o_factor_gn2o_per_gfuel: float
-    c_slip_percent: float
+    ch4_factor_gch4_per_gfuel: Union[float, np.ndarray]
+    n2o_factor_gn2o_per_gfuel: Union[float, np.ndarray]
+    c_slip_percent: Union[float, np.ndarray]
     fuel_consumer_class: Optional[Union[FuelConsumerClassFuelEUMaritime, str]] = None
 
     def __post_init__(self):
@@ -240,7 +240,7 @@ class GhgEmissionFactorTankToWake:
             )
 
     @property
-    def ghg_emission_factor_gco2eq_per_gfuel(self) -> float:
+    def ghg_emission_factor_gco2eq_per_gfuel(self) -> Union[float, np.ndarray]:
         return (1 - self.c_slip_percent / 100) * (
             self.co2_factor_gco2_per_gfuel
             + self.ch4_factor_gch4_per_gfuel * _GWP100_CH4
@@ -472,6 +472,55 @@ class Fuel:
         fuel.mass_or_mass_fraction = 0.0
         return fuel
 
+    def with_emission_curve_ghg_overrides(
+        self,
+        ch4_factor_gch4_per_gfuel: Optional[Union[float, np.ndarray]] = None,
+        n2o_factor_gn2o_per_gfuel: Optional[Union[float, np.ndarray]] = None,
+    ) -> "Fuel":
+        """Return a copy with CH4 and/or N2O GHG factors replaced by curve-derived values.
+
+        When ch4_factor_gch4_per_gfuel is provided, c_slip_percent is set to 0 in all
+        GhgEmissionFactorTankToWake entries to prevent double-counting: the emission
+        curve already captures total methane (combusted + slipped).
+
+        If both arguments are None, returns self unchanged.
+
+        Args:
+            ch4_factor_gch4_per_gfuel: Curve-derived factor in gCH4/gfuel, or None.
+                May be a numpy array when the engine run point covers multiple load points.
+            n2o_factor_gn2o_per_gfuel: Curve-derived factor in gN2O/gfuel, or None.
+                May be a numpy array when the engine run point covers multiple load points.
+
+        Returns:
+            A new Fuel object with updated GhgEmissionFactorTankToWake entries.
+        """
+        if ch4_factor_gch4_per_gfuel is None and n2o_factor_gn2o_per_gfuel is None:
+            return self
+
+        import copy
+        import dataclasses
+
+        new_ttw = [
+            dataclasses.replace(
+                entry,
+                ch4_factor_gch4_per_gfuel=(
+                    ch4_factor_gch4_per_gfuel
+                    if ch4_factor_gch4_per_gfuel is not None
+                    else entry.ch4_factor_gch4_per_gfuel
+                ),
+                n2o_factor_gn2o_per_gfuel=(
+                    n2o_factor_gn2o_per_gfuel
+                    if n2o_factor_gn2o_per_gfuel is not None
+                    else entry.n2o_factor_gn2o_per_gfuel
+                ),
+                c_slip_percent=(0.0 if ch4_factor_gch4_per_gfuel is not None else entry.c_slip_percent),
+            )
+            for entry in self.ghg_emission_factor_tank_to_wake
+        ]
+        new_fuel = copy.copy(self)
+        new_fuel.ghg_emission_factor_tank_to_wake = new_ttw
+        return new_fuel
+
     @property
     def ghg_emission_factor_well_to_tank_gco2_per_gfuel(self) -> float:
         """Returns the GHG emission factor from well to tank in gCO2eq/gfuel"""
@@ -481,7 +530,7 @@ class Fuel:
         self,
         fuel_consumer_class: FuelConsumerClassFuelEUMaritime = None,
         exclude_slip: bool = False,
-    ) -> float:
+    ) -> Union[float, np.ndarray]:
         """Returns the GHG emission factor from tank to wake in gCO2eq/gfuel
 
         Args:
