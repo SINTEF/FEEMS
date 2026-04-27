@@ -448,12 +448,14 @@ class ElectricPowerSystem(MachinerySystem):
 
     @property
     def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
-        result = {"main_engine": [], "genset": [], "fuel_cell": []}
+        result = {"main_engine": [], "genset": [], "fuel_cell": [], "coges": []}
 
         genset_options = []
         fuel_cell_options = []
-        seen_genset = set()
-        seen_fuel_cell = set()
+        coges_options = []
+        seen_genset: Set[FuelOption] = set()
+        seen_fuel_cell: Set[FuelOption] = set()
+        seen_coges: Set[FuelOption] = set()
 
         for component in self.power_sources:
             options = _extract_fuel_options_from_component(component)
@@ -467,9 +469,33 @@ class ElectricPowerSystem(MachinerySystem):
                     if option not in seen_fuel_cell:
                         seen_fuel_cell.add(option)
                         fuel_cell_options.append(option)
+            elif isinstance(component, COGES):
+                cogas = component.cogas
+                if cogas.multi_fuel_characteristics:
+                    for fc in cogas.multi_fuel_characteristics:
+                        option = FuelOption(
+                            fuel_type=fc.main_fuel_type,
+                            fuel_origin=fc.main_fuel_origin,
+                            primary=True,
+                            for_pilot=False,
+                        )
+                        if option not in seen_coges:
+                            seen_coges.add(option)
+                            coges_options.append(option)
+                else:
+                    option = FuelOption(
+                        fuel_type=cogas.fuel_type,
+                        fuel_origin=cogas.fuel_origin,
+                        primary=True,
+                        for_pilot=False,
+                    )
+                    if option not in seen_coges:
+                        seen_coges.add(option)
+                        coges_options.append(option)
 
         result["genset"] = genset_options
         result["fuel_cell"] = fuel_cell_options
+        result["coges"] = coges_options
         return result
 
     def set_status_by_switchboard_id_power_type(
