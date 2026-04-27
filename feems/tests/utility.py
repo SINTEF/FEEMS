@@ -25,6 +25,7 @@ from feems.components_model.node import Switchboard
 from feems.exceptions import ConfigurationError
 from feems.fuel import FuelOrigin, TypeFuel
 from feems.types_for_feems import (
+    EmissionCurve,
     NOxCalculationMethod,
     Power_kW,
     Speed_rpm,
@@ -801,11 +802,16 @@ def create_electric_components_for_switchboard(
 def create_cogas_system(
     rated_power_kw: float = 1000,
     rated_speed_rpm: float = 1000,
-    eff_curve: np.ndarray = None,
-    gas_turbine_power_curve: np.ndarray = None,
-    steam_turbine_power_curve: np.ndarray = None,
+    eff_curve: np.ndarray | None = None,
+    gas_turbine_power_curve: np.ndarray | None = None,
+    steam_turbine_power_curve: np.ndarray | None = None,
     fuel_type: TypeFuel = TypeFuel.NATURAL_GAS,
     fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+    emissions_curves: List[EmissionCurve] | None = None,
+    ch4_factor_gch4_per_gfuel: float | None = None,
+    n2o_factor_gn2o_per_gfuel: float | None = None,
+    c_slip_percent: float | None = None,
+    multi_fuel_characteristics=None,
 ) -> COGAS:
     # Create a cogas system
     if eff_curve is None:
@@ -818,6 +824,17 @@ def create_cogas_system(
         steam_turbine_power_curve[:, 1] = (
             steam_turbine_power_curve[:, 0] * rated_power_kw - gas_turbine_power_curve[:, 1]
         )
+    kwargs = {}
+    if ch4_factor_gch4_per_gfuel is not None:
+        kwargs["ch4_factor_gch4_per_gfuel"] = ch4_factor_gch4_per_gfuel
+    if n2o_factor_gn2o_per_gfuel is not None:
+        kwargs["n2o_factor_gn2o_per_gfuel"] = n2o_factor_gn2o_per_gfuel
+    if c_slip_percent is not None:
+        kwargs["c_slip_percent"] = c_slip_percent
+    if emissions_curves is not None:
+        kwargs["emissions_curves"] = emissions_curves
+    if multi_fuel_characteristics is not None:
+        kwargs["multi_fuel_characteristics"] = multi_fuel_characteristics
     return COGAS(
         name="COGAS",
         rated_power=rated_power_kw,
@@ -827,4 +844,5 @@ def create_cogas_system(
         steam_turbine_power_curve=steam_turbine_power_curve,
         fuel_type=fuel_type,
         fuel_origin=fuel_origin,
+        **kwargs,
     )

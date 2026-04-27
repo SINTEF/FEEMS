@@ -232,10 +232,12 @@ class Engine(_message.Message):
         DIESEL: _ClassVar[Engine.EngineCycleType]
         OTTO: _ClassVar[Engine.EngineCycleType]
         LEAN_BURN_SPARK_IGNITION: _ClassVar[Engine.EngineCycleType]
+        BRAYTON: _ClassVar[Engine.EngineCycleType]
     NONE: Engine.EngineCycleType
     DIESEL: Engine.EngineCycleType
     OTTO: Engine.EngineCycleType
     LEAN_BURN_SPARK_IGNITION: Engine.EngineCycleType
+    BRAYTON: Engine.EngineCycleType
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]
@@ -269,7 +271,22 @@ class Engine(_message.Message):
     def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., pilot_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., pilot_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ...) -> None: ...
 
 class COGAS(_message.Message):
-    __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "efficiency", "gas_turbine_power_curve", "steam_turbine_power_curve", "fuel", "order_from_switchboard_or_shaftline", "nox_calculation_method", "emission_curves", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid")
+    __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "efficiency", "gas_turbine_power_curve", "steam_turbine_power_curve", "fuel", "order_from_switchboard_or_shaftline", "nox_calculation_method", "emission_curves", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid", "fuel_modes", "ch4_factor_gch4_per_gfuel", "n2o_factor_gn2o_per_gfuel", "c_slip_percent")
+    class FuelMode(_message.Message):
+        __slots__ = ("main_fuel", "secondary_fuel", "eff", "emission_curves", "engine_cycle_type", "nox_calculation_method")
+        MAIN_FUEL_FIELD_NUMBER: _ClassVar[int]
+        SECONDARY_FUEL_FIELD_NUMBER: _ClassVar[int]
+        EFF_FIELD_NUMBER: _ClassVar[int]
+        EMISSION_CURVES_FIELD_NUMBER: _ClassVar[int]
+        ENGINE_CYCLE_TYPE_FIELD_NUMBER: _ClassVar[int]
+        NOX_CALCULATION_METHOD_FIELD_NUMBER: _ClassVar[int]
+        main_fuel: Fuel
+        secondary_fuel: Fuel
+        eff: Efficiency
+        emission_curves: _containers.RepeatedCompositeFieldContainer[EmissionCurve]
+        engine_cycle_type: Engine.EngineCycleType
+        nox_calculation_method: Engine.NOxCalculationMethod
+        def __init__(self, main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., secondary_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., eff: _Optional[_Union[Efficiency, _Mapping]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ...) -> None: ...
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]
@@ -284,6 +301,10 @@ class COGAS(_message.Message):
     START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
     TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     UID_FIELD_NUMBER: _ClassVar[int]
+    FUEL_MODES_FIELD_NUMBER: _ClassVar[int]
+    CH4_FACTOR_GCH4_PER_GFUEL_FIELD_NUMBER: _ClassVar[int]
+    N2O_FACTOR_GN2O_PER_GFUEL_FIELD_NUMBER: _ClassVar[int]
+    C_SLIP_PERCENT_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     rated_speed_rpm: float
@@ -298,7 +319,11 @@ class COGAS(_message.Message):
     start_delay_s: float
     turn_off_power_kw: float
     uid: str
-    def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., efficiency: _Optional[_Union[Efficiency, _Mapping]] = ..., gas_turbine_power_curve: _Optional[_Union[PowerCurve, _Mapping]] = ..., steam_turbine_power_curve: _Optional[_Union[PowerCurve, _Mapping]] = ..., fuel: _Optional[_Union[Fuel, _Mapping]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ...) -> None: ...
+    fuel_modes: _containers.RepeatedCompositeFieldContainer[COGAS.FuelMode]
+    ch4_factor_gch4_per_gfuel: float
+    n2o_factor_gn2o_per_gfuel: float
+    c_slip_percent: float
+    def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., efficiency: _Optional[_Union[Efficiency, _Mapping]] = ..., gas_turbine_power_curve: _Optional[_Union[PowerCurve, _Mapping]] = ..., steam_turbine_power_curve: _Optional[_Union[PowerCurve, _Mapping]] = ..., fuel: _Optional[_Union[Fuel, _Mapping]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ..., fuel_modes: _Optional[_Iterable[_Union[COGAS.FuelMode, _Mapping]]] = ..., ch4_factor_gch4_per_gfuel: _Optional[float] = ..., n2o_factor_gn2o_per_gfuel: _Optional[float] = ..., c_slip_percent: _Optional[float] = ...) -> None: ...
 
 class ElectricMachine(_message.Message):
     __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "efficiency", "order_from_switchboard_or_shaftline", "unit_price_usd", "uid")

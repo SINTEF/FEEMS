@@ -3,14 +3,20 @@ import random
 
 import numpy as np
 import pandas as pd
-from feems.components_model.component_electric import Genset
+from feems.components_model.component_electric import (
+    COGES,
+    ElectricComponent,
+    ElectricMachine,
+    Genset,
+)
 from feems.components_model.component_mechanical import (
+    COGAS,
     EngineMultiFuel,
     FuelCharacteristics,
 )
 from feems.fuel import FuelOrigin, FuelSpecifiedBy, TypeFuel
-from feems.system_model import FuelOption
-from feems.types_for_feems import EngineCycleType, TypeComponent
+from feems.system_model import ElectricPowerSystem, FuelOption
+from feems.types_for_feems import EngineCycleType, TypeComponent, TypePower
 from MachSysS.convert_to_feems import convert_proto_propulsion_system_to_feems
 from MachSysS.gymir_result_pb2 import (
     GymirResult,
@@ -342,4 +348,116 @@ def test_machinery_calculation_multifuel():
         / total_energy_consumption_default_gj
         < 1e-2
     )
+
+
+def _build_coges_electric_system(eff_curve: np.ndarray) -> ElectricPowerSystem:
+    """Build a minimal ElectricPowerSystem with a multi-fuel COGES (LNG + H2) and an other_load."""
+    generator = ElectricMachine(
+        type_=TypeComponent.GENERATOR,
+        name="COGES Gen",
+        rated_power=1000,
+        rated_speed=3000,
+        power_type=TypePower.POWER_SOURCE,
+        switchboard_id=1,
+    )
+    cogas = COGAS(
+        name="COGAS",
+        rated_power=1000,
+        rated_speed=3000,
+        eff_curve=eff_curve,
+        fuel_type=TypeFuel.NATURAL_GAS,
+        fuel_origin=FuelOrigin.FOSSIL,
+        multi_fuel_characteristics=[
+            FuelCharacteristics(
+                main_fuel_type=TypeFuel.NATURAL_GAS,
+                main_fuel_origin=FuelOrigin.FOSSIL,
+                eff_curve=eff_curve,
+                engine_cycle_type=EngineCycleType.BRAYTON,
+            ),
+            FuelCharacteristics(
+                main_fuel_type=TypeFuel.HYDROGEN,
+                main_fuel_origin=FuelOrigin.RENEWABLE_NON_BIO,
+                eff_curve=eff_curve,
+                engine_cycle_type=EngineCycleType.BRAYTON,
+            ),
+        ],
+    )
+    coges_component = COGES(name="COGES unit", cogas=cogas, generator=generator)
+
+    other_load = ElectricComponent(
+        type_=TypeComponent.OTHER_LOAD,
+        name="Aux load",
+        rated_power=500,
+        power_type=TypePower.POWER_CONSUMER,
+        switchboard_id=1,
+        eff_curve=np.array([[0.0, 1.0], [1.0, 1.0]]),
+    )
+    return ElectricPowerSystem(
+        name="COGES test system",
+        power_plant_components=[coges_component, other_load],
+        bus_tie_connections=[],
+    )
+
+
+def test_machinery_calculation_multifuel_coges():
+    eff_curve = np.array([[0.0, 0.30], [0.5, 0.40], [1.0, 0.44]])
+    system = _build_coges_electric_system(eff_curve)
+
+    machinery_calculation = MachineryCalculation(feems_system=system)
+
+    run_kwargs = dict(
+        propulsion_power=np.array([0.0]),
+        frequency=np.array([3600.0]),
+        auxiliary_power_kw=500.0,
+        fuel_specified_by=FuelSpecifiedBy.IMO,
+    )
+
+    # Default (no fuel_option) → first mode = LNG
+    res_default = machinery_calculation.calculate_machinery_system_output_from_statistics(
+        **run_kwargs
+    )
+
+    # Force H2
+    res_h2 = machinery_calculation.calculate_machinery_system_output_from_statistics(
+        **run_kwargs,
+        fuel_option=FuelOption(
+            fuel_type=TypeFuel.HYDROGEN,
+            fuel_origin=FuelOrigin.RENEWABLE_NON_BIO,
+            for_pilot=False,
+            primary=False,
+        ),
+    )
+
+    # Force LNG explicitly
+    res_lng = machinery_calculation.calculate_machinery_system_output_from_statistics(
+        **run_kwargs,
+        fuel_option=FuelOption(
+            fuel_type=TypeFuel.NATURAL_GAS,
+            fuel_origin=FuelOrigin.FOSSIL,
+            for_pilot=False,
+            primary=True,
+        ),
+    )
+
+    fuels_default = res_default.multi_fuel_consumption_total_kg.fuels
+    fuels_h2 = res_h2.multi_fuel_consumption_total_kg.fuels
+
+    # Default = LNG: natural_gas consumed, no hydrogen
+    assert any(f.fuel_type == TypeFuel.NATURAL_GAS and f.mass_or_mass_fraction > 0
+               for f in fuels_default), "Default mode should consume natural gas"
+    assert not any(f.fuel_type == TypeFuel.HYDROGEN and f.mass_or_mass_fraction > 0
+                   for f in fuels_default), "Default mode should not consume hydrogen"
+
+    # H2 forced: hydrogen consumed, no natural_gas
+    assert any(f.fuel_type == TypeFuel.HYDROGEN and f.mass_or_mass_fraction > 0
+               for f in fuels_h2), "H2 mode should consume hydrogen"
+    assert not any(f.fuel_type == TypeFuel.NATURAL_GAS and f.mass_or_mass_fraction > 0
+                   for f in fuels_h2), "H2 mode should not consume natural gas"
+
+    # LNG forced matches default
+    assert np.isclose(
+        res_default.fuel_consumption_total_kg,
+        res_lng.fuel_consumption_total_kg,
+        rtol=1e-6,
+    ), "Explicit LNG option should match default"
 

@@ -15,6 +15,7 @@ from ..fuel import (
     FuelOrigin,
     FuelSpecifiedBy,
     TypeFuel,
+    find_user_fuel,
 )
 from ..types_for_feems import (
     FEEMSResult,
@@ -127,6 +128,9 @@ def get_fuel_emission_energy_balance_for_component(
         source_component: Union[PowerSource, PowerConsumer],
         fuel_consumption: FuelConsumption,
     ) -> Optional[FuelConsumerClassFuelEUMaritime]:
+        if isinstance(source_component, COGES):
+            return source_component.cogas.fuel_consumer_type_fuel_eu_maritime
+
         engine_candidate: Union[Engine, EngineDualFuel, EngineMultiFuel, None]
         if isinstance(source_component, Genset):
             engine_candidate = source_component.aux_engine
@@ -381,17 +385,30 @@ def get_fuel_emission_energy_balance_for_component(
         )
     elif component.type == TypeComponent.COGES:
         component = cast(COGES, component)
+        component.cogas.set_fuel_in_use(fuel_type=fuel_type, fuel_origin=fuel_origin)
+        user_fuel = find_user_fuel(effective_user_fuels, component.cogas.fuel_type, component.cogas.fuel_origin)
         coges_run_point = component.get_system_run_point_from_power_output_kw(
             fuel_specified_by=fuel_specified_by,
+            lhv_mj_per_g=user_fuel.lhv_mj_per_g if user_fuel is not None else None,
+            ghg_emission_factor_well_to_tank_gco2eq_per_mj=(
+                user_fuel.ghg_emission_factor_well_to_tank_gco2eq_per_mj if user_fuel is not None else None
+            ),
+            ghg_emission_factor_tank_to_wake=(
+                user_fuel.ghg_emission_factor_tank_to_wake if user_fuel is not None else None
+            ),
         )
         res.multi_fuel_consumption_total_kg = integrate_multi_fuel_consumption(
             fuel_consumption_kg_per_s=coges_run_point.cogas.fuel_flow_rate_kg_per_s,
             time_interval_s=time_interval_s,
             integration_method=integration_method,
         )
-        res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
-            component.cogas.fuel_consumer_type_fuel_eu_maritime
+        fuel_consumer_class = _resolve_fuel_consumer_class(
+            component, coges_run_point.cogas.fuel_flow_rate_kg_per_s
         )
+        if fuel_consumer_class is not None:
+            res.co2_emission_total_kg = res.multi_fuel_consumption_total_kg.get_total_co2_emissions(
+                fuel_consumer_class=fuel_consumer_class
+            )
 
         if (
             np.isscalar(coges_run_point.coges_load_ratio)

@@ -123,6 +123,40 @@ def _extract_fuel_options_from_component(component: object) -> List[FuelOption]:
                 primary=True,
             )
         ]
+    elif isinstance(component, COGES):
+        cogas = component.cogas
+        if cogas.multi_fuel_characteristics:
+            options: List[FuelOption] = []
+            seen: Set[FuelOption] = set()
+            for i, fc in enumerate(cogas.multi_fuel_characteristics):
+                option = FuelOption(
+                    fuel_type=fc.main_fuel_type,
+                    fuel_origin=fc.main_fuel_origin,
+                    for_pilot=False,
+                    primary=i == 0,
+                )
+                if option not in seen:
+                    options.append(option)
+                    seen.add(option)
+                if fc.secondary_fuel_type is not None:
+                    sec = FuelOption(
+                        fuel_type=fc.secondary_fuel_type,
+                        fuel_origin=fc.secondary_fuel_origin,
+                        for_pilot=True,
+                        primary=i == 0,
+                    )
+                    if sec not in seen:
+                        options.append(sec)
+                        seen.add(sec)
+            return options
+        return [
+            FuelOption(
+                fuel_type=cogas.fuel_type,
+                fuel_origin=cogas.fuel_origin,
+                for_pilot=False,
+                primary=True,
+            )
+        ]
     elif isinstance(component, (Engine, EngineMultiFuel, EngineDualFuel)):
         engine = component
 
@@ -390,70 +424,31 @@ class ElectricPowerSystem(MachinerySystem):
                 options = _extract_multi_fuel_options(component.aux_engine)
                 if options:
                     inventory[component.name] = list(options)
+            elif isinstance(component, COGES) and component.cogas.multi_fuel_characteristics:
+                inventory[component.name] = _extract_fuel_options_from_component(component)
         return inventory
 
     @property
     def available_fuel_options(self) -> List[FuelOption]:
         options: List[FuelOption] = []
         seen: Set[FuelOption] = set()
-        for engine_options in self.multi_fuel_engine_inventory.values():
-            for option in engine_options:
+        for component in self.power_sources:
+            for option in _extract_fuel_options_from_component(component):
                 if option not in seen:
                     options.append(option)
                     seen.add(option)
-        # Check all the power sources that use fuel but are not multi-fuel engines
-        for component in self.power_sources:
-            if isinstance(component, Genset):
-                if isinstance(component.aux_engine, EngineMultiFuel):
-                    continue
-                fuel_option = FuelOption(
-                    fuel_type=component.aux_engine.fuel_type,
-                    fuel_origin=component.aux_engine.fuel_origin,
-                    primary=True,
-                    for_pilot=False,
-                )
-                if fuel_option not in seen:
-                    options.append(fuel_option)
-                    seen.add(fuel_option)
-                if hasattr(component.aux_engine, "pilot_fuel_type"):
-                    fuel_option = FuelOption(
-                        fuel_type=component.aux_engine.pilot_fuel_type,
-                        fuel_origin=component.aux_engine.pilot_fuel_origin,
-                        primary=True,
-                        for_pilot=True,
-                    )
-                    if fuel_option not in seen:
-                        options.append(fuel_option)
-                        seen.add(fuel_option)
-            elif isinstance(component, FuelCellSystem):
-                fuel_option = FuelOption(
-                    fuel_type=component.fuel_cell.fuel_type,
-                    fuel_origin=component.fuel_cell.fuel_origin,
-                    primary=True,
-                    for_pilot=False,
-                )
-            elif isinstance(component, COGES):
-                fuel_option = FuelOption(
-                    fuel_type=component.cogas.fuel_type,
-                    fuel_origin=component.cogas.fuel_origin,
-                    primary=True,
-                    for_pilot=False,
-                )
-            else:
-                continue
-            if fuel_option not in seen:
-                options.append(fuel_option)
-                seen.add(fuel_option)
         return options
 
     @property
     def available_fuel_options_by_converter(self) -> Dict[str, List[FuelOption]]:
-        result = {"main_engine": [], "genset": [], "fuel_cell": []}
+        result = {"main_engine": [], "genset": [], "fuel_cell": [], "coges": []}
 
         genset_options = []
         fuel_cell_options = []
-        seen_genset = set()
-        seen_fuel_cell = set()
+        coges_options = []
+        seen_genset: Set[FuelOption] = set()
+        seen_fuel_cell: Set[FuelOption] = set()
+        seen_coges: Set[FuelOption] = set()
 
         for component in self.power_sources:
             options = _extract_fuel_options_from_component(component)
@@ -467,9 +462,15 @@ class ElectricPowerSystem(MachinerySystem):
                     if option not in seen_fuel_cell:
                         seen_fuel_cell.add(option)
                         fuel_cell_options.append(option)
+            elif isinstance(component, COGES):
+                for option in options:
+                    if option not in seen_coges:
+                        seen_coges.add(option)
+                        coges_options.append(option)
 
         result["genset"] = genset_options
         result["fuel_cell"] = fuel_cell_options
+        result["coges"] = coges_options
         return result
 
     def set_status_by_switchboard_id_power_type(

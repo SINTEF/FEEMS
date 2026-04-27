@@ -81,6 +81,39 @@ def convert_efficiency_curve_to_protobuf(
     return efficiency
 
 
+def convert_eff_array_to_protobuf(eff_array: np.ndarray) -> proto.Efficiency:
+    """Convert an efficiency value or Nx2 array ([[load_ratio, eff], ...]) to proto.Efficiency."""
+    eff = proto.Efficiency()
+    if eff_array is None:
+        return eff
+    if np.isscalar(eff_array):
+        eff.value = float(eff_array)
+        return eff
+    eff_array = np.asarray(eff_array)
+    if eff_array.size == 0:
+        return eff
+    if eff_array.ndim == 0:
+        eff.value = float(eff_array)
+        return eff
+    if eff_array.ndim == 1:
+        if eff_array.size == 1:
+            eff.value = float(eff_array[0])
+            return eff
+        raise ValueError(
+            "Efficiency array must be a scalar, a single-value array, or an Nx2 array."
+        )
+    if eff_array.ndim == 2 and eff_array.shape[1] == 2:
+        eff.curve.curve.points.extend(
+            [proto.Point(x=float(p[0]), y=float(p[1])) for p in eff_array]
+        )
+        eff.curve.x_label = "load_ratio"
+        eff.curve.y_label = "efficiency"
+        return eff
+    raise ValueError(
+        "Efficiency array must be a scalar, a single-value array, or an Nx2 array."
+    )
+
+
 def convert_np_array_to_protobuf_power_curve(power_curve: np.array) -> proto.PowerCurve:
     """Convert power curve in the component to protobuf message"""
     # Check if the array is in n x 2 dimension or a single value
@@ -359,8 +392,8 @@ def convert_multi_fuel_engine_to_protobuf(
 def convert_cogas_component_to_protobuf(
     component: COGAS,
     order_from_shaftline_or_switchboard: int = 1,
-) -> proto.Engine:
-    """Convert engine component of FEEMS to protobuf message"""
+) -> proto.COGAS:
+    """Convert COGAS component of FEEMS to protobuf message"""
     cogas = proto.COGAS(
         name=component.name,
         rated_power_kw=component.rated_power,
@@ -376,6 +409,9 @@ def convert_cogas_component_to_protobuf(
         emission_curves=convert_emission_curves_to_protobuf(component.emission_curves),
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
         uid=component.uid,
+        ch4_factor_gch4_per_gfuel=component.ch4_factor_gch4_per_gfuel,
+        n2o_factor_gn2o_per_gfuel=component.n2o_factor_gn2o_per_gfuel,
+        c_slip_percent=component.c_slip_percent,
     )
     if component.gas_turbine_power_curve is not None:
         cogas.gas_turbine_power_curve.CopyFrom(
@@ -384,6 +420,29 @@ def convert_cogas_component_to_protobuf(
         cogas.steam_turbine_power_curve.CopyFrom(
             convert_np_array_to_protobuf_power_curve(component.steam_turbine_power_curve)
         )
+    if component.multi_fuel_characteristics:
+        for fc in component.multi_fuel_characteristics:
+            fuel_mode = proto.COGAS.FuelMode(
+                main_fuel=proto.Fuel(
+                    fuel_type=fc.main_fuel_type.value,
+                    fuel_origin=fc.main_fuel_origin.value,
+                ),
+                emission_curves=convert_emission_curves_to_protobuf(fc.emission_curves),
+                nox_calculation_method=convert_nox_calculation_method_to_protobuf(
+                    fc.nox_calculation_method
+                ),
+                engine_cycle_type=fc.engine_cycle_type.value,
+            )
+            if fc.eff_curve is not None:
+                fuel_mode.eff.CopyFrom(convert_eff_array_to_protobuf(fc.eff_curve))
+            if fc.pilot_fuel_type is not None:
+                fuel_mode.secondary_fuel.CopyFrom(
+                    proto.Fuel(
+                        fuel_type=fc.pilot_fuel_type.value,
+                        fuel_origin=fc.pilot_fuel_origin.value,
+                    )
+                )
+            cogas.fuel_modes.append(fuel_mode)
     return cogas
 
 

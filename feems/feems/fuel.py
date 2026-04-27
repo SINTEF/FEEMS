@@ -111,6 +111,7 @@ class FuelConsumerClassFuelEUMaritime(Enum):
     LNG_DIESEL = 4
     LNG_LBSI = 5
     FUEL_CELL = 6
+    GAS_TURBINE = 7
 
 
 _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING = {
@@ -120,6 +121,7 @@ _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING = {
     FuelConsumerClassFuelEUMaritime.LNG_DIESEL: "LNG diesel (slow speed)",
     FuelConsumerClassFuelEUMaritime.LNG_LBSI: "LBSI",
     FuelConsumerClassFuelEUMaritime.FUEL_CELL: "Fuel Cells",
+    FuelConsumerClassFuelEUMaritime.GAS_TURBINE: "Gas Turbine",
 }
 
 _FUEL_ALIAS_MAP: dict[tuple[str, FuelOrigin, TypeFuel], tuple[str, FuelOrigin, TypeFuel]] = {
@@ -476,25 +478,30 @@ class Fuel:
         self,
         ch4_factor_gch4_per_gfuel: Optional[Union[float, np.ndarray]] = None,
         n2o_factor_gn2o_per_gfuel: Optional[Union[float, np.ndarray]] = None,
+        c_slip_percent: Optional[Union[float, np.ndarray]] = None,
     ) -> "Fuel":
-        """Return a copy with CH4 and/or N2O GHG factors replaced by curve-derived values.
+        """Return a copy with CH4, N2O and/or c_slip GHG factors replaced by override values.
 
-        When ch4_factor_gch4_per_gfuel is provided, c_slip_percent is set to 0 in all
-        GhgEmissionFactorTankToWake entries to prevent double-counting: the emission
-        curve already captures total methane (combusted + slipped).
+        When ch4_factor_gch4_per_gfuel is provided and c_slip_percent is None, c_slip_percent
+        is set to 0 in all GhgEmissionFactorTankToWake entries to prevent double-counting (the
+        emission curve already captures total methane). When c_slip_percent is provided explicitly,
+        it is used as-is regardless of ch4_factor — this allows gas turbine scalar overrides to
+        set a non-zero c_slip alongside ch4_factor.
 
-        If both arguments are None, returns self unchanged.
+        If all arguments are None, returns self unchanged.
 
         Args:
-            ch4_factor_gch4_per_gfuel: Curve-derived factor in gCH4/gfuel, or None.
+            ch4_factor_gch4_per_gfuel: Override factor in gCH4/gfuel, or None.
                 May be a numpy array when the engine run point covers multiple load points.
-            n2o_factor_gn2o_per_gfuel: Curve-derived factor in gN2O/gfuel, or None.
+            n2o_factor_gn2o_per_gfuel: Override factor in gN2O/gfuel, or None.
                 May be a numpy array when the engine run point covers multiple load points.
+            c_slip_percent: Override methane slip %, or None. When None and ch4_factor is
+                provided, legacy behaviour applies (c_slip zeroed to avoid double-counting).
 
         Returns:
             A new Fuel object with updated GhgEmissionFactorTankToWake entries.
         """
-        if ch4_factor_gch4_per_gfuel is None and n2o_factor_gn2o_per_gfuel is None:
+        if ch4_factor_gch4_per_gfuel is None and n2o_factor_gn2o_per_gfuel is None and c_slip_percent is None:
             return self
 
         import copy
@@ -513,7 +520,13 @@ class Fuel:
                     if n2o_factor_gn2o_per_gfuel is not None
                     else entry.n2o_factor_gn2o_per_gfuel
                 ),
-                c_slip_percent=(0.0 if ch4_factor_gch4_per_gfuel is not None else entry.c_slip_percent),
+                c_slip_percent=(
+                    c_slip_percent                      # explicit value: use as-is (gas turbine case)
+                    if c_slip_percent is not None
+                    else 0.0                            # legacy: zero slip when ch4_factor given
+                    if ch4_factor_gch4_per_gfuel is not None
+                    else entry.c_slip_percent           # no override: leave unchanged
+                ),
             )
             for entry in self.ghg_emission_factor_tank_to_wake
         ]

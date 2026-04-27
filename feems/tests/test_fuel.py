@@ -38,7 +38,7 @@ def test_fuel_class():
         fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME,
     )
     assert fuel_by_eu.ghg_emission_factor_well_to_tank_gco2eq_per_mj == pytest.approx(18.5)
-    assert len(fuel_by_eu.ghg_emission_factor_tank_to_wake) == 5
+    assert len(fuel_by_eu.ghg_emission_factor_tank_to_wake) == 6
     assert fuel_by_eu.get_ghg_emission_factor_tank_to_wake_gco2eq_per_gfuel(
         fuel_consumer_class=FuelConsumerClassFuelEUMaritime.LNG_OTTO_MEDIUM_SPEED,
     ) == pytest.approx((1 - 3.1 / 100) * (2.75 + 0.00011 * _GWP100_N2O) + 3.1 / 100 * _GWP100_CH4)
