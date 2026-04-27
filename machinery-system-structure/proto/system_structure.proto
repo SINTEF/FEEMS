@@ -158,6 +158,14 @@ message Engine {
 }
 
 message COGAS {
+  message FuelMode {
+    Fuel main_fuel = 1;
+    optional Fuel secondary_fuel = 2;    // support/secondary fuel (e.g. pilot ignition)
+    optional Efficiency eff = 3;         // combined GT+ST efficiency vs load-ratio
+    repeated EmissionCurve emission_curves = 4;
+    Engine.EngineCycleType engine_cycle_type = 5;
+    Engine.NOxCalculationMethod nox_calculation_method = 6;
+  }
   string name = 1;
   double rated_power_kw = 2;
   double rated_speed_rpm = 3;
@@ -172,7 +180,7 @@ message COGAS {
   double start_delay_s = 12;
   double turn_off_power_kw = 13;
   string uid = 14;
-  repeated MultiFuelEngine.FuelMode fuel_modes = 15;
+  repeated COGAS.FuelMode fuel_modes = 15;
   double ch4_factor_gch4_per_gfuel = 16;
   double n2o_factor_gn2o_per_gfuel = 17;
   double c_slip_percent = 18;

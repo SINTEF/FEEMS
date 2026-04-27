@@ -405,7 +405,7 @@ def convert_cogas_component_to_protobuf(
         )
     if component.multi_fuel_characteristics:
         for fc in component.multi_fuel_characteristics:
-            fuel_mode = proto.MultiFuelEngine.FuelMode(
+            fuel_mode = proto.COGAS.FuelMode(
                 main_fuel=proto.Fuel(
                     fuel_type=fc.main_fuel_type.value,
                     fuel_origin=fc.main_fuel_origin.value,
@@ -417,19 +417,12 @@ def convert_cogas_component_to_protobuf(
                 engine_cycle_type=fc.engine_cycle_type.value,
             )
             if fc.eff_curve is not None:
-                fuel_mode.main_eff.CopyFrom(convert_eff_array_to_protobuf(fc.eff_curve))
+                fuel_mode.eff.CopyFrom(convert_eff_array_to_protobuf(fc.eff_curve))
             if fc.pilot_fuel_type is not None:
-                fuel_mode.pilot_fuel.CopyFrom(
+                fuel_mode.secondary_fuel.CopyFrom(
                     proto.Fuel(
                         fuel_type=fc.pilot_fuel_type.value,
                         fuel_origin=fc.pilot_fuel_origin.value,
-                    )
-                )
-            else:
-                fuel_mode.pilot_fuel.CopyFrom(
-                    proto.Fuel(
-                        fuel_type=proto.FuelType.NONE3,
-                        fuel_origin=proto.FuelOrigin.NONE1,
                     )
                 )
             cogas.fuel_modes.append(fuel_mode)

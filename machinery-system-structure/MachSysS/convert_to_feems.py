@@ -329,18 +329,18 @@ def convert_proto_cogas_to_feems(
                 main_fuel_type=TypeFuel(fuel_mode.main_fuel.fuel_type),
                 main_fuel_origin=FuelOrigin(fuel_mode.main_fuel.fuel_origin),
                 eff_curve=(
-                    convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.main_eff)
-                    if fuel_mode.HasField("main_eff")
+                    convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.eff)
+                    if fuel_mode.HasField("eff")
                     else None
                 ),
                 engine_cycle_type=EngineCycleType(fuel_mode.engine_cycle_type),
             )
             if (
-                fuel_mode.HasField("pilot_fuel")
-                and fuel_mode.pilot_fuel.fuel_type != proto.FuelType.NONE3
+                fuel_mode.HasField("secondary_fuel")
+                and fuel_mode.secondary_fuel.fuel_type != proto.FuelType.NONE3
             ):
-                fc.pilot_fuel_type = TypeFuel(fuel_mode.pilot_fuel.fuel_type)
-                fc.pilot_fuel_origin = FuelOrigin(fuel_mode.pilot_fuel.fuel_origin)
+                fc.pilot_fuel_type = TypeFuel(fuel_mode.secondary_fuel.fuel_type)
+                fc.pilot_fuel_origin = FuelOrigin(fuel_mode.secondary_fuel.fuel_origin)
             if len(fuel_mode.emission_curves) > 0:
                 fc.emission_curves = [
                     convert_emission_curve_to_feems(e) for e in fuel_mode.emission_curves
