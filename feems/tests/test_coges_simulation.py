@@ -206,26 +206,24 @@ class TestEmissionCurveOverridesScalarDefaults:
 
 class TestMultiFuelModeSwitch:
     def _make_cogas_multi(self):
-        eff_curve = create_random_monotonic_eff_curve()
-        bsfc_lng = np.array([[0.1, 200.0], [0.5, 180.0], [1.0, 195.0]])
-        bsfc_h2 = np.array([[0.1, 220.0], [0.5, 200.0], [1.0, 215.0]])
+        eff_lng = np.array([[0.1, 0.32], [0.5, 0.44], [1.0, 0.42]])
+        eff_h2 = np.array([[0.1, 0.30], [0.5, 0.42], [1.0, 0.40]])
         lng_mode = FuelCharacteristics(
             main_fuel_type=TypeFuel.NATURAL_GAS,
             main_fuel_origin=FuelOrigin.FOSSIL,
-            bsfc_curve=bsfc_lng,
+            eff_curve=eff_lng,
             engine_cycle_type=EngineCycleType.BRAYTON,
         )
         h2_mode = FuelCharacteristics(
             main_fuel_type=TypeFuel.HYDROGEN,
             main_fuel_origin=FuelOrigin.FOSSIL,
-            bsfc_curve=bsfc_h2,
+            eff_curve=eff_h2,
             engine_cycle_type=EngineCycleType.BRAYTON,
         )
         return COGAS(
             name="multi_cogas",
             rated_power=1000.0,
             rated_speed=3000.0,
-            eff_curve=eff_curve,
             multi_fuel_characteristics=[lng_mode, h2_mode],
         )
 
@@ -280,25 +278,24 @@ class TestNodeCogesBranchForwarding:
         from feems.types_for_feems import TypeComponent, TypePower
 
         if multi_fuel:
-            bsfc_lng = np.array([[0.1, 200.0], [0.5, 180.0], [1.0, 195.0]])
-            bsfc_h2 = np.array([[0.1, 220.0], [0.5, 200.0], [1.0, 215.0]])
+            eff_lng = np.array([[0.1, 0.32], [0.5, 0.44], [1.0, 0.42]])
+            eff_h2 = np.array([[0.1, 0.30], [0.5, 0.42], [1.0, 0.40]])
             lng_mode = FuelCharacteristics(
                 main_fuel_type=TypeFuel.NATURAL_GAS,
                 main_fuel_origin=FuelOrigin.FOSSIL,
-                bsfc_curve=bsfc_lng,
+                eff_curve=eff_lng,
                 engine_cycle_type=EngineCycleType.BRAYTON,
             )
             h2_mode = FuelCharacteristics(
                 main_fuel_type=TypeFuel.HYDROGEN,
                 main_fuel_origin=FuelOrigin.FOSSIL,
-                bsfc_curve=bsfc_h2,
+                eff_curve=eff_h2,
                 engine_cycle_type=EngineCycleType.BRAYTON,
             )
             cogas = COGAS(
                 name="COGAS",
                 rated_power=5000.0,
                 rated_speed=3000.0,
-                eff_curve=create_random_monotonic_eff_curve(),
                 multi_fuel_characteristics=[lng_mode, h2_mode],
             )
         else:
@@ -379,28 +376,27 @@ class TestProtoRoundTrip:
         from MachSysS.convert_to_protobuf import convert_cogas_component_to_protobuf
         from MachSysS.convert_to_feems import convert_proto_cogas_to_feems
 
-        bsfc_lng = np.array([[0.1, 200.0], [0.5, 180.0], [1.0, 195.0]])
-        bsfc_h2 = np.array([[0.1, 220.0], [0.5, 200.0], [1.0, 215.0]])
+        eff_lng = np.array([[0.1, 0.32], [0.5, 0.44], [1.0, 0.42]])
+        eff_h2 = np.array([[0.1, 0.30], [0.5, 0.42], [1.0, 0.40]])
         modes = [
             FuelCharacteristics(
                 main_fuel_type=TypeFuel.NATURAL_GAS,
                 main_fuel_origin=FuelOrigin.FOSSIL,
-                bsfc_curve=bsfc_lng,
+                eff_curve=eff_lng,
                 engine_cycle_type=EngineCycleType.BRAYTON,
             ),
             FuelCharacteristics(
                 main_fuel_type=TypeFuel.HYDROGEN,
                 main_fuel_origin=FuelOrigin.FOSSIL,
-                bsfc_curve=bsfc_h2,
+                eff_curve=eff_h2,
                 engine_cycle_type=EngineCycleType.BRAYTON,
             ),
         ]
         original = create_cogas_system(
             rated_power_kw=5000.0,
             rated_speed_rpm=3600.0,
+            multi_fuel_characteristics=modes,
         )
-        original.multi_fuel_characteristics = modes
-        original._fuel_in_use = modes[0]
         proto_msg = convert_cogas_component_to_protobuf(original)
         restored = convert_proto_cogas_to_feems(proto_msg)
 
@@ -408,3 +404,5 @@ class TestProtoRoundTrip:
         assert len(restored.multi_fuel_characteristics) == 2
         assert restored.multi_fuel_characteristics[0].main_fuel_type == TypeFuel.NATURAL_GAS
         assert restored.multi_fuel_characteristics[1].main_fuel_type == TypeFuel.HYDROGEN
+        assert restored.multi_fuel_characteristics[0].eff_curve is not None
+        np.testing.assert_allclose(restored.multi_fuel_characteristics[0].eff_curve, eff_lng)

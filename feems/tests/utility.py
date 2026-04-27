@@ -25,6 +25,7 @@ from feems.components_model.node import Switchboard
 from feems.exceptions import ConfigurationError
 from feems.fuel import FuelOrigin, TypeFuel
 from feems.types_for_feems import (
+    EmissionCurve,
     NOxCalculationMethod,
     Power_kW,
     Speed_rpm,
@@ -801,15 +802,16 @@ def create_electric_components_for_switchboard(
 def create_cogas_system(
     rated_power_kw: float = 1000,
     rated_speed_rpm: float = 1000,
-    eff_curve: np.ndarray = None,
-    gas_turbine_power_curve: np.ndarray = None,
-    steam_turbine_power_curve: np.ndarray = None,
+    eff_curve: np.ndarray | None = None,
+    gas_turbine_power_curve: np.ndarray | None = None,
+    steam_turbine_power_curve: np.ndarray | None = None,
     fuel_type: TypeFuel = TypeFuel.NATURAL_GAS,
     fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
-    emissions_curves=None,
-    ch4_factor_gch4_per_gfuel: float = None,
-    n2o_factor_gn2o_per_gfuel: float = None,
-    c_slip_percent: float = None,
+    emissions_curves: List[EmissionCurve] | None = None,
+    ch4_factor_gch4_per_gfuel: float | None = None,
+    n2o_factor_gn2o_per_gfuel: float | None = None,
+    c_slip_percent: float | None = None,
+    multi_fuel_characteristics=None,
 ) -> COGAS:
     from feems.components_model.component_mechanical import (
         _DEFAULT_BRAYTON_C_SLIP_PERCENT,
@@ -837,6 +839,8 @@ def create_cogas_system(
         kwargs["c_slip_percent"] = c_slip_percent
     if emissions_curves is not None:
         kwargs["emissions_curves"] = emissions_curves
+    if multi_fuel_characteristics is not None:
+        kwargs["multi_fuel_characteristics"] = multi_fuel_characteristics
     return COGAS(
         name="COGAS",
         rated_power=rated_power_kw,

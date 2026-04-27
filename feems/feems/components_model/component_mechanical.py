@@ -389,6 +389,7 @@ class FuelCharacteristics:
     pilot_fuel_origin: FuelOrigin = None
     bsfc_curve: np.ndarray = None
     bspfc_curve: np.ndarray = None
+    eff_curve: np.ndarray = None  # per-mode efficiency curve for COGAS fuel modes
     emission_curves: List[EmissionCurve] = None
     engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL
 
@@ -973,17 +974,14 @@ class COGAS(BasicComponent):
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
         )
-        # If a fuel mode with a BSFC curve is active, use BSFC-based fuel calc; else use eff_curve.
-        if self._fuel_in_use is not None and self._fuel_in_use.bsfc_curve is not None:
-            bsfc_interp, _ = get_efficiency_curve_from_points(self._fuel_in_use.bsfc_curve)
-            bsfc_g_per_kwh = bsfc_interp(load_ratio)
-            power_kwh_per_s = power_kw / 3600
-            fuel_consumption_kg_per_s = bsfc_g_per_kwh * power_kwh_per_s / 1000
-            eff = power_kw / (fuel_consumption_kg_per_s * fuel.lhv_mj_per_g * 1e6)
+        # Active fuel mode provides its own efficiency curve; else fall back to self.eff_curve.
+        if self._fuel_in_use is not None and self._fuel_in_use.eff_curve is not None:
+            eff_interp, _ = get_efficiency_curve_from_points(self._fuel_in_use.eff_curve)
+            eff = eff_interp(load_ratio)
         else:
             eff = self.get_efficiency_from_load_percentage(load_ratio)
-            fuel_power_kw = power_kw / eff
-            fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000) / 1000
+        fuel_power_kw = power_kw / eff
+        fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000) / 1000
         fuel.mass_or_mass_fraction = fuel_consumption_kg_per_s
         # Use emission curves from active fuel mode if available, else top-level curves.
         active_emission_curves_interp = (

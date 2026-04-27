@@ -328,7 +328,11 @@ def convert_proto_cogas_to_feems(
                 ),
                 main_fuel_type=TypeFuel(fuel_mode.main_fuel.fuel_type),
                 main_fuel_origin=FuelOrigin(fuel_mode.main_fuel.fuel_origin),
-                bsfc_curve=convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.main_bsfc),
+                eff_curve=(
+                    convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.main_eff)
+                    if fuel_mode.HasField("main_eff")
+                    else None
+                ),
                 engine_cycle_type=EngineCycleType(fuel_mode.engine_cycle_type),
             )
             if (

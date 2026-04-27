@@ -655,7 +655,7 @@ class MachinerySystem(_message.Message):
 class MultiFuelEngine(_message.Message):
     __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "fuel_modes", "order_from_switchboard_or_shaftline", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid")
     class FuelMode(_message.Message):
-        __slots__ = ("main_fuel", "main_bsfc", "pilot_fuel", "pilot_bsfc", "emission_curves", "engine_cycle_type", "nox_calculation_method")
+        __slots__ = ("main_fuel", "main_bsfc", "pilot_fuel", "pilot_bsfc", "emission_curves", "engine_cycle_type", "nox_calculation_method", "main_eff")
         MAIN_FUEL_FIELD_NUMBER: _ClassVar[int]
         MAIN_BSFC_FIELD_NUMBER: _ClassVar[int]
         PILOT_FUEL_FIELD_NUMBER: _ClassVar[int]
@@ -663,6 +663,7 @@ class MultiFuelEngine(_message.Message):
         EMISSION_CURVES_FIELD_NUMBER: _ClassVar[int]
         ENGINE_CYCLE_TYPE_FIELD_NUMBER: _ClassVar[int]
         NOX_CALCULATION_METHOD_FIELD_NUMBER: _ClassVar[int]
+        MAIN_EFF_FIELD_NUMBER: _ClassVar[int]
         main_fuel: Fuel
         main_bsfc: BSFC
         pilot_fuel: Fuel
@@ -670,7 +671,8 @@ class MultiFuelEngine(_message.Message):
         emission_curves: _containers.RepeatedCompositeFieldContainer[EmissionCurve]
         engine_cycle_type: Engine.EngineCycleType
         nox_calculation_method: Engine.NOxCalculationMethod
-        def __init__(self, main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., main_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., pilot_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., pilot_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ...) -> None: ...
+        main_eff: Efficiency
+        def __init__(self, main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., main_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., pilot_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., pilot_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ..., main_eff: _Optional[_Union[Efficiency, _Mapping]] = ...) -> None: ...
     NAME_FIELD_NUMBER: _ClassVar[int]
     RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     RATED_SPEED_RPM_FIELD_NUMBER: _ClassVar[int]

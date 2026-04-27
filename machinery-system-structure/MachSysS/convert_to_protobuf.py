@@ -81,6 +81,22 @@ def convert_efficiency_curve_to_protobuf(
     return efficiency
 
 
+def convert_eff_array_to_protobuf(eff_array: np.ndarray) -> proto.Efficiency:
+    """Convert an efficiency np.ndarray (shape Nx2: [[load_ratio, eff], ...]) to proto.Efficiency."""
+    eff = proto.Efficiency()
+    if eff_array is None or len(eff_array) == 0:
+        return eff
+    if np.isscalar(eff_array) or len(eff_array) == 1:
+        eff.value = float(eff_array) if np.isscalar(eff_array) else float(eff_array[0])
+    else:
+        eff.curve.curve.points.extend(
+            [proto.Point(x=float(p[0]), y=float(p[1])) for p in eff_array]
+        )
+        eff.curve.x_label = "load_ratio"
+        eff.curve.y_label = "efficiency"
+    return eff
+
+
 def convert_np_array_to_protobuf_power_curve(power_curve: np.array) -> proto.PowerCurve:
     """Convert power curve in the component to protobuf message"""
     # Check if the array is in n x 2 dimension or a single value
@@ -394,13 +410,14 @@ def convert_cogas_component_to_protobuf(
                     fuel_type=fc.main_fuel_type.value,
                     fuel_origin=fc.main_fuel_origin.value,
                 ),
-                main_bsfc=convert_bsfc_array_value_to_protobuf(fc.bsfc_curve),
                 emission_curves=convert_emission_curves_to_protobuf(fc.emission_curves),
                 nox_calculation_method=convert_nox_calculation_method_to_protobuf(
                     fc.nox_calculation_method
                 ),
                 engine_cycle_type=fc.engine_cycle_type.value,
             )
+            if fc.eff_curve is not None:
+                fuel_mode.main_eff.CopyFrom(convert_eff_array_to_protobuf(fc.eff_curve))
             if fc.pilot_fuel_type is not None:
                 fuel_mode.pilot_fuel.CopyFrom(
                     proto.Fuel(

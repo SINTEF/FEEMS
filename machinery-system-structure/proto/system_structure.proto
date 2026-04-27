@@ -376,6 +376,7 @@ message MultiFuelEngine {
     repeated EmissionCurve emission_curves = 5;
     Engine.EngineCycleType engine_cycle_type = 6;
     Engine.NOxCalculationMethod nox_calculation_method = 7;
+    optional Efficiency main_eff = 8;  // efficiency vs load-ratio curve for COGAS fuel modes
   }
   string name = 1;
   double rated_power_kw = 2;
