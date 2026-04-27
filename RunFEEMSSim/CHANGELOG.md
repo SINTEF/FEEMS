@@ -5,6 +5,18 @@ All notable changes to the RunFeemsSim package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.4.4...RunFeemsSim-v0.5.0) (2026-04-27)
+
+
+### Features
+
+* add COGES multi-fuel simulation support ([#89](https://github.com/SINTEF/FEEMS/issues/89)) ([e409744](https://github.com/SINTEF/FEEMS/commit/e409744989d93fc58d16157aa921ea8ce0c87c03))
+
+
+### Bug Fixes
+
+* address code review comments on PR [#90](https://github.com/SINTEF/FEEMS/issues/90) ([4c492de](https://github.com/SINTEF/FEEMS/commit/4c492de75514c7217ce897c03741d07b5a0109d2))
+
 ## [0.4.4](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.4.3...RunFeemsSim-v0.4.4) (2026-02-11)
 
 
