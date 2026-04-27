@@ -806,7 +806,17 @@ def create_cogas_system(
     steam_turbine_power_curve: np.ndarray = None,
     fuel_type: TypeFuel = TypeFuel.NATURAL_GAS,
     fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+    emissions_curves=None,
+    ch4_factor_gch4_per_gfuel: float = None,
+    n2o_factor_gn2o_per_gfuel: float = None,
+    c_slip_percent: float = None,
 ) -> COGAS:
+    from feems.components_model.component_mechanical import (
+        _DEFAULT_BRAYTON_C_SLIP_PERCENT,
+        _DEFAULT_BRAYTON_CH4_GFUEL,
+        _DEFAULT_BRAYTON_N2O_GFUEL,
+    )
+
     # Create a cogas system
     if eff_curve is None:
         eff_curve = create_random_monotonic_eff_curve()
@@ -818,6 +828,15 @@ def create_cogas_system(
         steam_turbine_power_curve[:, 1] = (
             steam_turbine_power_curve[:, 0] * rated_power_kw - gas_turbine_power_curve[:, 1]
         )
+    kwargs = {}
+    if ch4_factor_gch4_per_gfuel is not None:
+        kwargs["ch4_factor_gch4_per_gfuel"] = ch4_factor_gch4_per_gfuel
+    if n2o_factor_gn2o_per_gfuel is not None:
+        kwargs["n2o_factor_gn2o_per_gfuel"] = n2o_factor_gn2o_per_gfuel
+    if c_slip_percent is not None:
+        kwargs["c_slip_percent"] = c_slip_percent
+    if emissions_curves is not None:
+        kwargs["emissions_curves"] = emissions_curves
     return COGAS(
         name="COGAS",
         rated_power=rated_power_kw,
@@ -827,4 +846,5 @@ def create_cogas_system(
         steam_turbine_power_curve=steam_turbine_power_curve,
         fuel_type=fuel_type,
         fuel_origin=fuel_origin,
+        **kwargs,
     )

@@ -359,8 +359,8 @@ def convert_multi_fuel_engine_to_protobuf(
 def convert_cogas_component_to_protobuf(
     component: COGAS,
     order_from_shaftline_or_switchboard: int = 1,
-) -> proto.Engine:
-    """Convert engine component of FEEMS to protobuf message"""
+) -> proto.COGAS:
+    """Convert COGAS component of FEEMS to protobuf message"""
     cogas = proto.COGAS(
         name=component.name,
         rated_power_kw=component.rated_power,
@@ -376,6 +376,9 @@ def convert_cogas_component_to_protobuf(
         emission_curves=convert_emission_curves_to_protobuf(component.emission_curves),
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
         uid=component.uid,
+        ch4_factor_gch4_per_gfuel=component.ch4_factor_gch4_per_gfuel,
+        n2o_factor_gn2o_per_gfuel=component.n2o_factor_gn2o_per_gfuel,
+        c_slip_percent=component.c_slip_percent,
     )
     if component.gas_turbine_power_curve is not None:
         cogas.gas_turbine_power_curve.CopyFrom(
@@ -384,6 +387,35 @@ def convert_cogas_component_to_protobuf(
         cogas.steam_turbine_power_curve.CopyFrom(
             convert_np_array_to_protobuf_power_curve(component.steam_turbine_power_curve)
         )
+    if component.multi_fuel_characteristics:
+        for fc in component.multi_fuel_characteristics:
+            fuel_mode = proto.MultiFuelEngine.FuelMode(
+                main_fuel=proto.Fuel(
+                    fuel_type=fc.main_fuel_type.value,
+                    fuel_origin=fc.main_fuel_origin.value,
+                ),
+                main_bsfc=convert_bsfc_array_value_to_protobuf(fc.bsfc_curve),
+                emission_curves=convert_emission_curves_to_protobuf(fc.emission_curves),
+                nox_calculation_method=convert_nox_calculation_method_to_protobuf(
+                    fc.nox_calculation_method
+                ),
+                engine_cycle_type=fc.engine_cycle_type.value,
+            )
+            if fc.pilot_fuel_type is not None:
+                fuel_mode.pilot_fuel.CopyFrom(
+                    proto.Fuel(
+                        fuel_type=fc.pilot_fuel_type.value,
+                        fuel_origin=fc.pilot_fuel_origin.value,
+                    )
+                )
+            else:
+                fuel_mode.pilot_fuel.CopyFrom(
+                    proto.Fuel(
+                        fuel_type=proto.FuelType.NONE3,
+                        fuel_origin=proto.FuelOrigin.NONE1,
+                    )
+                )
+            cogas.fuel_modes.append(fuel_mode)
     return cogas
 
 

@@ -62,6 +62,9 @@ from feems.components_model.component_mechanical import (
     EngineDualFuel,
     EngineMultiFuel,
     FuelCharacteristics,
+    _DEFAULT_BRAYTON_C_SLIP_PERCENT,
+    _DEFAULT_BRAYTON_CH4_GFUEL,
+    _DEFAULT_BRAYTON_N2O_GFUEL,
 )
 from feems.fuel import FuelOrigin, TypeFuel
 from feems.system_model import (
@@ -304,7 +307,7 @@ def convert_proto_multifuel_engine_to_feems(
 
 def convert_proto_cogas_to_feems(
     proto_cogas: proto.COGAS,
-) -> Engine:
+) -> COGAS:
     """Converts protobuf COGAS message to feems COGAS component"""
     nox_calculation_method = get_nox_calculation_method(proto_cogas)
     emission_curves = (
@@ -315,6 +318,36 @@ def convert_proto_cogas_to_feems(
         if proto_cogas.emission_curves
         else None
     )
+    multi_fuel_characteristics = None
+    if proto_cogas.fuel_modes:
+        multi_fuel_characteristics = []
+        for fuel_mode in proto_cogas.fuel_modes:
+            fc = FuelCharacteristics(
+                nox_calculation_method=convert_nox_calculation_method(
+                    fuel_mode.nox_calculation_method
+                ),
+                main_fuel_type=TypeFuel(fuel_mode.main_fuel.fuel_type),
+                main_fuel_origin=FuelOrigin(fuel_mode.main_fuel.fuel_origin),
+                bsfc_curve=convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.main_bsfc),
+                engine_cycle_type=EngineCycleType(fuel_mode.engine_cycle_type),
+            )
+            if (
+                fuel_mode.HasField("pilot_fuel")
+                and fuel_mode.pilot_fuel.fuel_type != proto.FuelType.NONE3
+            ):
+                fc.pilot_fuel_type = TypeFuel(fuel_mode.pilot_fuel.fuel_type)
+                fc.pilot_fuel_origin = FuelOrigin(fuel_mode.pilot_fuel.fuel_origin)
+            if len(fuel_mode.emission_curves) > 0:
+                fc.emission_curves = [
+                    convert_emission_curve_to_feems(e) for e in fuel_mode.emission_curves
+                ]
+            multi_fuel_characteristics.append(fc)
+
+    # proto3 default for double is 0.0; treat 0 as "use module default"
+    ch4 = proto_cogas.ch4_factor_gch4_per_gfuel or _DEFAULT_BRAYTON_CH4_GFUEL
+    n2o = proto_cogas.n2o_factor_gn2o_per_gfuel or _DEFAULT_BRAYTON_N2O_GFUEL
+    c_slip = proto_cogas.c_slip_percent or _DEFAULT_BRAYTON_C_SLIP_PERCENT
+
     return COGAS(
         name=proto_cogas.name,
         rated_power=proto_cogas.rated_power_kw,
@@ -331,6 +364,10 @@ def convert_proto_cogas_to_feems(
         nox_calculation_method=nox_calculation_method,
         emissions_curves=emission_curves,
         uid=proto_cogas.uid if len(proto_cogas.uid) > _MIN_LENGTH_UID else None,
+        multi_fuel_characteristics=multi_fuel_characteristics,
+        ch4_factor_gch4_per_gfuel=ch4,
+        n2o_factor_gn2o_per_gfuel=n2o,
+        c_slip_percent=c_slip,
     )
 
 

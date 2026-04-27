@@ -39,6 +39,12 @@ from .utility import (
 
 logger = get_logger(__name__)
 
+# IPCC 2006 Vol.2 Ch.2 Table 2.6 defaults for gas turbines (Brayton cycle).
+# Source: 4th IMO GHG Study / MEPC.391(81); no FuelEU Maritime Annex II entry exists.
+_DEFAULT_BRAYTON_C_SLIP_PERCENT: float = 0.01
+_DEFAULT_BRAYTON_CH4_GFUEL: float = 0.000192  # 4 kg/TJ at LNG LCV 48 MJ/kg
+_DEFAULT_BRAYTON_N2O_GFUEL: float = 0.000048  # 1 kg/TJ at LNG LCV 48 MJ/kg
+
 
 @dataclass
 class EngineRunPoint:
@@ -385,6 +391,24 @@ class FuelCharacteristics:
     bspfc_curve: np.ndarray = None
     emission_curves: List[EmissionCurve] = None
     engine_cycle_type: EngineCycleType = EngineCycleType.DIESEL
+
+    @property
+    def secondary_fuel_type(self) -> Optional[TypeFuel]:
+        """Alias for pilot_fuel_type; use this name for Brayton (gas turbine) fuel-mode switching."""
+        return self.pilot_fuel_type
+
+    @secondary_fuel_type.setter
+    def secondary_fuel_type(self, value: Optional[TypeFuel]) -> None:
+        self.pilot_fuel_type = value
+
+    @property
+    def secondary_fuel_origin(self) -> Optional[FuelOrigin]:
+        """Alias for pilot_fuel_origin; use this name for Brayton fuel-mode switching."""
+        return self.pilot_fuel_origin
+
+    @secondary_fuel_origin.setter
+    def secondary_fuel_origin(self, value: Optional[FuelOrigin]) -> None:
+        self.pilot_fuel_origin = value
 
 
 class EngineMultiFuel(Engine):
@@ -767,6 +791,10 @@ class COGAS(BasicComponent):
         emissions_curves: List[EmissionCurve] = None,
         nox_calculation_method: NOxCalculationMethod = NOxCalculationMethod.TIER_3,
         uid: Optional[str] = None,
+        multi_fuel_characteristics: Optional[List["FuelCharacteristics"]] = None,
+        ch4_factor_gch4_per_gfuel: float = _DEFAULT_BRAYTON_CH4_GFUEL,
+        n2o_factor_gn2o_per_gfuel: float = _DEFAULT_BRAYTON_N2O_GFUEL,
+        c_slip_percent: float = _DEFAULT_BRAYTON_C_SLIP_PERCENT,
     ):
         """Constructor for COGES component"""
         # Validate the inputs for curves. The length of the curves should be the same
@@ -812,6 +840,57 @@ class COGAS(BasicComponent):
         self.fuel_origin = fuel_origin
         self._setup_emissions(emissions_curves)
         self._setup_nox(nox_calculation_method, rated_speed)
+        self.multi_fuel_characteristics = multi_fuel_characteristics
+        self.ch4_factor_gch4_per_gfuel = ch4_factor_gch4_per_gfuel
+        self.n2o_factor_gn2o_per_gfuel = n2o_factor_gn2o_per_gfuel
+        self.c_slip_percent = c_slip_percent
+        if multi_fuel_characteristics:
+            self.fuel_type = multi_fuel_characteristics[0].main_fuel_type
+            self.fuel_origin = multi_fuel_characteristics[0].main_fuel_origin
+            self._fuel_in_use: Optional[FuelCharacteristics] = multi_fuel_characteristics[0]
+        else:
+            self._fuel_in_use = None
+
+    def set_fuel_in_use(
+        self, fuel_type: Optional[TypeFuel] = None, fuel_origin: Optional[FuelOrigin] = None
+    ) -> None:
+        """Select the active fuel mode from multi_fuel_characteristics.
+
+        If multi_fuel_characteristics is None (single-fuel COGAS), this is a no-op.
+        If fuel_type/fuel_origin are None, resets to the first mode in the list.
+        """
+        if self.multi_fuel_characteristics is None:
+            return
+        if fuel_type is None or fuel_origin is None:
+            self._fuel_in_use = self.multi_fuel_characteristics[0]
+            self.fuel_type = self._fuel_in_use.main_fuel_type
+            self.fuel_origin = self._fuel_in_use.main_fuel_origin
+            return
+        fc = next(
+            (
+                fc
+                for fc in self.multi_fuel_characteristics
+                if fc.main_fuel_type == fuel_type and fc.main_fuel_origin == fuel_origin
+            ),
+            None,
+        )
+        if fc is None:
+            raise ValueError(
+                f"No FuelCharacteristics for fuel_type={fuel_type}, fuel_origin={fuel_origin}."
+            )
+        self._fuel_in_use = fc
+        self.fuel_type = fc.main_fuel_type
+        self.fuel_origin = fc.main_fuel_origin
+
+    def _build_emission_interp(
+        self, curves: Optional[List[EmissionCurve]]
+    ) -> Dict[EmissionType, Callable[[T], T]]:
+        result: Dict[EmissionType, Callable[[T], T]] = {}
+        if curves:
+            for e in curves:
+                if len(e.points_per_kwh) > 0:
+                    result[e.emission] = get_emission_curve_from_points(e.points_per_kwh)
+        return result
 
     def _setup_emissions(self, emissions_curves: List[EmissionCurve] = None) -> None:
         self.emission_curves = emissions_curves
@@ -826,8 +905,7 @@ class COGAS(BasicComponent):
 
     @property
     def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
-        Warning("Fuel consumer type for COGAS is not defined in FuelEU Maritime regulation yet.")
-        return None
+        return FuelConsumerClassFuelEUMaritime.GAS_TURBINE
 
     def emissions_g_per_kwh(self, emission_type: EmissionType, load_ratio: T) -> Optional[T]:
         if emission_type in self._emissions_per_kwh_interp:
@@ -884,14 +962,9 @@ class COGAS(BasicComponent):
         ghg_emission_factor_well_to_tank_gco2eq_per_mj: Optional[float] = None,
         ghg_emission_factor_tank_to_wake: List[Optional[GhgEmissionFactorTankToWake]] = None,
     ) -> COGASRunPoint:
-        # GHG factors for FuelEU Maritime is not available for COGAS yet.
-        # It should raise an error if the user tries to use it.
-        if fuel_specified_by == FuelSpecifiedBy.FUEL_EU_MARITIME:
-            raise ValueError("GHG factors for FuelEU Maritime is not available for COGAS yet.")
         if power_kw is None:
             power_kw = self.power_output
         load_ratio = self.get_load(power_kw)
-        eff = self.get_efficiency_from_load_percentage(load_ratio)
         fuel = Fuel(
             origin=self.fuel_origin,
             fuel_type=self.fuel_type,
@@ -900,18 +973,33 @@ class COGAS(BasicComponent):
             ghg_emission_factor_tank_to_wake=ghg_emission_factor_tank_to_wake,
             ghg_emission_factor_well_to_tank_gco2eq_per_mj=ghg_emission_factor_well_to_tank_gco2eq_per_mj,
         )
-        fuel_power_kw = power_kw / eff
-        fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000) / 1000
+        # If a fuel mode with a BSFC curve is active, use BSFC-based fuel calc; else use eff_curve.
+        if self._fuel_in_use is not None and self._fuel_in_use.bsfc_curve is not None:
+            bsfc_interp, _ = get_efficiency_curve_from_points(self._fuel_in_use.bsfc_curve)
+            bsfc_g_per_kwh = bsfc_interp(load_ratio)
+            power_kwh_per_s = power_kw / 3600
+            fuel_consumption_kg_per_s = bsfc_g_per_kwh * power_kwh_per_s / 1000
+            eff = power_kw / (fuel_consumption_kg_per_s * fuel.lhv_mj_per_g * 1e6)
+        else:
+            eff = self.get_efficiency_from_load_percentage(load_ratio)
+            fuel_power_kw = power_kw / eff
+            fuel_consumption_kg_per_s = fuel_power_kw / (fuel.lhv_mj_per_g * 1000) / 1000
         fuel.mass_or_mass_fraction = fuel_consumption_kg_per_s
-        # --- emission-curve GHG override -------------------------------------------
+        # Use emission curves from active fuel mode if available, else top-level curves.
+        active_emission_curves_interp = (
+            self._build_emission_interp(self._fuel_in_use.emission_curves)
+            if self._fuel_in_use is not None and self._fuel_in_use.emission_curves
+            else self._emissions_per_kwh_interp
+        )
+        # --- GHG override: emission curves (issue #85) take priority over scalar fields ----------
         _ch4_g_per_kwh = (
-            self.emissions_g_per_kwh(EmissionType.CH4, load_ratio)
-            if EmissionType.CH4 in self._emissions_per_kwh_interp
+            active_emission_curves_interp[EmissionType.CH4](load_ratio)
+            if EmissionType.CH4 in active_emission_curves_interp
             else None
         )
         _n2o_g_per_kwh = (
-            self.emissions_g_per_kwh(EmissionType.N2O, load_ratio)
-            if EmissionType.N2O in self._emissions_per_kwh_interp
+            active_emission_curves_interp[EmissionType.N2O](load_ratio)
+            if EmissionType.N2O in active_emission_curves_interp
             else None
         )
         if _ch4_g_per_kwh is not None or _n2o_g_per_kwh is not None:
@@ -924,14 +1012,20 @@ class COGAS(BasicComponent):
                 n2o_factor_gn2o_per_gfuel=(
                     _n2o_g_per_kwh / _bsfc_eq_g_per_kwh if _n2o_g_per_kwh is not None else None
                 ),
+                # c_slip_percent=None → legacy zero-out behaviour (curve captures all CH4)
             )
-        # ---------------------------------------------------------------------------
+        else:
+            # --- scalar-field override (BRAYTON IPCC defaults or user-supplied values) -----------
+            fuel = fuel.with_emission_curve_ghg_overrides(
+                ch4_factor_gch4_per_gfuel=self.ch4_factor_gch4_per_gfuel,
+                n2o_factor_gn2o_per_gfuel=self.n2o_factor_gn2o_per_gfuel,
+                c_slip_percent=self.c_slip_percent,  # explicit: not zeroed out
+            )
+        # -----------------------------------------------------------------------------------------
         emissionn_per_s = {}
         power_kwh_per_s = power_kw / 3600
-        for e in self._emissions_per_kwh_interp:
-            emissionn_per_s[e] = (
-                self.emissions_g_per_kwh(emission_type=e, load_ratio=load_ratio) * power_kwh_per_s
-            )
+        for e, interp_fn in active_emission_curves_interp.items():
+            emissionn_per_s[e] = interp_fn(load_ratio) * power_kwh_per_s
         result = COGASRunPoint(
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel]),

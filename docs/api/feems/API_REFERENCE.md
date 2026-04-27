@@ -1113,11 +1113,12 @@ A single fuel with its GHG emission factors and consumption quantity.
   - Returns the tank-to-wake GHG factor in gCO₂eq/gfuel for the given consumer class.
   - Returns a `np.ndarray` when the stored `ch4_factor_gch4_per_gfuel` / `n2o_factor_gn2o_per_gfuel` fields are arrays (i.e., when set via engine emission curves over multiple load points).
 
-- `with_emission_curve_ghg_overrides(ch4_factor_gch4_per_gfuel=None, n2o_factor_gn2o_per_gfuel=None) -> Fuel`
-  - Returns a copy with CH₄ and/or N₂O GHG factors replaced by engine-curve-derived values.
+- `with_emission_curve_ghg_overrides(ch4_factor_gch4_per_gfuel=None, n2o_factor_gn2o_per_gfuel=None, c_slip_percent=None) -> Fuel`
+  - Returns a copy with CH₄, N₂O, and/or methane slip factors replaced by override values.
   - **Parameters accept `Union[float, np.ndarray]`** — when `power_kw` is a numpy array the engine computes per-timestep factors as arrays, and this method propagates them correctly through element-wise arithmetic.
-  - When `ch4_factor_gch4_per_gfuel` is provided, `c_slip_percent` is zeroed in all `GhgEmissionFactorTankToWake` entries (the curve already captures total methane including slip).
-  - Returns `self` unchanged when both arguments are `None`.
+  - When `ch4_factor_gch4_per_gfuel` is provided and `c_slip_percent` is `None`, `c_slip_percent` is zeroed in all `GhgEmissionFactorTankToWake` entries (the emission curve already captures total methane including slip — legacy ICE behaviour).
+  - When `c_slip_percent` is provided explicitly (e.g. for gas turbines), it is used as-is regardless of `ch4_factor_gch4_per_gfuel`.
+  - Returns `self` unchanged when all arguments are `None`.
 
 ### `FuelConsumption`
 
@@ -1240,6 +1241,7 @@ from feems.types_for_feems import EngineCycleType
 EngineCycleType.DIESEL                  # Diesel cycle (default)
 EngineCycleType.OTTO                    # Otto cycle
 EngineCycleType.LEAN_BURN_SPARK_IGNITION  # LBSI cycle
+EngineCycleType.BRAYTON                 # Brayton cycle (gas turbines, COGAS/COGES)
 EngineCycleType.NONE
 ```
 

@@ -16,6 +16,7 @@ class EngineCycleType(Enum):
     DIESEL = auto()
     OTTO = auto()
     LEAN_BURN_SPARK_IGNITION = auto()
+    BRAYTON = auto()
 
 
 class EmissionType(Enum):
