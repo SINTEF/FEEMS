@@ -5,6 +5,21 @@ All notable changes to the FEEMS package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.15.0...feems-v0.16.0) (2026-04-27)
+
+
+### Features
+
+* add COGES fuel options to available_fuel_options_by_converter ([789b640](https://github.com/SINTEF/FEEMS/commit/789b6405427a8a8a8ca89b6b7350a3b58f53ab5a))
+* add COGES multi-fuel simulation support ([#89](https://github.com/SINTEF/FEEMS/issues/89)) ([e409744](https://github.com/SINTEF/FEEMS/commit/e409744989d93fc58d16157aa921ea8ce0c87c03))
+* add COGES simulation support ([#89](https://github.com/SINTEF/FEEMS/issues/89)) ([1927c2d](https://github.com/SINTEF/FEEMS/commit/1927c2dc7409eeb766813b262041a42cbf7577b8))
+
+
+### Bug Fixes
+
+* address code review comments on PR [#90](https://github.com/SINTEF/FEEMS/issues/90) ([4c492de](https://github.com/SINTEF/FEEMS/commit/4c492de75514c7217ce897c03741d07b5a0109d2))
+* use eff_curve (not bsfc) for COGAS multi-fuel modes; add missing Gas Turbine CSV rows ([d915e09](https://github.com/SINTEF/FEEMS/commit/d915e0978ed61f2a0a723135431574bb57e3eaf9))
+
 ## [0.15.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.14.0...feems-v0.15.0) (2026-02-22)
 
 
