@@ -280,7 +280,7 @@ class TestCOGESFuelOptions(unittest.TestCase):
         self.assertEqual(len(options), 2)
         self.assertIn(FuelOption(TypeFuel.NATURAL_GAS, FuelOrigin.FOSSIL, False, True), options)
         self.assertIn(
-            FuelOption(TypeFuel.HYDROGEN, FuelOrigin.RENEWABLE_NON_BIO, False, True), options
+            FuelOption(TypeFuel.HYDROGEN, FuelOrigin.RENEWABLE_NON_BIO, False, False), options
         )
         self.assertEqual(len(options), len(set(options)), "Duplicate fuel options found")
 
@@ -334,7 +334,7 @@ class TestCOGESFuelOptions(unittest.TestCase):
         options = eps.available_fuel_options
         self.assertIn(FuelOption(TypeFuel.NATURAL_GAS, FuelOrigin.FOSSIL, False, True), options)
         self.assertIn(
-            FuelOption(TypeFuel.HYDROGEN, FuelOrigin.RENEWABLE_NON_BIO, False, True), options
+            FuelOption(TypeFuel.HYDROGEN, FuelOrigin.RENEWABLE_NON_BIO, False, False), options
         )
         self.assertEqual(len(options), len(set(options)), "Duplicate fuel options found")
 

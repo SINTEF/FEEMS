@@ -128,12 +128,12 @@ def _extract_fuel_options_from_component(component: object) -> List[FuelOption]:
         if cogas.multi_fuel_characteristics:
             options: List[FuelOption] = []
             seen: Set[FuelOption] = set()
-            for fc in cogas.multi_fuel_characteristics:
+            for i, fc in enumerate(cogas.multi_fuel_characteristics):
                 option = FuelOption(
                     fuel_type=fc.main_fuel_type,
                     fuel_origin=fc.main_fuel_origin,
                     for_pilot=False,
-                    primary=True,
+                    primary=i == 0,
                 )
                 if option not in seen:
                     options.append(option)
@@ -143,7 +143,7 @@ def _extract_fuel_options_from_component(component: object) -> List[FuelOption]:
                         fuel_type=fc.secondary_fuel_type,
                         fuel_origin=fc.secondary_fuel_origin,
                         for_pilot=True,
-                        primary=True,
+                        primary=i == 0,
                     )
                     if sec not in seen:
                         options.append(sec)
