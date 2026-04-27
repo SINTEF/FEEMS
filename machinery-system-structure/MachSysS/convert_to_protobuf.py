@@ -82,19 +82,36 @@ def convert_efficiency_curve_to_protobuf(
 
 
 def convert_eff_array_to_protobuf(eff_array: np.ndarray) -> proto.Efficiency:
-    """Convert an efficiency np.ndarray (shape Nx2: [[load_ratio, eff], ...]) to proto.Efficiency."""
+    """Convert an efficiency value or Nx2 array ([[load_ratio, eff], ...]) to proto.Efficiency."""
     eff = proto.Efficiency()
-    if eff_array is None or len(eff_array) == 0:
+    if eff_array is None:
         return eff
-    if np.isscalar(eff_array) or len(eff_array) == 1:
-        eff.value = float(eff_array) if np.isscalar(eff_array) else float(eff_array[0])
-    else:
+    if np.isscalar(eff_array):
+        eff.value = float(eff_array)
+        return eff
+    eff_array = np.asarray(eff_array)
+    if eff_array.size == 0:
+        return eff
+    if eff_array.ndim == 0:
+        eff.value = float(eff_array)
+        return eff
+    if eff_array.ndim == 1:
+        if eff_array.size == 1:
+            eff.value = float(eff_array[0])
+            return eff
+        raise ValueError(
+            "Efficiency array must be a scalar, a single-value array, or an Nx2 array."
+        )
+    if eff_array.ndim == 2 and eff_array.shape[1] == 2:
         eff.curve.curve.points.extend(
             [proto.Point(x=float(p[0]), y=float(p[1])) for p in eff_array]
         )
         eff.curve.x_label = "load_ratio"
         eff.curve.y_label = "efficiency"
-    return eff
+        return eff
+    raise ValueError(
+        "Efficiency array must be a scalar, a single-value array, or an Nx2 array."
+    )
 
 
 def convert_np_array_to_protobuf_power_curve(power_curve: np.array) -> proto.PowerCurve:

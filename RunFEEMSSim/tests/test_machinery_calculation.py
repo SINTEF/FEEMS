@@ -441,7 +441,6 @@ def test_machinery_calculation_multifuel_coges():
 
     fuels_default = res_default.multi_fuel_consumption_total_kg.fuels
     fuels_h2 = res_h2.multi_fuel_consumption_total_kg.fuels
-    fuels_lng = res_lng.multi_fuel_consumption_total_kg.fuels
 
     # Default = LNG: natural_gas consumed, no hydrogen
     assert any(f.fuel_type == TypeFuel.NATURAL_GAS and f.mass_or_mass_fraction > 0

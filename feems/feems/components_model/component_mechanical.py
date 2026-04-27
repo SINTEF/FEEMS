@@ -860,7 +860,7 @@ class COGAS(BasicComponent):
         If multi_fuel_characteristics is None (single-fuel COGAS), this is a no-op.
         If fuel_type/fuel_origin are None, resets to the first mode in the list.
         """
-        if self.multi_fuel_characteristics is None:
+        if not self.multi_fuel_characteristics:
             return
         if fuel_type is None or fuel_origin is None:
             self._fuel_in_use = self.multi_fuel_characteristics[0]

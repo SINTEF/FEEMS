@@ -21,7 +21,7 @@ from feems.components_model.component_mechanical import (
     _DEFAULT_BRAYTON_N2O_GFUEL,
 )
 
-from .utility import create_cogas_system, create_random_monotonic_eff_curve
+from .utility import create_cogas_system
 
 
 # ---------------------------------------------------------------------------

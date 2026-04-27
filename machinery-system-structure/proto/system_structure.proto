@@ -160,7 +160,7 @@ message Engine {
 message COGAS {
   message FuelMode {
     Fuel main_fuel = 1;
-    optional Fuel secondary_fuel = 2;    // support/secondary fuel (e.g. pilot ignition)
+    optional Fuel secondary_fuel = 2;    // support/secondary fuel for this operating mode
     optional Efficiency eff = 3;         // combined GT+ST efficiency vs load-ratio
     repeated EmissionCurve emission_curves = 4;
     Engine.EngineCycleType engine_cycle_type = 5;
@@ -181,9 +181,9 @@ message COGAS {
   double turn_off_power_kw = 13;
   string uid = 14;
   repeated COGAS.FuelMode fuel_modes = 15;
-  double ch4_factor_gch4_per_gfuel = 16;
-  double n2o_factor_gn2o_per_gfuel = 17;
-  double c_slip_percent = 18;
+  optional double ch4_factor_gch4_per_gfuel = 16;
+  optional double n2o_factor_gn2o_per_gfuel = 17;
+  optional double c_slip_percent = 18;
 }
 
 message ElectricMachine {

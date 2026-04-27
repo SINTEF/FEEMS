@@ -813,12 +813,6 @@ def create_cogas_system(
     c_slip_percent: float | None = None,
     multi_fuel_characteristics=None,
 ) -> COGAS:
-    from feems.components_model.component_mechanical import (
-        _DEFAULT_BRAYTON_C_SLIP_PERCENT,
-        _DEFAULT_BRAYTON_CH4_GFUEL,
-        _DEFAULT_BRAYTON_N2O_GFUEL,
-    )
-
     # Create a cogas system
     if eff_curve is None:
         eff_curve = create_random_monotonic_eff_curve()

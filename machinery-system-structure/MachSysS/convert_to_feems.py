@@ -347,10 +347,22 @@ def convert_proto_cogas_to_feems(
                 ]
             multi_fuel_characteristics.append(fc)
 
-    # proto3 default for double is 0.0; treat 0 as "use module default"
-    ch4 = proto_cogas.ch4_factor_gch4_per_gfuel or _DEFAULT_BRAYTON_CH4_GFUEL
-    n2o = proto_cogas.n2o_factor_gn2o_per_gfuel or _DEFAULT_BRAYTON_N2O_GFUEL
-    c_slip = proto_cogas.c_slip_percent or _DEFAULT_BRAYTON_C_SLIP_PERCENT
+    # Use HasField to distinguish an explicit zero from "not set" (proto3 optional double).
+    ch4 = (
+        proto_cogas.ch4_factor_gch4_per_gfuel
+        if proto_cogas.HasField("ch4_factor_gch4_per_gfuel")
+        else _DEFAULT_BRAYTON_CH4_GFUEL
+    )
+    n2o = (
+        proto_cogas.n2o_factor_gn2o_per_gfuel
+        if proto_cogas.HasField("n2o_factor_gn2o_per_gfuel")
+        else _DEFAULT_BRAYTON_N2O_GFUEL
+    )
+    c_slip = (
+        proto_cogas.c_slip_percent
+        if proto_cogas.HasField("c_slip_percent")
+        else _DEFAULT_BRAYTON_C_SLIP_PERCENT
+    )
 
     return COGAS(
         name=proto_cogas.name,

@@ -67,12 +67,12 @@ Represents a Combined Gas And Steam (COGAS) prime mover. This message is embedde
 | `steam_turbine_power_curve` | `PowerCurve` | ST efficiency vs. load-ratio (optional) |
 | `emission_curves` | `repeated EmissionCurve` | Per-pollutant emission curves (g/kWh vs. load-ratio) |
 | `uid` | `string` | Stable unique identifier |
-| `fuel_modes` | `repeated MultiFuelEngine.FuelMode` | Multi-fuel mode definitions (mirrors `MultiFuelEngine`). Each mode carries its own BSFC curve, emission curves, and `engine_cycle_type`. |
-| `ch4_factor_gch4_per_gfuel` | `double` | Scalar CH₄ emission factor (g CH₄ / g fuel). Proto3 default 0 → library applies IPCC 2006 Brayton default (`0.000192`). |
-| `n2o_factor_gn2o_per_gfuel` | `double` | Scalar N₂O emission factor (g N₂O / g fuel). Proto3 default 0 → library applies IPCC 2006 Brayton default (`0.000048`). |
-| `c_slip_percent` | `double` | Methane slip (% of fuel mass). Proto3 default 0 → library applies Brayton default (`0.01 %`). |
+| `fuel_modes` | `repeated COGAS.FuelMode` | Multi-fuel mode definitions. Each mode contains its own `Efficiency eff`, emission curves, and optional `secondary_fuel`. |
+| `ch4_factor_gch4_per_gfuel` | `optional double` | Scalar CH₄ emission factor (g CH₄ / g fuel). If absent, library applies IPCC 2006 Brayton default (`0.000192`). |
+| `n2o_factor_gn2o_per_gfuel` | `optional double` | Scalar N₂O emission factor (g N₂O / g fuel). If absent, library applies IPCC 2006 Brayton default (`0.000048`). |
+| `c_slip_percent` | `optional double` | Methane slip (% of fuel mass). If absent, library applies Brayton default (`0.01 %`). Explicit `0.0` is preserved (e.g. for H₂ modes). |
 
-**Zero-default semantics**: Because proto3 encodes the default `double` value as 0, the conversion layer interprets `0` as "use the module default" for `ch4_factor_gch4_per_gfuel`, `n2o_factor_gn2o_per_gfuel`, and `c_slip_percent`. This allows older serialized messages (without these fields) to automatically receive IPCC 2006 Brayton-cycle defaults upon deserialization.
+**Optional-field semantics**: `ch4_factor_gch4_per_gfuel`, `n2o_factor_gn2o_per_gfuel`, and `c_slip_percent` are declared `optional double`. The conversion layer uses `HasField` to distinguish an unset field (→ use IPCC 2006 Brayton default) from an explicitly serialised `0.0` (→ use the value as-is). This allows H₂ or NH₃ modes—where CH₄/slip genuinely should be zero—to round-trip correctly.
 
 ### Engine.EngineCycleType enum
 
@@ -100,9 +100,9 @@ def convert_proto_cogas_to_feems(proto_cogas: proto.COGAS) -> COGAS
 
 Converts a `proto.COGAS` message to a `feems.components_model.component_mechanical.COGAS` object.
 
-**Multi-fuel support**: If `proto_cogas.fuel_modes` is non-empty, each mode is converted to a `FuelCharacteristics` object (BSFC curve, emission curves, `engine_cycle_type`, optional pilot fuel) and collected in `multi_fuel_characteristics`.
+**Multi-fuel support**: If `proto_cogas.fuel_modes` is non-empty, each `COGAS.FuelMode` is converted to a `FuelCharacteristics` object (efficiency curve, emission curves, `engine_cycle_type`, optional secondary fuel) and collected in `multi_fuel_characteristics`.
 
-**Scalar GHG defaults**: `ch4_factor`, `n2o_factor`, and `c_slip_percent` are read from the proto. If any field is 0 (proto3 default / not set in old messages), the corresponding IPCC 2006 Brayton module constant is used:
+**Scalar GHG defaults**: `ch4_factor`, `n2o_factor`, and `c_slip_percent` are read via `HasField`. If the field is absent (proto3 optional, not serialised), the corresponding IPCC 2006 Brayton module constant is used:
 
 | Constant | Value |
 |---|---|
