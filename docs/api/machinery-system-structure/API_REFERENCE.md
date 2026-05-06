@@ -74,6 +74,23 @@ Represents a Combined Gas And Steam (COGAS) prime mover. This message is embedde
 
 **Optional-field semantics**: `ch4_factor_gch4_per_gfuel`, `n2o_factor_gn2o_per_gfuel`, and `c_slip_percent` are declared `optional double`. The conversion layer uses `HasField` to distinguish an unset field (→ use IPCC 2006 Brayton default) from an explicitly serialised `0.0` (→ use the value as-is). This allows H₂ or NH₃ modes—where CH₄/slip genuinely should be zero—to round-trip correctly.
 
+### SteamBoiler message
+
+Represents a standalone fuel-fired auxiliary boiler. Not embedded in a `Subsystem`; passed directly to simulation helpers.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Component name |
+| `uid` | `string` | Stable unique identifier |
+| `rated_steam_production_kg_per_h` | `double` | Rated steam output (kg/h) |
+| `working_pressure_bar` | `double` | Steam working pressure (bar) |
+| `feed_water_temperature_c` | `double` | Feed water temperature (°C) |
+| `fuel_type` | `FuelType` | Primary fuel type (single-fuel mode) |
+| `fuel_origin` | `FuelOrigin` | Fuel origin (single-fuel mode) |
+| `thermal_efficiency_curve` | `EfficiencyCurve` | Thermal efficiency vs. load-ratio (single-fuel) |
+| `emission_curves` | `repeated EmissionCurve` | Boiler-level per-pollutant emission curves |
+| `fuel_modes` | `repeated COGAS.FuelMode` | Multi-fuel mode definitions (reuses `COGAS.FuelMode`). When present, `thermal_efficiency_curve` and `fuel_type`/`fuel_origin` are ignored during deserialization. |
+
 ### Engine.EngineCycleType enum
 
 ```protobuf
@@ -198,6 +215,19 @@ Top-level converter for hybrid (mechanical propulsion + electric power) systems.
 
 ---
 
+### proto_to_steam_boiler
+
+```python
+def proto_to_steam_boiler(pb: proto.SteamBoiler) -> SteamBoiler
+```
+
+Converts a `proto.SteamBoiler` message to a `SteamBoiler` instance.
+
+- **Single-fuel**: reads `pb.thermal_efficiency_curve` (`EfficiencyCurve`), `fuel_type`, `fuel_origin`, and optional `emission_curves`.
+- **Multi-fuel**: reads `pb.fuel_modes` (`repeated COGAS.FuelMode`), reconstructing one `FuelCharacteristics` per mode.
+
+---
+
 ## Converters: FEEMS → Protobuf
 
 ### convert_cogas_component_to_protobuf
@@ -266,3 +296,17 @@ def convert_mechanical_system_to_protobuf(
 ```
 
 Converts a FEEMS `MechanicalPropulsionSystem` to a `proto.MachinerySystem` message.
+
+---
+
+### steam_boiler_to_proto
+
+```python
+def steam_boiler_to_proto(boiler: SteamBoiler) -> proto.SteamBoiler
+```
+
+Converts a `SteamBoiler` instance to a `proto.SteamBoiler` message.
+
+- **Single-fuel**: serializes `_eta_curve` as `thermal_efficiency_curve` (`EfficiencyCurve`) plus `fuel_type` and `fuel_origin`.
+- **Multi-fuel**: serializes each `FuelCharacteristics` as a `COGAS.FuelMode` entry in `fuel_modes`; `thermal_efficiency_curve` is left empty.
+- Emission curves (if any) are serialized to `emission_curves`.

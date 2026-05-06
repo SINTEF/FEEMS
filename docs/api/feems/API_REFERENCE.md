@@ -405,6 +405,76 @@ main_engine = MainEngineForMechanicalPropulsion(
 
 `MainEngineForMechanicalPropulsion` subclass with an integrated gearbox efficiency model.
 
+#### `SteamBoiler`
+
+Standalone fuel-fired auxiliary boiler. Not connected to a switchboard or shaftline — operates independently and is passed directly to the system's `get_fuel_energy_consumption_running_time` method.
+
+```python
+import numpy as np
+from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
+from feems.fuel import FuelOrigin, TypeFuel
+
+# Single-fuel boiler (efficiency curve)
+boiler = SteamBoiler(
+    name="Aux Boiler",
+    rated_steam_production_kg_per_h=10_000.0,
+    working_pressure_bar=7.0,
+    thermal_efficiency_curve=np.array([[0.25, 0.85], [0.50, 0.87], [0.75, 0.88], [1.00, 0.87]]),
+    fuel_type=TypeFuel.HFO,
+    fuel_origin=FuelOrigin.FOSSIL,
+    feed_water_temperature_c=80.0,
+    uid="boiler-001",
+)
+
+# Multi-fuel boiler
+hfo_mode = FuelCharacteristics()
+hfo_mode.main_fuel_type = TypeFuel.HFO
+hfo_mode.main_fuel_origin = FuelOrigin.FOSSIL
+hfo_mode.eff_curve = np.array([[0.25, 0.85], [0.50, 0.87], [0.75, 0.88], [1.00, 0.87]])
+
+lng_mode = FuelCharacteristics()
+lng_mode.main_fuel_type = TypeFuel.NATURAL_GAS
+lng_mode.main_fuel_origin = FuelOrigin.FOSSIL
+lng_mode.eff_curve = np.array([[0.25, 0.87], [0.50, 0.89], [0.75, 0.90], [1.00, 0.89]])
+
+multi_boiler = SteamBoiler(
+    name="Multi-fuel Boiler",
+    rated_steam_production_kg_per_h=10_000.0,
+    working_pressure_bar=7.0,
+    multi_fuel_characteristics=[hfo_mode, lng_mode],
+    uid="boiler-002",
+)
+```
+
+**Constructor parameters:**
+- `name: str` — Component name
+- `rated_steam_production_kg_per_h: float` — Rated steam output (kg/h)
+- `working_pressure_bar: float` — Steam working pressure (bar)
+- `feed_water_temperature_c: float` — Feed water temperature (°C, default `20.0`)
+- `thermal_efficiency_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, efficiency], ...]` (single-fuel)
+- `kg_fuel_per_kg_steam_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, kg_fuel/kg_steam], ...]`; alternative to `thermal_efficiency_curve`
+- `kg_fuel_per_h_curve: Optional[np.ndarray]` — Nx2 array `[[steam_kg/h, fuel_kg/h], ...]`; alternative to `thermal_efficiency_curve`
+- `fuel_type: TypeFuel` — Fuel type (single-fuel mode)
+- `fuel_origin: FuelOrigin` — Fuel origin (single-fuel mode)
+- `multi_fuel_characteristics: Optional[List[FuelCharacteristics]]` — Multi-fuel mode configurations
+- `emissions_curves: Optional[List[EmissionCurve]]` — Boiler-level emission curves
+- `uid: Optional[str]` — Unique identifier
+
+**Methods:**
+- `get_boiler_run_point(steam_demand_kg_per_h, fuel_specified_by=FuelSpecifiedBy.IMO) -> BoilerRunPoint`
+- `set_fuel_in_use(fuel_type=None, fuel_origin=None)` — Switch active fuel in multi-fuel mode
+
+#### `BoilerRunPoint`
+
+Result dataclass returned by `SteamBoiler.get_boiler_run_point`.
+
+**Fields:**
+- `load_ratio: np.ndarray` — Load fraction relative to rated capacity
+- `fuel_flow_rate_kg_per_s: FuelConsumption` — Fuel consumption rate
+- `steam_production_kg_per_s: np.ndarray` — Steam output rate (kg/s)
+- `thermal_efficiency: np.ndarray` — Boiler thermal efficiency at each operating point
+- `emissions_g_per_s: Dict[EmissionType, np.ndarray]` — Emission rates (g/s)
+
 ### Electric Components
 
 #### `ElectricComponent`

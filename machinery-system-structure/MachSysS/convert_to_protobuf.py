@@ -1,5 +1,6 @@
 
 __all__ = [
+    "steam_boiler_to_proto",
     "convert_efficiency_curve_to_protobuf",
     "convert_np_array_to_protobuf_power_curve",
     "convert_bsfc_curve_to_protobuf",
@@ -50,6 +51,7 @@ from feems.components_model.component_mechanical import (
     COGAS,
     EngineDualFuel,
     EngineMultiFuel,
+    SteamBoiler,
 )
 from feems.system_model import (
     ElectricPowerSystem,
@@ -444,6 +446,47 @@ def convert_cogas_component_to_protobuf(
                 )
             cogas.fuel_modes.append(fuel_mode)
     return cogas
+
+
+def steam_boiler_to_proto(boiler: SteamBoiler) -> proto.SteamBoiler:
+    """Convert a SteamBoiler instance to a proto.SteamBoiler message."""
+    pb = proto.SteamBoiler(
+        name=boiler.name,
+        uid=boiler.uid or "",
+        rated_steam_production_kg_per_h=boiler.rated_steam_production_kg_per_h,
+        working_pressure_bar=boiler.working_pressure_bar,
+        feed_water_temperature_c=boiler.feed_water_temperature_c,
+        fuel_type=boiler.fuel_type.value,
+        fuel_origin=boiler.fuel_origin.value,
+        emission_curves=convert_emission_curves_to_protobuf(boiler.emissions_curves),
+    )
+    if boiler.multi_fuel_characteristics:
+        for fc in boiler.multi_fuel_characteristics:
+            fuel_mode = proto.COGAS.FuelMode(
+                main_fuel=proto.Fuel(
+                    fuel_type=fc.main_fuel_type.value,
+                    fuel_origin=fc.main_fuel_origin.value,
+                ),
+            )
+            if fc.eff_curve is not None:
+                fuel_mode.eff.CopyFrom(convert_eff_array_to_protobuf(fc.eff_curve))
+            if fc.emission_curves:
+                fuel_mode.emission_curves.extend(
+                    convert_emission_curves_to_protobuf(fc.emission_curves)
+                )
+            pb.fuel_modes.append(fuel_mode)
+    elif boiler._eta_curve is not None:
+        eta = np.asarray(boiler._eta_curve)
+        pb.thermal_efficiency_curve.CopyFrom(
+            proto.EfficiencyCurve(
+                x_label="load_ratio",
+                y_label="thermal_efficiency",
+                curve=proto.Curve1D(
+                    points=[proto.Point(x=float(row[0]), y=float(row[1])) for row in eta]
+                ),
+            )
+        )
+    return pb
 
 
 def convert_switchboard_to_protobuf(

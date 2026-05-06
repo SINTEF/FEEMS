@@ -320,6 +320,7 @@ message Subsystem {
     SHORE_POWER = 27;
     COGAS = 28;
     COGES = 29;
+    STEAM_BOILER = 30;
   }
   PowerType power_type = 14;
   ComponentType component_type = 15;
@@ -373,6 +374,19 @@ message MachinerySystem {
   ElectricSystem electric_system = 6;
   double maximum_allowed_fuel_cell_load_percentage = 7;
   double average_base_load_percentage = 8;
+}
+
+message SteamBoiler {
+  string name = 1;
+  string uid = 2;
+  double rated_steam_production_kg_per_h = 3;
+  double working_pressure_bar = 4;
+  double feed_water_temperature_c = 5;
+  FuelType fuel_type = 6;
+  FuelOrigin fuel_origin = 7;
+  EfficiencyCurve thermal_efficiency_curve = 8;
+  repeated EmissionCurve emission_curves = 9;
+  repeated COGAS.FuelMode fuel_modes = 10;  // multi-fuel support (reuses COGAS.FuelMode)
 }
 
 message MultiFuelEngine {

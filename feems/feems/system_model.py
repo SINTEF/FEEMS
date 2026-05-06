@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import reduce
 from operator import itemgetter
 from typing import Dict, List, NamedTuple, NewType, Optional, Set, Tuple, Union
@@ -9,7 +10,7 @@ from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
-from feems.fuel import Fuel, FuelOrigin, FuelSpecifiedBy, TypeFuel
+from feems.fuel import Fuel, FuelConsumption, FuelOrigin, FuelSpecifiedBy, TypeFuel
 
 from . import get_logger
 from .components_model.component_electric import (
@@ -30,11 +31,12 @@ from .components_model.component_electric import (
     SuperCapacitor,
     SuperCapacitorSystem,
 )
-from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel
+from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel, SteamBoiler
 from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard
-from .components_model.utility import IntegrationMethod
+from .components_model.utility import IntegrationMethod, integrate_data, integrate_multi_fuel_consumption
 from .exceptions import ConfigurationError, InputError
 from .types_for_feems import (
+    EmissionType,
     FEEMSResult,
     TimeIntervalList,
     TypeComponent,
@@ -264,6 +266,59 @@ class MachinerySystem:
             )
 
         return fuel_option
+
+    def _calculate_boiler_result(
+        self,
+        boilers: List[SteamBoiler],
+        steam_demand_kg_per_h: np.ndarray,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+    ) -> FEEMSResult:
+        """Accumulate fuel, steam, and running-hour totals for a list of boilers.
+
+        Each boiler is assumed to receive the same steam_demand_kg_per_h profile.
+        The boiler fuel is included in both fuel_consumption_boiler_total and
+        multi_fuel_consumption_total_kg so that overall fuel figures stay consistent.
+        """
+        boiler_fc = FuelConsumption()
+        total_steam_kg = 0.0
+        running_hr = 0.0
+        total_emission_kg: dict = defaultdict(float)
+
+        for boiler in boilers:
+            rp = boiler.get_boiler_run_point(steam_demand_kg_per_h, fuel_specified_by)
+            steam_kg_per_s = rp.steam_production_kg_per_s
+
+            fuel_total = integrate_multi_fuel_consumption(
+                fuel_consumption_kg_per_s=rp.fuel_flow_rate_kg_per_s,
+                time_interval_s=self.time_interval_s,
+                integration_method=self.integration_method,
+            )
+            steam_total = integrate_data(
+                data_to_integrate=steam_kg_per_s,
+                time_interval_s=self.time_interval_s,
+                integration_method=self.integration_method,
+            )
+            running_hr += float(
+                np.dot((steam_kg_per_s > 0), np.atleast_1d(self.time_interval_s)).sum() / 3600.0
+            )
+
+            boiler_fc = boiler_fc + fuel_total
+            total_steam_kg += float(steam_total)
+
+            for et, g_per_s in rp.emissions_g_per_s.items():
+                total_emission_kg[et] += integrate_data(
+                    data_to_integrate=g_per_s,
+                    time_interval_s=self.time_interval_s,
+                    integration_method=self.integration_method,
+                ) / 1000.0
+
+        return FEEMSResult(
+            running_hours_boiler_total_hr=running_hr,
+            steam_production_boiler_total_kg=total_steam_kg,
+            fuel_consumption_boiler_total=boiler_fc,
+            multi_fuel_consumption_total_kg=boiler_fc,
+            total_emission_kg=defaultdict(float, total_emission_kg) if total_emission_kg else None,
+        )
 
 
 class ElectricPowerSystem(MachinerySystem):
@@ -914,6 +969,8 @@ class ElectricPowerSystem(MachinerySystem):
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
         user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
+        boilers: List[SteamBoiler] = [],
+        steam_demand_kg_per_h: Optional[np.ndarray] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -931,6 +988,8 @@ class ElectricPowerSystem(MachinerySystem):
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
             user_defined_fuels_by_component: Optional dict mapping component name to a list of
                 Fuel objects. Takes priority over user_defined_fuels for named components.
+            boilers: Optional list of SteamBoiler instances attached to this system.
+            steam_demand_kg_per_h: Steam demand time series (kg/h) passed to each boiler.
 
         Returns:
             FEEMSResult
@@ -961,6 +1020,10 @@ class ElectricPowerSystem(MachinerySystem):
             )
             result_swb.detail_result["switchboard id"] = switchboard.id
             res = res.sum_with_freeze_duration(result_swb)
+
+        if boilers and steam_demand_kg_per_h is not None:
+            boiler_res = self._calculate_boiler_result(boilers, steam_demand_kg_per_h, fuel_specified_by)
+            res = res.sum_with_freeze_duration(boiler_res)
 
         return res
 
@@ -1429,6 +1492,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
         user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
+        boilers: List[SteamBoiler] = [],
+        steam_demand_kg_per_h: Optional[np.ndarray] = None,
     ) -> FEEMSResult:
         """
         Get the performance result of the power calculation. Prerequisite:
@@ -1443,6 +1508,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
             user_defined_fuels_by_component: Optional dict mapping component name to a list of
                 Fuel objects. Takes priority over user_defined_fuels for named components.
+            boilers: Optional list of SteamBoiler instances attached to this system.
+            steam_demand_kg_per_h: Steam demand time series (kg/h) passed to each boiler.
 
         Returns:
             FEEMSResult
@@ -1468,7 +1535,8 @@ class MechanicalPropulsionSystem(MachinerySystem):
         )
         if len(self.shaft_line) == 0:
             logger.warning("There is no shaftline in the system")
-            return FEEMSResult(duration_s=0)
+            if not (boilers and steam_demand_kg_per_h is not None):
+                return FEEMSResult(duration_s=0)
         for shaft_line in self.shaft_line:
             result_shaft_line: FEEMSResult = shaft_line.get_fuel_calculation_running_hours(
                 time_step=self.time_interval_s,
@@ -1481,6 +1549,11 @@ class MechanicalPropulsionSystem(MachinerySystem):
             )
             result_shaft_line.detail_result["shaftline id"] = shaft_line.id
             res = res.sum_with_freeze_duration(result_shaft_line)
+
+        if boilers and steam_demand_kg_per_h is not None:
+            boiler_res = self._calculate_boiler_result(boilers, steam_demand_kg_per_h, fuel_specified_by)
+            res = res.sum_with_freeze_duration(boiler_res)
+
         return res
 
 
@@ -1590,6 +1663,8 @@ class HybridPropulsionSystem(MachinerySystem):
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
         user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
+        boilers: List[SteamBoiler] = [],
+        steam_demand_kg_per_h: Optional[np.ndarray] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1603,6 +1678,8 @@ class HybridPropulsionSystem(MachinerySystem):
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
             user_defined_fuels_by_component: Optional dict mapping component name to a list of
                 Fuel objects. Takes priority over user_defined_fuels for named components.
+            boilers: Optional list of SteamBoiler instances attached to this system.
+            steam_demand_kg_per_h: Steam demand time series (kg/h) passed to each boiler.
         Returns:
             FEEMSResultForMachinerySystem
         """
@@ -1643,6 +1720,13 @@ class HybridPropulsionSystem(MachinerySystem):
             user_defined_fuels=user_defined_fuels,
             user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
+
+        if boilers and steam_demand_kg_per_h is not None:
+            self.time_interval_s = time_interval_s
+            self.integration_method = integration_method
+            boiler_res = self._calculate_boiler_result(boilers, steam_demand_kg_per_h, fuel_specified_by)
+            result_elec = result_elec.sum_with_freeze_duration(boiler_res)
+
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
             mechanical_system=result_mech,
@@ -1694,6 +1778,8 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
         fuel_option: Optional[FuelOption] = None,
         user_defined_fuels: Optional[List[Fuel]] = None,
         user_defined_fuels_by_component: Optional[Dict[str, List[Fuel]]] = None,
+        boilers: List[SteamBoiler] = [],
+        steam_demand_kg_per_h: Optional[np.ndarray] = None,
     ) -> FEEMSResultForMachinerySystem:
         """Calculates fuel consumption, emissions, energy consumption and running hours and
         returns the result.
@@ -1748,6 +1834,13 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             user_defined_fuels=user_defined_fuels,
             user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
+
+        if boilers and steam_demand_kg_per_h is not None:
+            self.time_interval_s = time_interval_s
+            self.integration_method = integration_method
+            boiler_res = self._calculate_boiler_result(boilers, steam_demand_kg_per_h, fuel_specified_by)
+            result_elec = result_elec.sum_with_freeze_duration(boiler_res)
+
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
             mechanical_system=result_mech,
