@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, auto, unique
 from functools import reduce
@@ -105,7 +106,8 @@ class FEEMSResult:
                             self.duration_s + other.duration_s
                         )
                 elif field_name == "total_emission_kg":
-                    value = {k: self_value[k] + other_value[k] for k in self_value}
+                    all_keys = set(self_value) | set(other_value)
+                    value = defaultdict(float, {k: self_value[k] + other_value[k] for k in all_keys})
                 elif field_name == "duration_s" and freeze_duration:
                     assert self_value == other_value, (
                         f"The duration of the two results are not "

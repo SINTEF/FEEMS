@@ -577,7 +577,7 @@ class TestFEEMSResultBoilerFields:
 
 
 def _make_machinery_system_with_boiler():
-    """Return a (MachinerySystem instance, SteamBoiler) pair for integration tests."""
+    """Return a (MachinerySystem instance, SteamBoiler, time_interval_s, integration_method) tuple."""
     from feems.components_model.component_mechanical import SteamBoiler
     from feems.components_model.utility import IntegrationMethod
     from feems.system_model import MachinerySystem
@@ -589,53 +589,56 @@ def _make_machinery_system_with_boiler():
         thermal_efficiency_curve=_flat_efficiency_curve(0.85),
     )
 
-    # MachinerySystem has no __init__; we just set the two required attributes directly
     sys = MachinerySystem()
-    sys.time_interval_s = 3600.0
-    sys.integration_method = IntegrationMethod.sum_with_time
-    return sys, boiler
+    time_interval_s = 3600.0
+    integration_method = IntegrationMethod.sum_with_time
+    return sys, boiler, time_interval_s, integration_method
 
 
 class TestCalculateBoilerResult:
     def test_running_hours_equals_one_for_single_hour(self):
-        sys, boiler = _make_machinery_system_with_boiler()
-        demand = np.array([10_000.0])
-        res = sys._calculate_boiler_result([boiler], demand)
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = sys._calculate_boiler_result(boiler, tis, im)
         assert res.running_hours_boiler_total_hr == pytest.approx(1.0)
 
     def test_steam_production_matches_demand_for_single_step(self):
-        sys, boiler = _make_machinery_system_with_boiler()
-        demand = np.array([10_000.0])
-        res = sys._calculate_boiler_result([boiler], demand)
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = sys._calculate_boiler_result(boiler, tis, im)
         # steam_kg_per_s * 3600 s = 10 000 kg
         assert res.steam_production_boiler_total_kg == pytest.approx(10_000.0, rel=1e-3)
 
     def test_boiler_fuel_consumption_is_nonzero(self):
-        sys, boiler = _make_machinery_system_with_boiler()
-        demand = np.array([10_000.0])
-        res = sys._calculate_boiler_result([boiler], demand)
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = sys._calculate_boiler_result(boiler, tis, im)
         assert float(np.sum(res.fuel_consumption_boiler_total.total_fuel_consumption)) > 0
 
     def test_multi_fuel_total_includes_boiler_fuel(self):
-        sys, boiler = _make_machinery_system_with_boiler()
-        demand = np.array([10_000.0])
-        res = sys._calculate_boiler_result([boiler], demand)
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = sys._calculate_boiler_result(boiler, tis, im)
         boiler_fc = float(np.sum(res.fuel_consumption_boiler_total.total_fuel_consumption))
         total_fc = float(np.sum(res.multi_fuel_consumption_total_kg.total_fuel_consumption))
         assert total_fc == pytest.approx(boiler_fc)
 
     def test_zero_demand_gives_zero_running_hours(self):
-        sys, boiler = _make_machinery_system_with_boiler()
-        demand = np.array([0.0])
-        res = sys._calculate_boiler_result([boiler], demand)
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        boiler.steam_out_kg_per_h = np.array([0.0])
+        res = sys._calculate_boiler_result(boiler, tis, im)
         assert res.running_hours_boiler_total_hr == pytest.approx(0.0)
 
-    def test_empty_boilers_list_gives_zero_result(self):
-        sys, _ = _make_machinery_system_with_boiler()
-        demand = np.array([10_000.0])
-        res = sys._calculate_boiler_result([], demand)
+    def test_no_boiler_on_system_gives_zero_boiler_hours(self):
+        """System with no boiler set returns zero boiler running hours."""
+        from feems.components_model.utility import IntegrationMethod
+        from feems.system_model import MechanicalPropulsionSystem
+
+        system = MechanicalPropulsionSystem(name="test mech", components_list=[])
+        system.set_time_interval(3600.0, IntegrationMethod.sum_with_time)
+        assert system.boiler is None
+        res = system.get_fuel_energy_consumption_running_time()
         assert res.running_hours_boiler_total_hr == pytest.approx(0.0)
-        assert res.steam_production_boiler_total_kg == pytest.approx(0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -664,14 +667,13 @@ class TestMechanicalPropulsionSystemBoiler:
         system.set_time_interval(time_interval_s=3600.0, integration_method=IntegrationMethod.sum_with_time)
 
         boiler = _make_boiler_for_system()
-        demand = np.array([10_000.0])
-        res = system.get_fuel_energy_consumption_running_time(
-            boilers=[boiler], steam_demand_kg_per_h=demand
-        )
+        system.boiler = boiler
+        system.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = system.get_fuel_energy_consumption_running_time()
         assert res.running_hours_boiler_total_hr == pytest.approx(1.0)
 
     def test_no_boilers_returns_existing_result_unchanged(self):
-        """Calling without boilers does not affect running hours boiler field."""
+        """Calling without boiler set does not affect running hours boiler field."""
         from feems.components_model.utility import IntegrationMethod
         from feems.system_model import MechanicalPropulsionSystem
 
@@ -679,3 +681,505 @@ class TestMechanicalPropulsionSystemBoiler:
         system.set_time_interval(time_interval_s=3600.0, integration_method=IntegrationMethod.sum_with_time)
         res = system.get_fuel_energy_consumption_running_time()
         assert res.running_hours_boiler_total_hr == pytest.approx(0.0)
+
+
+def _make_electric_system_with_shore_power():
+    """Minimal ElectricPowerSystem — shore power only, no fuel consumption."""
+    from feems.components_model.component_electric import ShorePowerConnection
+    from feems.components_model.utility import IntegrationMethod
+    from feems.system_model import ElectricPowerSystem
+    from feems.types_for_feems import Power_kW, SwbId
+
+    shore = ShorePowerConnection(name="Shore", rated_power=Power_kW(1000.0), switchboard_id=SwbId(1))
+    system = ElectricPowerSystem(name="test elec", power_plant_components=[shore], bus_tie_connections=[])
+    system.set_time_interval(time_interval_s=3600.0, integration_method=IntegrationMethod.sum_with_time)
+    return system
+
+
+class TestElectricPowerSystemBoiler:
+    def test_boiler_running_hours_nonzero_in_result(self):
+        """ElectricPowerSystem with boiler accumulates boiler running hours."""
+        system = _make_electric_system_with_shore_power()
+        boiler = _make_boiler_for_system()
+        system.boiler = boiler
+        system.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = system.get_fuel_energy_consumption_running_time()
+        assert res.running_hours_boiler_total_hr == pytest.approx(1.0)
+
+    def test_boiler_fuel_consumption_nonzero_in_result(self):
+        system = _make_electric_system_with_shore_power()
+        boiler = _make_boiler_for_system()
+        system.boiler = boiler
+        system.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = system.get_fuel_energy_consumption_running_time()
+        assert float(np.sum(res.fuel_consumption_boiler_total.total_fuel_consumption)) > 0
+
+    def test_no_boiler_gives_zero_boiler_hours(self):
+        system = _make_electric_system_with_shore_power()
+        res = system.get_fuel_energy_consumption_running_time()
+        assert res.running_hours_boiler_total_hr == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# T8 — Multi-step (N > 1) integration: running_hr crash regression
+# ---------------------------------------------------------------------------
+
+
+class TestMultiStepBoilerResult:
+    """Regression guard for the running_hr np.dot crash on N > 1 time arrays."""
+
+    def setup_method(self):
+        from feems.components_model.component_mechanical import SteamBoiler
+        from feems.components_model.utility import IntegrationMethod
+        from feems.system_model import MachinerySystem
+
+        self.boiler = SteamBoiler(
+            name="multi-step boiler",
+            rated_steam_production_kg_per_h=10_000.0,
+            working_pressure_bar=7.0,
+            thermal_efficiency_curve=_flat_efficiency_curve(0.85),
+        )
+        self.sys = MachinerySystem()
+        self.im = IntegrationMethod.sum_with_time
+
+    def test_running_hours_multi_step_all_active(self):
+        """4 × 1-hour steps at full load → 4 running hours."""
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0, 10_000.0, 10_000.0, 10_000.0])
+        time_interval_s = np.array([3600.0, 3600.0, 3600.0, 3600.0])
+        res = self.sys._calculate_boiler_result(self.boiler, time_interval_s, self.im)
+        assert res.running_hours_boiler_total_hr == pytest.approx(4.0)
+
+    def test_running_hours_multi_step_partial_active(self):
+        """4 steps: first two at zero demand, last two at full load → 2 running hours."""
+        self.boiler.steam_out_kg_per_h = np.array([0.0, 0.0, 10_000.0, 10_000.0])
+        time_interval_s = np.array([3600.0, 3600.0, 3600.0, 3600.0])
+        res = self.sys._calculate_boiler_result(self.boiler, time_interval_s, self.im)
+        assert res.running_hours_boiler_total_hr == pytest.approx(2.0)
+
+    def test_steam_production_multi_step(self):
+        """Full load for two 1-hour steps → 20 000 kg steam total."""
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0, 10_000.0])
+        time_interval_s = np.array([3600.0, 3600.0])
+        res = self.sys._calculate_boiler_result(self.boiler, time_interval_s, self.im)
+        assert res.steam_production_boiler_total_kg == pytest.approx(20_000.0, rel=1e-3)
+
+    def test_fuel_consumption_multi_step_doubles_vs_single_step(self):
+        """Two identical steps should produce twice the fuel of one step."""
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res_1 = self.sys._calculate_boiler_result(self.boiler, np.array([3600.0]), self.im)
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0, 10_000.0])
+        res_2 = self.sys._calculate_boiler_result(self.boiler, np.array([3600.0, 3600.0]), self.im)
+        fc_1 = float(np.sum(res_1.fuel_consumption_boiler_total.total_fuel_consumption))
+        fc_2 = float(np.sum(res_2.fuel_consumption_boiler_total.total_fuel_consumption))
+        assert fc_2 == pytest.approx(2.0 * fc_1, rel=1e-4)
+
+
+# ---------------------------------------------------------------------------
+# T9 — Input validation
+# ---------------------------------------------------------------------------
+
+
+class TestSteamBoilerInputValidation:
+    def test_zero_rated_production_raises_input_error(self):
+        from feems.components_model.component_mechanical import SteamBoiler
+
+        with pytest.raises(InputError):
+            SteamBoiler(
+                name="bad",
+                rated_steam_production_kg_per_h=0.0,
+                working_pressure_bar=7.0,
+                thermal_efficiency_curve=_flat_efficiency_curve(0.85),
+            )
+
+    def test_negative_rated_production_raises_input_error(self):
+        from feems.components_model.component_mechanical import SteamBoiler
+
+        with pytest.raises(InputError):
+            SteamBoiler(
+                name="bad",
+                rated_steam_production_kg_per_h=-1.0,
+                working_pressure_bar=7.0,
+                thermal_efficiency_curve=_flat_efficiency_curve(0.85),
+            )
+
+    def test_feed_water_temp_too_high_raises_input_error(self):
+        """feed_water_temperature_c higher than saturation temp → delta_h <= 0."""
+        from feems.components_model.component_mechanical import SteamBoiler
+
+        with pytest.raises(InputError):
+            SteamBoiler(
+                name="bad",
+                rated_steam_production_kg_per_h=10_000.0,
+                working_pressure_bar=7.0,
+                thermal_efficiency_curve=_flat_efficiency_curve(0.85),
+                feed_water_temperature_c=700.0,  # far above saturation (~165 °C at 7 bar)
+            )
+
+    def test_negative_steam_demand_raises_value_error(self):
+        boiler = _make_boiler()
+        with pytest.raises(ValueError):
+            boiler.get_boiler_run_point(np.array([-100.0]))
+
+    def test_nan_steam_demand_raises_value_error(self):
+        boiler = _make_boiler()
+        with pytest.raises(ValueError):
+            boiler.get_boiler_run_point(np.array([float("nan")]))
+
+    def test_inf_steam_demand_raises_value_error(self):
+        boiler = _make_boiler()
+        with pytest.raises(ValueError):
+            boiler.get_boiler_run_point(np.array([float("inf")]))
+
+
+# ---------------------------------------------------------------------------
+# T10 — Emission accumulation in _calculate_boiler_result
+# ---------------------------------------------------------------------------
+
+
+class TestCalculateBoilerResultEmissions:
+    def setup_method(self):
+        from feems.components_model.component_mechanical import SteamBoiler
+        from feems.components_model.utility import IntegrationMethod
+        from feems.system_model import MachinerySystem
+
+        nox_curve = EmissionCurve(
+            points_per_kwh=[
+                EmissionCurvePoint(load_ratio=0.25, emission_g_per_kwh=2.0),
+                EmissionCurvePoint(load_ratio=0.50, emission_g_per_kwh=2.0),
+                EmissionCurvePoint(load_ratio=0.75, emission_g_per_kwh=2.0),
+                EmissionCurvePoint(load_ratio=1.00, emission_g_per_kwh=2.0),
+            ],
+            emission=EmissionType.NOX,
+        )
+        self.boiler = SteamBoiler(
+            name="emission boiler",
+            rated_steam_production_kg_per_h=10_000.0,
+            working_pressure_bar=7.0,
+            thermal_efficiency_curve=_flat_efficiency_curve(0.85),
+            emissions_curves=[nox_curve],
+        )
+        self.sys = MachinerySystem()
+        self.im = IntegrationMethod.sum_with_time
+
+    def test_nox_emission_kg_nonzero(self):
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = self.sys._calculate_boiler_result(self.boiler, 3600.0, self.im)
+        assert res.total_emission_kg is not None
+        assert res.total_emission_kg[EmissionType.NOX] > 0
+
+    def test_nox_doubles_for_two_steps(self):
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res_1 = self.sys._calculate_boiler_result(self.boiler, 3600.0, self.im)
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0, 10_000.0])
+        res_2 = self.sys._calculate_boiler_result(self.boiler, np.array([3600.0, 3600.0]), self.im)
+        nox_1 = res_1.total_emission_kg[EmissionType.NOX]
+        nox_2 = res_2.total_emission_kg[EmissionType.NOX]
+        assert nox_2 == pytest.approx(2.0 * nox_1, rel=1e-4)
+
+    def test_zero_demand_gives_no_emissions(self):
+        self.boiler.steam_out_kg_per_h = np.array([0.0])
+        res = self.sys._calculate_boiler_result(self.boiler, 3600.0, self.im)
+        if res.total_emission_kg is not None:
+            assert res.total_emission_kg[EmissionType.NOX] == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# T11 — fuel_option applied to boiler in _calculate_boiler_result
+# ---------------------------------------------------------------------------
+
+
+class TestBoilerFuelOption:
+    def setup_method(self):
+        from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
+        from feems.components_model.utility import IntegrationMethod
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import MachinerySystem
+
+        hfo_mode = FuelCharacteristics()
+        hfo_mode.main_fuel_type = TypeFuel.HFO
+        hfo_mode.main_fuel_origin = FuelOrigin.FOSSIL
+        hfo_mode.eff_curve = _flat_efficiency_curve(0.85)
+
+        lng_mode = FuelCharacteristics()
+        lng_mode.main_fuel_type = TypeFuel.NATURAL_GAS
+        lng_mode.main_fuel_origin = FuelOrigin.FOSSIL
+        lng_mode.eff_curve = _flat_efficiency_curve(0.87)
+
+        self.boiler_multi = SteamBoiler(
+            name="multi-fuel boiler",
+            rated_steam_production_kg_per_h=10_000.0,
+            working_pressure_bar=7.0,
+            multi_fuel_characteristics=[hfo_mode, lng_mode],
+        )
+        self.boiler_single = _make_boiler()  # HFO single-fuel
+        self.sys = MachinerySystem()
+        self.im = IntegrationMethod.sum_with_time
+
+    def test_matching_fuel_option_switches_boiler_to_lng(self):
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import FuelOption
+
+        self.boiler_multi.steam_out_kg_per_h = np.array([10_000.0])
+        option = FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
+        self.sys._calculate_boiler_result(self.boiler_multi, 3600.0, self.im, fuel_option=option)
+        assert self.boiler_multi.fuel_type == TypeFuel.NATURAL_GAS
+
+    def test_non_matching_fuel_option_leaves_single_fuel_boiler_unchanged(self):
+        """A single-fuel HFO boiler ignores any fuel_option — no error raised."""
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import FuelOption
+
+        self.boiler_single.steam_out_kg_per_h = np.array([10_000.0])
+        option = FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
+        self.sys._calculate_boiler_result(self.boiler_single, 3600.0, self.im, fuel_option=option)
+        assert self.boiler_single.fuel_type == TypeFuel.HFO
+
+    def test_fuel_option_not_in_boiler_modes_keeps_current_fuel(self):
+        """Multi-fuel boiler with HFO+LNG: passing METHANOL option keeps current fuel."""
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import FuelOption
+
+        self.boiler_multi.steam_out_kg_per_h = np.array([10_000.0])
+        option = FuelOption(fuel_type=TypeFuel.METHANOL, fuel_origin=FuelOrigin.FOSSIL)
+        self.sys._calculate_boiler_result(self.boiler_multi, 3600.0, self.im, fuel_option=option)
+        assert self.boiler_multi.fuel_type == TypeFuel.HFO  # default first mode unchanged
+
+    def test_no_fuel_option_leaves_boiler_on_current_fuel(self):
+        self.boiler_multi.steam_out_kg_per_h = np.array([10_000.0])
+        self.sys._calculate_boiler_result(self.boiler_multi, 3600.0, self.im)
+        assert self.boiler_multi.fuel_type == TypeFuel.HFO  # first mode, unchanged
+
+
+# ---------------------------------------------------------------------------
+# T12 — fuel_option applied through full get_fuel_energy_consumption_running_time
+# ---------------------------------------------------------------------------
+
+
+def _make_multi_fuel_genset(switchboard_id: int = 1):
+    """Genset with EngineMultiFuel (LNG primary / Diesel secondary) on the given switchboard."""
+    from feems.components_model.component_electric import ElectricMachine, Genset
+    from feems.components_model.component_mechanical import EngineMultiFuel, FuelCharacteristics
+    from feems.fuel import FuelOrigin, TypeFuel
+    from feems.types_for_feems import Power_kW, Speed_rpm, SwbId, TypeComponent, TypePower
+
+    lng_mode = FuelCharacteristics(
+        main_fuel_type=TypeFuel.NATURAL_GAS,
+        main_fuel_origin=FuelOrigin.FOSSIL,
+        bsfc_curve=np.array([[0.0, 180.0], [1.0, 180.0]], dtype=float),
+    )
+    hfo_mode = FuelCharacteristics(
+        main_fuel_type=TypeFuel.HFO,
+        main_fuel_origin=FuelOrigin.FOSSIL,
+        bsfc_curve=np.array([[0.0, 210.0], [1.0, 210.0]], dtype=float),
+    )
+    engine = EngineMultiFuel(
+        type_=TypeComponent.MAIN_ENGINE,
+        name="multi-fuel engine",
+        rated_power=Power_kW(1000.0),
+        rated_speed=Speed_rpm(750.0),
+        multi_fuel_characteristics=[lng_mode, hfo_mode],
+    )
+    generator = ElectricMachine(
+        type_=TypeComponent.GENERATOR,
+        name="generator",
+        rated_power=Power_kW(900.0),
+        rated_speed=Speed_rpm(750.0),
+        power_type=TypePower.POWER_SOURCE,
+        switchboard_id=SwbId(switchboard_id),
+        eff_curve=np.array([[0.1, 0.95], [1.0, 0.95]]),
+    )
+    genset = Genset("multi-fuel genset", engine, generator)
+    genset.switchboard_id = SwbId(switchboard_id)
+    genset.power_output = np.array([500.0])
+    return genset
+
+
+def _make_multi_fuel_boiler_hfo_lng():
+    """SteamBoiler with HFO as first mode and LNG as second mode."""
+    from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
+    from feems.fuel import FuelOrigin, TypeFuel
+
+    hfo_mode = FuelCharacteristics()
+    hfo_mode.main_fuel_type = TypeFuel.HFO
+    hfo_mode.main_fuel_origin = FuelOrigin.FOSSIL
+    hfo_mode.eff_curve = _flat_efficiency_curve(0.85)
+
+    lng_mode = FuelCharacteristics()
+    lng_mode.main_fuel_type = TypeFuel.NATURAL_GAS
+    lng_mode.main_fuel_origin = FuelOrigin.FOSSIL
+    lng_mode.eff_curve = _flat_efficiency_curve(0.87)
+
+    return SteamBoiler(
+        name="multi-fuel boiler",
+        rated_steam_production_kg_per_h=10_000.0,
+        working_pressure_bar=7.0,
+        multi_fuel_characteristics=[hfo_mode, lng_mode],
+    )
+
+
+class TestBoilerFuelOptionFullChain:
+    """T12: fuel_option reaches the boiler through get_fuel_energy_consumption_running_time."""
+
+    def setup_method(self):
+        from feems.components_model.utility import IntegrationMethod
+        from feems.system_model import ElectricPowerSystem
+
+        self.genset = _make_multi_fuel_genset(switchboard_id=1)
+        self.boiler = _make_multi_fuel_boiler_hfo_lng()
+
+        self.system = ElectricPowerSystem(
+            name="test system",
+            power_plant_components=[self.genset],
+            bus_tie_connections=[],
+        )
+        self.system.set_time_interval(
+            time_interval_s=3600.0,
+            integration_method=IntegrationMethod.sum_with_time,
+        )
+        self.system.boiler = self.boiler
+        self.system.boiler.steam_out_kg_per_h = np.array([10_000.0])
+
+    def test_fuel_option_lng_switches_boiler_to_lng(self):
+        """fuel_option=LNG reaches the boiler and switches it away from the HFO default."""
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import FuelOption
+
+        option = FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
+        res = self.system.get_fuel_energy_consumption_running_time(fuel_option=option)
+        assert self.boiler.fuel_type == TypeFuel.NATURAL_GAS
+        assert res.running_hours_boiler_total_hr == pytest.approx(1.0)
+
+    def test_no_fuel_option_leaves_boiler_on_default_hfo(self):
+        """No fuel_option: boiler stays on HFO (its first configured mode)."""
+        self.system.get_fuel_energy_consumption_running_time()
+        assert self.boiler.fuel_type == TypeFuel.HFO
+
+    def test_fuel_option_unsupported_by_boiler_keeps_current_fuel(self):
+        """fuel_option for a fuel the boiler doesn't have leaves the boiler unchanged."""
+        from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import FuelOption
+
+        # Replace boiler with one that only supports HFO and LNG;
+        # pass METHANOL option (not in boiler, but genset supports LNG so validation passes)
+        # Use the LNG option to satisfy validation, then give the boiler only HFO.
+        hfo_only = FuelCharacteristics()
+        hfo_only.main_fuel_type = TypeFuel.HFO
+        hfo_only.main_fuel_origin = FuelOrigin.FOSSIL
+        hfo_only.eff_curve = _flat_efficiency_curve(0.85)
+        self.system.boiler = SteamBoiler(
+            name="hfo-only boiler",
+            rated_steam_production_kg_per_h=10_000.0,
+            working_pressure_bar=7.0,
+            multi_fuel_characteristics=[hfo_only],
+        )
+        self.system.boiler.steam_out_kg_per_h = np.array([10_000.0])
+
+        # LNG option passes validation (genset supports it) but boiler only has HFO
+        option = FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
+        self.system.get_fuel_energy_consumption_running_time(fuel_option=option)
+        assert self.system.boiler.fuel_type == TypeFuel.HFO
+
+
+# ---------------------------------------------------------------------------
+# T13 — detail_result includes boiler row
+# ---------------------------------------------------------------------------
+
+
+class TestBoilerDetailResult:
+    """Boiler row appears in FEEMSResult.detail_result after system calculation."""
+
+    def setup_method(self):
+        self.system = _make_electric_system_with_shore_power()
+        self.boiler = _make_boiler_for_system()
+        self.system.boiler = self.boiler
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0])
+        self.res = self.system.get_fuel_energy_consumption_running_time()
+
+    def test_boiler_row_present_in_detail_result(self):
+        assert self.res.detail_result is not None
+        assert self.boiler.name in self.res.detail_result.index
+
+    def test_boiler_detail_running_hours(self):
+        row = self.res.detail_result.loc[self.boiler.name]
+        assert float(row["running hours [h]"]) == pytest.approx(1.0)
+
+    def test_boiler_detail_component_type(self):
+        row = self.res.detail_result.loc[self.boiler.name]
+        assert row["component type"] == "STEAM_BOILER"
+
+    def test_boiler_detail_rated_capacity(self):
+        row = self.res.detail_result.loc[self.boiler.name]
+        assert float(row["rated capacity"]) == pytest.approx(10_000.0)
+        assert row["rated capacity unit"] == "kg/h"
+
+    def test_boiler_detail_fuel_consumption_nonzero(self):
+        from feems.fuel import FuelConsumption
+
+        row = self.res.detail_result.loc[self.boiler.name]
+        fc = row["multi fuel consumption [kg]"]
+        assert isinstance(fc, FuelConsumption)
+        assert fc.total_fuel_consumption > 0
+
+    def test_boiler_co2_emission_in_result(self):
+        from feems.fuel import GHGEmissions
+
+        assert isinstance(self.res.co2_emission_total_kg, GHGEmissions)
+        assert self.res.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel > 0
+
+    def test_boiler_co2_emission_in_detail_row(self):
+        from feems.fuel import GHGEmissions
+
+        row = self.res.detail_result.loc[self.boiler.name]
+        co2 = row["CO2 emission [kg]"]
+        assert isinstance(co2, GHGEmissions)
+        assert co2.tank_to_wake_kg_or_gco2eq_per_gfuel > 0
+
+
+# ---------------------------------------------------------------------------
+# T14 — fuel_option on boiler-only system (no multi-fuel engines)
+# ---------------------------------------------------------------------------
+
+
+class TestBoilerOnlyFuelOption:
+    """fuel_option is allowed when the boiler (but no engine) supports the fuel."""
+
+    def setup_method(self):
+        from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
+
+        lng_mode = FuelCharacteristics()
+        lng_mode.main_fuel_type = TypeFuel.NATURAL_GAS
+        lng_mode.main_fuel_origin = FuelOrigin.FOSSIL
+        lng_mode.eff_curve = _flat_efficiency_curve(0.88)
+
+        hfo_mode = FuelCharacteristics()
+        hfo_mode.main_fuel_type = TypeFuel.HFO
+        hfo_mode.main_fuel_origin = FuelOrigin.FOSSIL
+        hfo_mode.eff_curve = _flat_efficiency_curve(0.85)
+
+        self.system = _make_electric_system_with_shore_power()
+        self.boiler = SteamBoiler(
+            name="multi-fuel boiler",
+            rated_steam_production_kg_per_h=10_000.0,
+            working_pressure_bar=7.0,
+            multi_fuel_characteristics=[hfo_mode, lng_mode],
+        )
+        self.system.boiler = self.boiler
+        self.boiler.steam_out_kg_per_h = np.array([10_000.0])
+
+    def test_matching_fuel_option_allowed_without_multi_fuel_engine(self):
+        from feems.system_model import FuelOption
+
+        option = FuelOption(fuel_type=TypeFuel.NATURAL_GAS, fuel_origin=FuelOrigin.FOSSIL)
+        # Must not raise — boiler supports LNG even though there are no multi-fuel engines
+        self.system.get_fuel_energy_consumption_running_time(fuel_option=option)
+        assert self.boiler.fuel_type == TypeFuel.NATURAL_GAS
+
+    def test_unsupported_fuel_option_still_raises_on_boiler_only_system(self):
+        from feems.exceptions import InputError
+        from feems.system_model import FuelOption
+
+        # HYDROGEN is not in HFO/LNG boiler modes, and there are no multi-fuel engines
+        option = FuelOption(fuel_type=TypeFuel.HYDROGEN, fuel_origin=FuelOrigin.RENEWABLE_NON_BIO)
+        with pytest.raises(InputError):
+            self.system.get_fuel_energy_consumption_running_time(fuel_option=option)

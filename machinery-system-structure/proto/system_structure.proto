@@ -377,6 +377,13 @@ message MachinerySystem {
 }
 
 message SteamBoiler {
+  // Field numbers for main_fuel (1), eff (3), and emission_curves (4) intentionally match
+  // COGAS.FuelMode to preserve wire compatibility with any previously serialised data.
+  message FuelMode {
+    Fuel main_fuel = 1;
+    optional Efficiency eff = 3;
+    repeated EmissionCurve emission_curves = 4;
+  }
   string name = 1;
   string uid = 2;
   double rated_steam_production_kg_per_h = 3;
@@ -386,7 +393,7 @@ message SteamBoiler {
   FuelOrigin fuel_origin = 7;
   EfficiencyCurve thermal_efficiency_curve = 8;
   repeated EmissionCurve emission_curves = 9;
-  repeated COGAS.FuelMode fuel_modes = 10;  // multi-fuel support (reuses COGAS.FuelMode)
+  repeated FuelMode fuel_modes = 10;
 }
 
 message MultiFuelEngine {

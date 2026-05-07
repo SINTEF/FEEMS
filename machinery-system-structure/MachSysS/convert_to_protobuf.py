@@ -462,7 +462,7 @@ def steam_boiler_to_proto(boiler: SteamBoiler) -> proto.SteamBoiler:
     )
     if boiler.multi_fuel_characteristics:
         for fc in boiler.multi_fuel_characteristics:
-            fuel_mode = proto.COGAS.FuelMode(
+            fuel_mode = proto.SteamBoiler.FuelMode(
                 main_fuel=proto.Fuel(
                     fuel_type=fc.main_fuel_type.value,
                     fuel_origin=fc.main_fuel_origin.value,
