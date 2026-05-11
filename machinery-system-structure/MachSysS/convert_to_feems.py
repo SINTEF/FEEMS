@@ -968,22 +968,29 @@ def convert_proto_propulsion_system_to_feems(
     HybridPropulsionSystem,
     None,
 ]:
+    boiler = proto_to_steam_boiler(system.steam_boiler) if system.HasField("steam_boiler") else None
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.MECHANICAL:
-        return MechanicalPropulsionSystemWithElectricPowerSystem(
+        feems_system = MechanicalPropulsionSystemWithElectricPowerSystem(
             name=system.name,
             electric_system=convert_proto_electric_system_to_feems(system.electric_system),
             mechanical_system=convert_proto_mechanical_system_to_feems(system.mechanical_system),
         )
+        feems_system.boiler = boiler
+        return feems_system
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.ELECTRIC:
-        return convert_proto_electric_system_to_feems(system.electric_system)
+        feems_system = convert_proto_electric_system_to_feems(system.electric_system)
+        feems_system.boiler = boiler
+        return feems_system
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.HYBRID:
         electric_system = convert_proto_electric_system_to_feems(system.electric_system)
         pti_ptos = electric_system.pti_pto if len(electric_system.pti_pto) > 0 else None
-        return HybridPropulsionSystem(
+        feems_system = HybridPropulsionSystem(
             name=system.name,
             electric_system=electric_system,
             mechanical_system=convert_proto_mechanical_system_to_feems(
                 system=system.mechanical_system, pti_ptos=pti_ptos
             ),
         )
+        feems_system.boiler = boiler
+        return feems_system
     return None

@@ -642,7 +642,7 @@ class FuelStorage(_message.Message):
     def __init__(self, fuel_type: _Optional[_Union[FuelType, str]] = ..., capacity_kg: _Optional[float] = ...) -> None: ...
 
 class MachinerySystem(_message.Message):
-    __slots__ = ("name", "propulsion_type", "fuel_storage", "maximum_allowed_genset_load_percentage", "mechanical_system", "electric_system", "maximum_allowed_fuel_cell_load_percentage", "average_base_load_percentage")
+    __slots__ = ("name", "propulsion_type", "fuel_storage", "maximum_allowed_genset_load_percentage", "mechanical_system", "electric_system", "maximum_allowed_fuel_cell_load_percentage", "average_base_load_percentage", "steam_boiler")
     class PropulsionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         MECHANICAL: _ClassVar[MachinerySystem.PropulsionType]
@@ -659,6 +659,7 @@ class MachinerySystem(_message.Message):
     ELECTRIC_SYSTEM_FIELD_NUMBER: _ClassVar[int]
     MAXIMUM_ALLOWED_FUEL_CELL_LOAD_PERCENTAGE_FIELD_NUMBER: _ClassVar[int]
     AVERAGE_BASE_LOAD_PERCENTAGE_FIELD_NUMBER: _ClassVar[int]
+    STEAM_BOILER_FIELD_NUMBER: _ClassVar[int]
     name: str
     propulsion_type: MachinerySystem.PropulsionType
     fuel_storage: _containers.RepeatedCompositeFieldContainer[FuelStorage]
@@ -667,7 +668,8 @@ class MachinerySystem(_message.Message):
     electric_system: ElectricSystem
     maximum_allowed_fuel_cell_load_percentage: float
     average_base_load_percentage: float
-    def __init__(self, name: _Optional[str] = ..., propulsion_type: _Optional[_Union[MachinerySystem.PropulsionType, str]] = ..., fuel_storage: _Optional[_Iterable[_Union[FuelStorage, _Mapping]]] = ..., maximum_allowed_genset_load_percentage: _Optional[float] = ..., mechanical_system: _Optional[_Union[MechanicalSystem, _Mapping]] = ..., electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ..., maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ..., average_base_load_percentage: _Optional[float] = ...) -> None: ...
+    steam_boiler: SteamBoiler
+    def __init__(self, name: _Optional[str] = ..., propulsion_type: _Optional[_Union[MachinerySystem.PropulsionType, str]] = ..., fuel_storage: _Optional[_Iterable[_Union[FuelStorage, _Mapping]]] = ..., maximum_allowed_genset_load_percentage: _Optional[float] = ..., mechanical_system: _Optional[_Union[MechanicalSystem, _Mapping]] = ..., electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ..., maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ..., average_base_load_percentage: _Optional[float] = ..., steam_boiler: _Optional[_Union[SteamBoiler, _Mapping]] = ...) -> None: ...
 
 class SteamBoiler(_message.Message):
     __slots__ = ("name", "uid", "rated_steam_production_kg_per_h", "working_pressure_barg", "feed_water_temperature_c", "fuel_type", "fuel_origin", "thermal_efficiency_curve", "emission_curves", "fuel_modes")

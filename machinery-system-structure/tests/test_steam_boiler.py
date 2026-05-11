@@ -1,11 +1,21 @@
 """T9 — SteamBoiler proto converter round-trip tests."""
 
+import os
+
 import numpy as np
 import pytest
 from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
 from feems.fuel import FuelOrigin, TypeFuel
-from MachSysS.convert_to_feems import proto_to_steam_boiler
-from MachSysS.convert_to_protobuf import steam_boiler_to_proto
+from MachSysS.convert_to_feems import convert_proto_propulsion_system_to_feems, proto_to_steam_boiler
+from MachSysS.convert_to_protobuf import (
+    convert_electric_system_to_protobuf_machinery_system,
+    convert_hybrid_propulsion_system_to_protobuf,
+    convert_mechanical_propulsion_system_with_electric_system_to_protobuf,
+    steam_boiler_to_proto,
+)
+from MachSysS.utility import retrieve_machinery_system_from_file
+
+_TEST_DIR = os.path.dirname(__file__)
 
 
 def _flat_eta_curve(eta: float) -> np.ndarray:
@@ -151,3 +161,86 @@ class TestMultiFuelRoundTrip:
         fuel_orig = float(np.sum(rp_orig.fuel_flow_rate_kg_per_s.total_fuel_consumption))
         fuel_rest = float(np.sum(rp_rest.fuel_flow_rate_kg_per_s.total_fuel_consumption))
         assert abs(fuel_rest - fuel_orig) / fuel_orig < 1e-4
+
+
+# ---------------------------------------------------------------------------
+# T10 — MachinerySystem-level boiler round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestMachinerySystemBoilerRoundTrip:
+    """Verify that a boiler attached to a full machinery system survives proto serialisation."""
+
+    @pytest.fixture()
+    def boiler(self):
+        return _make_single_fuel_boiler()
+
+    def _check_boiler_preserved(self, original_boiler, restored_system) -> None:
+        b = restored_system.boiler
+        assert b is not None, "boiler was not restored from proto"
+        assert b.name == original_boiler.name
+        assert b.rated_steam_production_kg_per_h == pytest.approx(
+            original_boiler.rated_steam_production_kg_per_h
+        )
+        assert b.working_pressure_barg == pytest.approx(original_boiler.working_pressure_barg)
+        assert b.feed_water_temperature_c == pytest.approx(original_boiler.feed_water_temperature_c)
+        assert b.fuel_type == original_boiler.fuel_type
+        assert b.fuel_origin == original_boiler.fuel_origin
+
+    def test_electric_system_with_boiler_round_trip(self, boiler):
+        mss_path = os.path.join(_TEST_DIR, "electric_propulsion_system.mss")
+        system_proto = retrieve_machinery_system_from_file(mss_path)
+        system = convert_proto_propulsion_system_to_feems(system_proto)
+        system.boiler = boiler
+
+        restored = convert_proto_propulsion_system_to_feems(
+            convert_electric_system_to_protobuf_machinery_system(system)
+        )
+        self._check_boiler_preserved(boiler, restored)
+
+    def test_electric_system_without_boiler_has_no_boiler(self):
+        mss_path = os.path.join(_TEST_DIR, "electric_propulsion_system.mss")
+        system_proto = retrieve_machinery_system_from_file(mss_path)
+        system = convert_proto_propulsion_system_to_feems(system_proto)
+        assert system.boiler is None
+
+        restored = convert_proto_propulsion_system_to_feems(
+            convert_electric_system_to_protobuf_machinery_system(system)
+        )
+        assert restored.boiler is None
+
+    def test_mechanical_system_with_boiler_round_trip(self, boiler):
+        mss_path = os.path.join(_TEST_DIR, "mechanical_propulsion_with_electric_system.mss")
+        system_proto = retrieve_machinery_system_from_file(mss_path)
+        system = convert_proto_propulsion_system_to_feems(system_proto)
+        system.boiler = boiler
+
+        restored = convert_proto_propulsion_system_to_feems(
+            convert_mechanical_propulsion_system_with_electric_system_to_protobuf(system)
+        )
+        self._check_boiler_preserved(boiler, restored)
+
+    def test_hybrid_system_with_boiler_round_trip(self, boiler):
+        mss_path = os.path.join(_TEST_DIR, "hybrid_propulsion_system.mss")
+        system_proto = retrieve_machinery_system_from_file(mss_path)
+        system = convert_proto_propulsion_system_to_feems(system_proto)
+        system.boiler = boiler
+
+        restored = convert_proto_propulsion_system_to_feems(
+            convert_hybrid_propulsion_system_to_protobuf(system)
+        )
+        self._check_boiler_preserved(boiler, restored)
+
+    def test_multi_fuel_boiler_preserved_in_system(self):
+        mss_path = os.path.join(_TEST_DIR, "electric_propulsion_system.mss")
+        system_proto = retrieve_machinery_system_from_file(mss_path)
+        system = convert_proto_propulsion_system_to_feems(system_proto)
+        system.boiler = _make_multi_fuel_boiler()
+
+        restored = convert_proto_propulsion_system_to_feems(
+            convert_electric_system_to_protobuf_machinery_system(system)
+        )
+        assert restored.boiler is not None
+        assert len(restored.boiler.multi_fuel_characteristics) == 2
+        assert restored.boiler.multi_fuel_characteristics[0].main_fuel_type == TypeFuel.HFO
+        assert restored.boiler.multi_fuel_characteristics[1].main_fuel_type == TypeFuel.NATURAL_GAS

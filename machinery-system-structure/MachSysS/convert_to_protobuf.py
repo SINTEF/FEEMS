@@ -753,6 +753,7 @@ def convert_electric_system_to_protobuf_machinery_system(
         fuel_storage=[],
         maximum_allowed_genset_load_percentage=maximum_allowed_genset_load_percentage,
         electric_system=convert_electric_system_to_protobuf(electric_system),
+        steam_boiler=steam_boiler_to_proto(electric_system.boiler) if electric_system.boiler else None,
     )
 
 
@@ -778,6 +779,7 @@ def convert_mechanical_propulsion_system_with_electric_system_to_protobuf(
         maximum_allowed_genset_load_percentage=maximum_allowed_genset_load_percentage,
         mechanical_system=convert_mechanical_system_to_protobuf(system_feems.mechanical_system),
         electric_system=convert_electric_system_to_protobuf(system_feems.electric_system),
+        steam_boiler=steam_boiler_to_proto(system_feems.boiler) if system_feems.boiler else None,
     )
 
 
@@ -792,4 +794,5 @@ def convert_hybrid_propulsion_system_to_protobuf(
         maximum_allowed_genset_load_percentage=maximum_allowed_genset_load_percentage,
         mechanical_system=convert_mechanical_system_to_protobuf(system_feems.mechanical_system),
         electric_system=convert_electric_system_to_protobuf(system_feems.electric_system),
+        steam_boiler=steam_boiler_to_proto(system_feems.boiler) if system_feems.boiler else None,
     )

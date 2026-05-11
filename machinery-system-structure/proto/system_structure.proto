@@ -374,6 +374,7 @@ message MachinerySystem {
   ElectricSystem electric_system = 6;
   double maximum_allowed_fuel_cell_load_percentage = 7;
   double average_base_load_percentage = 8;
+  SteamBoiler steam_boiler = 9;
 }
 
 message SteamBoiler {
