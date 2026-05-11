@@ -5,6 +5,14 @@ All notable changes to the RunFeemsSim package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.5.0...RunFeemsSim-v0.6.0) (2026-05-11)
+
+
+### Features
+
+* add SteamBoiler component with multi-fuel and proto round-trip support ([0725ac7](https://github.com/SINTEF/FEEMS/commit/0725ac7f6391eb6f5b5a844b14c2b8aadcffa569))
+* add SteamBoiler detail_result rows, CO2 accounting, and boiler-only fuel_option ([75901e7](https://github.com/SINTEF/FEEMS/commit/75901e74789d843b0da299ea49d970dbf389bc5a))
+
 ## [0.5.0](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.4.4...RunFeemsSim-v0.5.0) (2026-04-27)
 
 
