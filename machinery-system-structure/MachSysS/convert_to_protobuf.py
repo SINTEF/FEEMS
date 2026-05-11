@@ -454,7 +454,7 @@ def steam_boiler_to_proto(boiler: SteamBoiler) -> proto.SteamBoiler:
         name=boiler.name,
         uid=boiler.uid or "",
         rated_steam_production_kg_per_h=boiler.rated_steam_production_kg_per_h,
-        working_pressure_bar=boiler.working_pressure_bar,
+        working_pressure_barg=boiler.working_pressure_barg,
         feed_water_temperature_c=boiler.feed_water_temperature_c,
         fuel_type=boiler.fuel_type.value,
         fuel_origin=boiler.fuel_origin.value,

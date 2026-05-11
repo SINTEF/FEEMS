@@ -419,7 +419,7 @@ from feems.fuel import FuelOrigin, TypeFuel
 boiler = SteamBoiler(
     name="Aux Boiler",
     rated_steam_production_kg_per_h=10_000.0,
-    working_pressure_bar=7.0,
+    working_pressure_barg=6.0,
     thermal_efficiency_curve=np.array([[0.25, 0.85], [0.50, 0.87], [0.75, 0.88], [1.00, 0.87]]),
     fuel_type=TypeFuel.HFO,
     fuel_origin=FuelOrigin.FOSSIL,
@@ -441,7 +441,7 @@ lng_mode.eff_curve = np.array([[0.25, 0.87], [0.50, 0.89], [0.75, 0.90], [1.00, 
 multi_boiler = SteamBoiler(
     name="Multi-fuel Boiler",
     rated_steam_production_kg_per_h=10_000.0,
-    working_pressure_bar=7.0,
+    working_pressure_barg=6.0,
     multi_fuel_characteristics=[hfo_mode, lng_mode],
     uid="boiler-002",
 )
@@ -450,7 +450,7 @@ multi_boiler = SteamBoiler(
 **Constructor parameters:**
 - `name: str` — Component name
 - `rated_steam_production_kg_per_h: float` — Rated steam output (kg/h); must be > 0
-- `working_pressure_bar: float` — Steam working pressure (bar); must be in [1, 20] bar
+- `working_pressure_barg: float` — Steam working pressure in bar gauge (barg); valid range [0, 19] barg (i.e. [1, 20] bara)
 - `feed_water_temperature_c: float` — Feed water temperature (°C, default `80.0`); must be low enough that `delta_h > 0`
 - `thermal_efficiency_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, efficiency], ...]` (single-fuel)
 - `kg_fuel_per_kg_steam_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, kg_fuel/kg_steam], ...]`; alternative to `thermal_efficiency_curve`

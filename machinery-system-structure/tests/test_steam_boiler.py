@@ -2,9 +2,8 @@
 
 import numpy as np
 import pytest
-
 from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
-from feems.fuel import FuelOrigin, FuelSpecifiedBy, TypeFuel
+from feems.fuel import FuelOrigin, TypeFuel
 from MachSysS.convert_to_feems import proto_to_steam_boiler
 from MachSysS.convert_to_protobuf import steam_boiler_to_proto
 
@@ -17,7 +16,7 @@ def _make_single_fuel_boiler(**kwargs) -> SteamBoiler:
     defaults = dict(
         name="test boiler",
         rated_steam_production_kg_per_h=10_000.0,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         thermal_efficiency_curve=_flat_eta_curve(0.85),
         fuel_type=TypeFuel.HFO,
         fuel_origin=FuelOrigin.FOSSIL,
@@ -42,7 +41,7 @@ def _make_multi_fuel_boiler() -> SteamBoiler:
     return SteamBoiler(
         name="multi boiler",
         rated_steam_production_kg_per_h=10_000.0,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         multi_fuel_characteristics=[hfo_mode, lng_mode],
         uid="boiler-uid-002",
     )
@@ -57,7 +56,7 @@ class TestSingleFuelRoundTrip:
     def test_working_pressure_preserved(self):
         original = _make_single_fuel_boiler()
         restored = proto_to_steam_boiler(steam_boiler_to_proto(original))
-        assert restored.working_pressure_bar == pytest.approx(7.0)
+        assert restored.working_pressure_barg == pytest.approx(6.0)
 
     def test_feed_water_temperature_preserved(self):
         original = _make_single_fuel_boiler()

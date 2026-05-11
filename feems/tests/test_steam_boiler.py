@@ -4,11 +4,9 @@ T3 (curve normalisation), T4 (multi-fuel support), and T5 (FEEMSResult boiler fi
 
 import numpy as np
 import pytest
-
 from feems.exceptions import InputError
-from feems.fuel import FuelConsumption, FuelOrigin, FuelSpecifiedBy, TypeFuel
+from feems.fuel import FuelConsumption, FuelOrigin, TypeFuel
 from feems.types_for_feems import EmissionCurve, EmissionCurvePoint, EmissionType, TypeComponent
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -21,7 +19,7 @@ def _flat_efficiency_curve(eta: float) -> np.ndarray:
 
 def _make_boiler(
     rated_kg_per_h: float = 10_000.0,
-    pressure_bar: float = 7.0,
+    pressure_barg: float = 6.0,
     eta: float = 0.85,
     feed_water_temp_c: float = 80.0,
     fuel_type: TypeFuel = TypeFuel.HFO,
@@ -33,7 +31,7 @@ def _make_boiler(
     return SteamBoiler(
         name="test boiler",
         rated_steam_production_kg_per_h=rated_kg_per_h,
-        working_pressure_bar=pressure_bar,
+        working_pressure_barg=pressure_barg,
         thermal_efficiency_curve=_flat_efficiency_curve(eta),
         fuel_type=fuel_type,
         fuel_origin=fuel_origin,
@@ -132,8 +130,8 @@ class TestSteamBoilerConstruction:
         assert boiler.rated_steam_production_kg_per_h == 12_000.0
 
     def test_construction_sets_working_pressure(self):
-        boiler = _make_boiler(pressure_bar=10.0)
-        assert boiler.working_pressure_bar == 10.0
+        boiler = _make_boiler(pressure_barg=9.0)
+        assert boiler.working_pressure_barg == 9.0
 
     def test_construction_default_feed_water_temp(self):
         boiler = _make_boiler()
@@ -144,8 +142,8 @@ class TestSteamBoilerConstruction:
         assert boiler.feed_water_temperature_c == 60.0
 
     def test_construction_computes_delta_h(self):
-        # Δh = h_g(7 bar) - 4.18 * 80 = 2763.1 - 334.4 ≈ 2428.7 kJ/kg
-        boiler = _make_boiler(pressure_bar=7.0, feed_water_temp_c=80.0)
+        # Δh = h_g(6 barg = 7 bara) - 4.18 * 80 = 2763.1 - 334.4 ≈ 2428.7 kJ/kg
+        boiler = _make_boiler(pressure_barg=6.0, feed_water_temp_c=80.0)
         expected_delta_h = 2763.1 - 4.18 * 80.0
         assert abs(boiler.delta_h_kj_per_kg - expected_delta_h) / expected_delta_h < 0.001
 
@@ -156,7 +154,7 @@ class TestSteamBoilerConstruction:
             SteamBoiler(
                 name="bad boiler",
                 rated_steam_production_kg_per_h=10_000.0,
-                working_pressure_bar=25.0,
+                working_pressure_barg=24.0,
                 thermal_efficiency_curve=_flat_efficiency_curve(0.85),
             )
 
@@ -167,7 +165,7 @@ class TestSteamBoilerConstruction:
             SteamBoiler(
                 name="no curve boiler",
                 rated_steam_production_kg_per_h=10_000.0,
-                working_pressure_bar=7.0,
+                working_pressure_barg=6.0,
             )
 
 
@@ -183,7 +181,7 @@ class TestSteamBoilerRunPoint:
     def setup_method(self):
         self.boiler = _make_boiler(
             rated_kg_per_h=10_000.0,
-            pressure_bar=7.0,
+            pressure_barg=6.0,
             eta=0.85,
             feed_water_temp_c=80.0,
         )
@@ -323,7 +321,7 @@ def _equivalent_boilers():
 
     common = dict(
         rated_steam_production_kg_per_h=_RATED_KG_PER_H,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         fuel_type=TypeFuel.HFO,
         fuel_origin=FuelOrigin.FOSSIL,
         feed_water_temperature_c=80.0,
@@ -373,7 +371,7 @@ class TestCurveNormalisation:
         with pytest.raises(InputError):
             SteamBoiler(
                 rated_steam_production_kg_per_h=10_000.0,
-                working_pressure_bar=7.0,
+                working_pressure_barg=6.0,
                 thermal_efficiency_curve=eta_curve,
                 kg_fuel_per_kg_steam_curve=sfc_curve,
             )
@@ -385,7 +383,7 @@ class TestCurveNormalisation:
         with pytest.raises((InputError, ValueError)):
             SteamBoiler(
                 rated_steam_production_kg_per_h=10_000.0,
-                working_pressure_bar=7.0,
+                working_pressure_barg=6.0,
             )
 
 
@@ -411,7 +409,7 @@ def _make_multi_fuel_boiler(eta_hfo: float = 0.85, eta_lng: float = 0.85):
     return SteamBoiler(
         name="multi-fuel boiler",
         rated_steam_production_kg_per_h=10_000.0,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         multi_fuel_characteristics=[hfo_mode, lng_mode],
     )
 
@@ -585,7 +583,7 @@ def _make_machinery_system_with_boiler():
     boiler = SteamBoiler(
         name="test boiler",
         rated_steam_production_kg_per_h=10_000.0,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         thermal_efficiency_curve=_flat_efficiency_curve(0.85),
     )
 
@@ -652,7 +650,7 @@ def _make_boiler_for_system():
     return SteamBoiler(
         name="ship boiler",
         rated_steam_production_kg_per_h=10_000.0,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         thermal_efficiency_curve=_flat_efficiency_curve(0.85),
     )
 
@@ -736,7 +734,7 @@ class TestMultiStepBoilerResult:
         self.boiler = SteamBoiler(
             name="multi-step boiler",
             rated_steam_production_kg_per_h=10_000.0,
-            working_pressure_bar=7.0,
+            working_pressure_barg=6.0,
             thermal_efficiency_curve=_flat_efficiency_curve(0.85),
         )
         self.sys = MachinerySystem()
@@ -787,7 +785,7 @@ class TestSteamBoilerInputValidation:
             SteamBoiler(
                 name="bad",
                 rated_steam_production_kg_per_h=0.0,
-                working_pressure_bar=7.0,
+                working_pressure_barg=6.0,
                 thermal_efficiency_curve=_flat_efficiency_curve(0.85),
             )
 
@@ -798,7 +796,7 @@ class TestSteamBoilerInputValidation:
             SteamBoiler(
                 name="bad",
                 rated_steam_production_kg_per_h=-1.0,
-                working_pressure_bar=7.0,
+                working_pressure_barg=6.0,
                 thermal_efficiency_curve=_flat_efficiency_curve(0.85),
             )
 
@@ -810,7 +808,7 @@ class TestSteamBoilerInputValidation:
             SteamBoiler(
                 name="bad",
                 rated_steam_production_kg_per_h=10_000.0,
-                working_pressure_bar=7.0,
+                working_pressure_barg=6.0,
                 thermal_efficiency_curve=_flat_efficiency_curve(0.85),
                 feed_water_temperature_c=700.0,  # far above saturation (~165 °C at 7 bar)
             )
@@ -854,7 +852,7 @@ class TestCalculateBoilerResultEmissions:
         self.boiler = SteamBoiler(
             name="emission boiler",
             rated_steam_production_kg_per_h=10_000.0,
-            working_pressure_bar=7.0,
+            working_pressure_barg=6.0,
             thermal_efficiency_curve=_flat_efficiency_curve(0.85),
             emissions_curves=[nox_curve],
         )
@@ -908,7 +906,7 @@ class TestBoilerFuelOption:
         self.boiler_multi = SteamBoiler(
             name="multi-fuel boiler",
             rated_steam_production_kg_per_h=10_000.0,
-            working_pressure_bar=7.0,
+            working_pressure_barg=6.0,
             multi_fuel_characteristics=[hfo_mode, lng_mode],
         )
         self.boiler_single = _make_boiler()  # HFO single-fuel
@@ -1012,7 +1010,7 @@ def _make_multi_fuel_boiler_hfo_lng():
     return SteamBoiler(
         name="multi-fuel boiler",
         rated_steam_production_kg_per_h=10_000.0,
-        working_pressure_bar=7.0,
+        working_pressure_barg=6.0,
         multi_fuel_characteristics=[hfo_mode, lng_mode],
     )
 
@@ -1070,7 +1068,7 @@ class TestBoilerFuelOptionFullChain:
         self.system.boiler = SteamBoiler(
             name="hfo-only boiler",
             rated_steam_production_kg_per_h=10_000.0,
-            working_pressure_bar=7.0,
+            working_pressure_barg=6.0,
             multi_fuel_characteristics=[hfo_only],
         )
         self.system.boiler.steam_out_kg_per_h = np.array([10_000.0])
@@ -1161,7 +1159,7 @@ class TestBoilerOnlyFuelOption:
         self.boiler = SteamBoiler(
             name="multi-fuel boiler",
             rated_steam_production_kg_per_h=10_000.0,
-            working_pressure_bar=7.0,
+            working_pressure_barg=6.0,
             multi_fuel_characteristics=[hfo_mode, lng_mode],
         )
         self.system.boiler = self.boiler

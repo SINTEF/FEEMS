@@ -1067,15 +1067,20 @@ class SteamBoiler:
     Arguments:
         name: Name of the boiler.
         rated_steam_production_kg_per_h: Rated steam production in kg/h.
-        working_pressure_bar: Pressure of the saturated steam produced by the boiler, in bar absolute (bara). The IAPWS-IF97 saturation table is indexed by absolute pressure; a boiler operating at 6 barg should pass 7.0 here (≈ 6 barg + 1 bar atmospheric).
+        working_pressure_barg: Working (gauge) pressure of the saturated steam in bar gauge (barg).
+            Atmospheric pressure (1 bar) is added internally before the IAPWS-IF97 lookup.
+            A boiler operating at 6 barg produces steam at 7 bara.
         thermal_efficiency_curve: 2D array (N x 2) of (load_ratio, thermal_efficiency)
         kg_fuel_per_h_curve: 2D array (N x 2) of (load_ratio, kg_fuel_per_h)
         kg_fuel_per_kg_steam_curve: 2D array (N x 2) of (load_ratio, kg_fuel_per_kg_steam)
         fuel_type: TypeFuel of the fuel used by the boiler.
         fuel_origin: FuelOrigin of the fuel used by the boiler.
-        feed_water_temperature_c: Temperature of the feed water in °C, used for calculating the enthalpy difference Δh of the steam produced by the boiler.
+        feed_water_temperature_c: Temperature of the feed water in °C, used for calculating
+            the enthalpy difference dh of the steam produced by the boiler.
         emissions_curves: List of EmissionCurve, optional.
-        multi_fuel_characteristics: List of FuelCharacteristics for multi-fuel boilers, optional. If provided, fuel_type and fuel_origin are taken from the first entry in the list, and the active fuel mode can be switched using set_fuel_in_use.
+        multi_fuel_characteristics: List of FuelCharacteristics for multi-fuel boilers,
+            optional. If provided, fuel_type and fuel_origin are taken from the first entry
+            in the list, and the active fuel mode can be switched using set_fuel_in_use.
         uid: Optional unique identifier for the component instance.
 
     The boiler is standalone — not connected to any switchboard or shaft line.
@@ -1086,7 +1091,7 @@ class SteamBoiler:
         *,
         name: str = "",
         rated_steam_production_kg_per_h: float,
-        working_pressure_bar: float,
+        working_pressure_barg: float,
         thermal_efficiency_curve: Optional[np.ndarray] = None,
         kg_fuel_per_h_curve: Optional[np.ndarray] = None,
         kg_fuel_per_kg_steam_curve: Optional[np.ndarray] = None,
@@ -1108,7 +1113,7 @@ class SteamBoiler:
                 f"got {rated_steam_production_kg_per_h}."
             )
         self.rated_steam_production_kg_per_h = rated_steam_production_kg_per_h
-        self.working_pressure_bar = working_pressure_bar
+        self.working_pressure_barg = working_pressure_barg
         self.feed_water_temperature_c = feed_water_temperature_c
         self.fuel_type = fuel_type
         self.fuel_origin = fuel_origin
@@ -1116,14 +1121,14 @@ class SteamBoiler:
         self.multi_fuel_characteristics = multi_fuel_characteristics
         self._fuel_in_use: Optional["FuelCharacteristics"] = None
 
-        #: Δh = h_g(P) − cp_water * T_fw  (kJ/kg)
-        h_g = get_saturated_steam_h_g_kj_per_kg(working_pressure_bar)  # raises InputError if OOB
+        #: Δh = h_g(P_abs) − cp_water * T_fw  (kJ/kg); P_abs = working_pressure_barg + 1 bara
+        h_g = get_saturated_steam_h_g_kj_per_kg(working_pressure_barg + 1.0)  # raises InputError if OOB
         self.delta_h_kj_per_kg: float = h_g - _CP_WATER_KJ_PER_KG_K * feed_water_temperature_c
         if self.delta_h_kj_per_kg <= 0:
             raise InputError(
                 f"SteamBoiler '{name}': computed enthalpy rise delta_h={self.delta_h_kj_per_kg:.1f} kJ/kg "
                 f"is not positive — feed_water_temperature_c={feed_water_temperature_c} °C is too high "
-                f"for working_pressure_bar={working_pressure_bar} bar."
+                f"for working_pressure_barg={working_pressure_barg} barg."
             )
 
         self._eta_curve: Optional[np.ndarray] = None
@@ -1304,13 +1309,13 @@ class SteamBoiler:
 
         load_ratio = steam_demand_kg_per_h / self.rated_steam_production_kg_per_h
 
-        eta = np.clip(self._active_eff_interp(load_ratio), 1e-6, 1.0)
+        efficiency_steam_boiler = np.clip(self._active_eff_interp(load_ratio), 1e-6, 1.0)
 
         steam_kg_per_s = steam_demand_kg_per_h / 3600.0
-        q_steam_kw = steam_kg_per_s * self.delta_h_kj_per_kg
-        q_fuel_kw = np.where(steam_kg_per_s > 0, q_steam_kw / eta, 0.0)
+        heat_flow_steam_kw = steam_kg_per_s * self.delta_h_kj_per_kg
+        heat_flow_fuel_kw = np.where(steam_kg_per_s > 0, heat_flow_steam_kw / efficiency_steam_boiler, 0.0)
 
-        fuel_kg_per_s = q_fuel_kw / self._lhv_kj_per_kg
+        fuel_kg_per_s = heat_flow_fuel_kw / self._lhv_kj_per_kg
 
         fuel_obj = Fuel(
             fuel_type=self.fuel_type,
@@ -1319,9 +1324,10 @@ class SteamBoiler:
             mass_or_mass_fraction=fuel_kg_per_s,
         )
 
-        power_kwh_per_s = q_steam_kw / 3600.0
+        # Emission curves are in g/kWh of fuel energy input
+        fuel_energy_kwh_per_s = heat_flow_fuel_kw / 3600.0
         emissions_g_per_s: Dict[EmissionType, np.ndarray] = {
-            et: interp(load_ratio) * power_kwh_per_s
+            et: interp(load_ratio) * fuel_energy_kwh_per_s
             for et, interp in self._active_emission_interp.items()
         }
 
@@ -1329,6 +1335,6 @@ class SteamBoiler:
             load_ratio=load_ratio,
             fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel_obj]),
             steam_production_kg_per_s=steam_kg_per_s,
-            thermal_efficiency=eta,
+            thermal_efficiency=efficiency_steam_boiler,
             emissions_g_per_s=emissions_g_per_s,
         )

@@ -83,13 +83,13 @@ Represents a standalone fuel-fired auxiliary boiler. Not embedded in a `Subsyste
 | `name` | `string` | Component name |
 | `uid` | `string` | Stable unique identifier |
 | `rated_steam_production_kg_per_h` | `double` | Rated steam output (kg/h) |
-| `working_pressure_bar` | `double` | Steam working pressure (bar) |
+| `working_pressure_barg` | `double` | Steam working pressure in bar gauge (barg) |
 | `feed_water_temperature_c` | `double` | Feed water temperature (°C) |
 | `fuel_type` | `FuelType` | Primary fuel type (single-fuel mode) |
 | `fuel_origin` | `FuelOrigin` | Fuel origin (single-fuel mode) |
 | `thermal_efficiency_curve` | `EfficiencyCurve` | Thermal efficiency vs. load-ratio (single-fuel) |
 | `emission_curves` | `repeated EmissionCurve` | Boiler-level per-pollutant emission curves |
-| `fuel_modes` | `repeated COGAS.FuelMode` | Multi-fuel mode definitions (reuses `COGAS.FuelMode`). When present, `thermal_efficiency_curve` and `fuel_type`/`fuel_origin` are ignored during deserialization. |
+| `fuel_modes` | `repeated SteamBoiler.FuelMode` | Multi-fuel mode definitions. When present, `thermal_efficiency_curve` and `fuel_type`/`fuel_origin` are ignored during deserialization. |
 
 ### Engine.EngineCycleType enum
 

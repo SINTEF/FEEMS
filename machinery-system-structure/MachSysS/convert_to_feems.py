@@ -417,7 +417,7 @@ def proto_to_steam_boiler(pb: proto.SteamBoiler) -> SteamBoiler:
         return SteamBoiler(
             name=pb.name,
             rated_steam_production_kg_per_h=pb.rated_steam_production_kg_per_h,
-            working_pressure_bar=pb.working_pressure_bar,
+            working_pressure_barg=pb.working_pressure_barg,
             feed_water_temperature_c=pb.feed_water_temperature_c,
             emissions_curves=emissions_curves,
             multi_fuel_characteristics=multi_fuel_characteristics,
@@ -432,7 +432,7 @@ def proto_to_steam_boiler(pb: proto.SteamBoiler) -> SteamBoiler:
         return SteamBoiler(
             name=pb.name,
             rated_steam_production_kg_per_h=pb.rated_steam_production_kg_per_h,
-            working_pressure_bar=pb.working_pressure_bar,
+            working_pressure_barg=pb.working_pressure_barg,
             feed_water_temperature_c=pb.feed_water_temperature_c,
             fuel_type=TypeFuel(pb.fuel_type),
             fuel_origin=FuelOrigin(pb.fuel_origin),

@@ -387,7 +387,7 @@ message SteamBoiler {
   string name = 1;
   string uid = 2;
   double rated_steam_production_kg_per_h = 3;
-  double working_pressure_bar = 4;
+  double working_pressure_barg = 4;
   double feed_water_temperature_c = 5;
   FuelType fuel_type = 6;
   FuelOrigin fuel_origin = 7;
