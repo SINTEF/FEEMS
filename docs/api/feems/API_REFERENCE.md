@@ -22,6 +22,7 @@ This document provides a comprehensive reference for the FEEMS API.
   - [Run Point Data Classes](#run-point-data-classes)
   - [System Types](#system-types)
 - [System Model](#system-model)
+  - [`fuel_option` behaviour](#fuel_option-behaviour)
 - [Fuel and Emissions](#fuel-and-emissions)
   - [GhgEmissionFactorTankToWake](#ghgemissionfactortanktowake)
   - [Fuel](#fuel)
@@ -405,6 +406,80 @@ main_engine = MainEngineForMechanicalPropulsion(
 
 `MainEngineForMechanicalPropulsion` subclass with an integrated gearbox efficiency model.
 
+#### `SteamBoiler`
+
+Standalone fuel-fired auxiliary boiler. Not connected to a switchboard or shaftline. Attach to a `MachinerySystem` via `system.boiler = boiler`, then set `boiler.steam_out_kg_per_h` before calling `get_fuel_energy_consumption_running_time`.
+
+```python
+import numpy as np
+from feems.components_model.component_mechanical import FuelCharacteristics, SteamBoiler
+from feems.fuel import FuelOrigin, TypeFuel
+
+# Single-fuel boiler (efficiency curve)
+boiler = SteamBoiler(
+    name="Aux Boiler",
+    rated_steam_production_kg_per_h=10_000.0,
+    working_pressure_barg=6.0,
+    thermal_efficiency_curve=np.array([[0.25, 0.85], [0.50, 0.87], [0.75, 0.88], [1.00, 0.87]]),
+    fuel_type=TypeFuel.HFO,
+    fuel_origin=FuelOrigin.FOSSIL,
+    feed_water_temperature_c=80.0,
+    uid="boiler-001",
+)
+
+# Multi-fuel boiler
+hfo_mode = FuelCharacteristics()
+hfo_mode.main_fuel_type = TypeFuel.HFO
+hfo_mode.main_fuel_origin = FuelOrigin.FOSSIL
+hfo_mode.eff_curve = np.array([[0.25, 0.85], [0.50, 0.87], [0.75, 0.88], [1.00, 0.87]])
+
+lng_mode = FuelCharacteristics()
+lng_mode.main_fuel_type = TypeFuel.NATURAL_GAS
+lng_mode.main_fuel_origin = FuelOrigin.FOSSIL
+lng_mode.eff_curve = np.array([[0.25, 0.87], [0.50, 0.89], [0.75, 0.90], [1.00, 0.89]])
+
+multi_boiler = SteamBoiler(
+    name="Multi-fuel Boiler",
+    rated_steam_production_kg_per_h=10_000.0,
+    working_pressure_barg=6.0,
+    multi_fuel_characteristics=[hfo_mode, lng_mode],
+    uid="boiler-002",
+)
+```
+
+**Constructor parameters:**
+- `name: str` — Component name
+- `rated_steam_production_kg_per_h: float` — Rated steam output (kg/h); must be > 0
+- `working_pressure_barg: float` — Steam working pressure in bar gauge (barg); valid range [0, 19] barg (i.e. [1, 20] bara)
+- `feed_water_temperature_c: float` — Feed water temperature (°C, default `80.0`); must be low enough that `delta_h > 0`
+- `thermal_efficiency_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, efficiency], ...]` (single-fuel)
+- `kg_fuel_per_kg_steam_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, kg_fuel/kg_steam], ...]`; alternative to `thermal_efficiency_curve`
+- `kg_fuel_per_h_curve: Optional[np.ndarray]` — Nx2 array `[[load_ratio, kg_fuel/h], ...]`; alternative to `thermal_efficiency_curve`; load_ratio=0 is not allowed
+- `fuel_type: TypeFuel` — Fuel type (single-fuel mode)
+- `fuel_origin: FuelOrigin` — Fuel origin (single-fuel mode)
+- `multi_fuel_characteristics: Optional[List[FuelCharacteristics]]` — Multi-fuel mode configurations
+- `emissions_curves: Optional[List[EmissionCurve]]` — Boiler-level emission curves
+- `uid: Optional[str]` — Unique identifier
+
+**Instance attributes:**
+- `steam_out_kg_per_h: Optional[np.ndarray]` — Steam output time series (kg/h). Set internally by `MachinerySystem.get_fuel_energy_consumption_running_time` from the `steam_demand_kg_per_h` argument passed to `MachineryCalculation`. Must be finite and >= 0 element-wise when set.
+- `fuel_type: TypeFuel` — Active fuel type. Updated automatically by `get_fuel_energy_consumption_running_time` when a matching `fuel_option` is passed (see **`fuel_option` behaviour** in the System Model section).
+
+**Methods:**
+- `get_boiler_run_point(steam_demand_kg_per_h, fuel_specified_by=FuelSpecifiedBy.IMO) -> BoilerRunPoint` — `steam_demand_kg_per_h` must be finite and >= 0
+- `set_fuel_in_use(fuel_type=None, fuel_origin=None)` — Switch active fuel in multi-fuel mode
+
+#### `BoilerRunPoint`
+
+Result dataclass returned by `SteamBoiler.get_boiler_run_point`.
+
+**Fields:**
+- `load_ratio: np.ndarray` — Load fraction relative to rated capacity
+- `fuel_flow_rate_kg_per_s: FuelConsumption` — Fuel consumption rate
+- `steam_production_kg_per_s: np.ndarray` — Steam output rate (kg/s)
+- `thermal_efficiency: np.ndarray` — Boiler thermal efficiency at each operating point
+- `emissions_g_per_s: Dict[EmissionType, np.ndarray]` — Emission rates (g/s)
+
 ### Electric Components
 
 #### `ElectricComponent`
@@ -771,8 +846,31 @@ mech_system = MechanicalPropulsionSystem(
 - `main_engines: List[MainEngineForMechanicalPropulsion]`
 - `pti_ptos: List[PTIPTO]`
 - `mechanical_loads: List[MechanicalComponent]`
+- `boiler: Optional[SteamBoiler]` — Optional boiler (inherited from `MachinerySystem`). Set with `system.boiler = my_boiler`, then set `system.boiler.steam_out_kg_per_h` before calling the result method.
 
-- `get_fuel_energy_consumption_running_time(fuel_specified_by=...) -> FEEMSResult`
+- `get_fuel_energy_consumption_running_time(fuel_specified_by=FuelSpecifiedBy.IMO, fuel_option=None) -> FEEMSResult`
+  — See [**`fuel_option` behaviour**](#fuel_option-behaviour) below.
+
+#### `HybridPropulsionSystem`
+
+Hybrid propulsion: an `ElectricPowerSystem` and a `MechanicalPropulsionSystem` connected via shared PTI/PTO component(s).
+
+```python
+from feems.system_model import HybridPropulsionSystem
+
+hybrid = HybridPropulsionSystem(
+    name="Hybrid Propulsion",
+    electric_system=electric_power_system,    # ElectricPowerSystem (must include PTI/PTO)
+    mechanical_system=mechanical_system,      # MechanicalPropulsionSystem (must include PTI/PTO)
+)
+```
+
+The PTI/PTO component instance must appear in **both** sub-systems.
+
+- `do_power_balance_calculation()` — performs electric then mechanical balance, re-running electric if full PTI mode is detected.
+- `get_fuel_energy_consumption_running_time(time_interval_s, integration_method=..., fuel_specified_by=FuelSpecifiedBy.IMO, fuel_option=None) -> FEEMSResultForMachinerySystem`
+  - Returns `FEEMSResultForMachinerySystem(electric_system: FEEMSResult, mechanical_system: FEEMSResult)`
+  - `fuel_option` is scoped per sub-system — see [**`fuel_option` behaviour**](#fuel_option-behaviour) below.
 
 #### `MechanicalPropulsionSystemWithElectricPowerSystem`
 
@@ -788,8 +886,9 @@ combined = MechanicalPropulsionSystemWithElectricPowerSystem(
 )
 ```
 
-- `get_fuel_energy_consumption_running_time(time_interval_s, fuel_specified_by=...) -> FEEMSResultForMachinerySystem`
+- `get_fuel_energy_consumption_running_time(time_interval_s, integration_method=..., fuel_specified_by=FuelSpecifiedBy.IMO, fuel_option=None) -> FEEMSResultForMachinerySystem`
   - Returns `FEEMSResultForMachinerySystem(electric_system: FEEMSResult, mechanical_system: FEEMSResult)`
+  - `fuel_option` is scoped per sub-system — see [**`fuel_option` behaviour**](#fuel_option-behaviour) below.
 
 ## System Model
 
@@ -816,6 +915,7 @@ system = ElectricPowerSystem(
 - `other_load: List[Component]` - Auxiliary loads
 - `switchboards: Dict[int, Switchboard]` - Switchboard objects by ID
 - `bus_tie_breakers: List[BusBreaker]` - Bus-tie breakers
+- `boiler: Optional[SteamBoiler]` — Optional boiler (inherited from `MachinerySystem`). Set with `system.boiler = my_boiler`, then set `system.boiler.steam_out_kg_per_h` before calling `get_fuel_energy_consumption_running_time`.
 
 **Key Methods:**
 
@@ -895,6 +995,7 @@ system = ElectricPowerSystem(
     - Energy consumption breakdown
     - Operating hours
     - Per-component results
+  - See [**`fuel_option` behaviour**](#fuel_option-behaviour) for how `fuel_option` affects individual components.
 
 **Returns:** `FEEMSResult`
 ```python
@@ -1029,6 +1130,40 @@ plt.show()
 - **Emissions Reporting**: Generate compliance reports (IMO, FuelEU Maritime)
 - **Economic Analysis**: Calculate Total Cost of Ownership (TCO) based on fuel consumption
 - **Energy Management**: Analyze battery usage, shore power savings, load distribution
+
+### `fuel_option` behaviour
+
+`fuel_option: Optional[FuelOption]` is accepted by `get_fuel_energy_consumption_running_time` on **all four system classes** (`ElectricPowerSystem`, `MechanicalPropulsionSystem`, `HybridPropulsionSystem`, `MechanicalPropulsionSystemWithElectricPowerSystem`). It selects an alternative fuel across all components that support it. `FuelOption` is a NamedTuple `(fuel_type: TypeFuel, fuel_origin: FuelOrigin)`.
+
+Scoping rules — only components whose configured modes include `(fuel_type, fuel_origin)` are affected; everything else runs on its current fuel:
+
+| Component type | Effect when `fuel_option` matches | Effect when it does not match |
+|---|---|---|
+| `EngineMultiFuel` genset / main engine | Switches to that fuel mode for this calculation | Raises `InputError` at validation — see below |
+| Single-fuel `Engine` genset / main engine | Raises `ValueError` at calculation time | No effect |
+| `SteamBoiler` (multi-fuel) | Switches to that fuel mode via `set_fuel_in_use` | Silently keeps current fuel |
+| `SteamBoiler` (single-fuel) | Silently ignored | Silently ignored |
+
+**Validation**: before any calculation, `_validate_selected_fuel_option` checks the *multi-fuel engine inventory* (only `EngineMultiFuel` gensets and main engines). If any of those engines does **not** support the requested option, an `InputError` is raised. Single-fuel engines and the boiler are excluded from this check.
+
+**Sub-system scoping** (for `HybridPropulsionSystem` and `MechanicalPropulsionSystemWithElectricPowerSystem`): the option is forwarded to a sub-system only if it appears in that sub-system's `available_fuel_options`. A diesel-only electric system therefore receives `fuel_option=None` and its gensets are unaffected.
+
+```python
+from feems.system_model import FuelOption
+from feems.fuel import TypeFuel, FuelOrigin
+
+# Switch all LNG-capable engines and the boiler (if it supports LNG) to LNG
+result = system.get_fuel_energy_consumption_running_time(
+    fuel_option=FuelOption(TypeFuel.NATURAL_GAS, FuelOrigin.FOSSIL)
+)
+
+# For systems that require time_interval_s (HybridPropulsionSystem,
+# MechanicalPropulsionSystemWithElectricPowerSystem):
+result = system.get_fuel_energy_consumption_running_time(
+    time_interval_s=time_interval_s,
+    fuel_option=FuelOption(TypeFuel.NATURAL_GAS, FuelOrigin.FOSSIL),
+)
+```
 
 ## Fuel and Emissions
 

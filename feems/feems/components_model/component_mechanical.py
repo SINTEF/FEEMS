@@ -6,6 +6,7 @@ import pandas as pd
 
 from .. import get_logger
 from ..constant import (
+    get_saturated_steam_h_g_kj_per_kg,
     nox_factor_imo_medium_speed_g_hWh,
     nox_factor_imo_slow_speed_g_kWh,
     nox_tier_slow_speed_max_rpm,
@@ -1041,3 +1042,299 @@ MechanicalComponent = Union[
     MainEngineWithGearBoxForMechanicalPropulsion,
     MechanicalPropulsionComponent,
 ]
+
+#: Specific heat capacity of liquid water (kJ/kg·K) used for feed water enthalpy
+_CP_WATER_KJ_PER_KG_K: float = 4.18
+
+
+@dataclass(kw_only=True)
+class BoilerRunPoint:
+    load_ratio: np.ndarray
+    fuel_flow_rate_kg_per_s: FuelConsumption
+    steam_production_kg_per_s: np.ndarray
+    thermal_efficiency: np.ndarray
+    emissions_g_per_s: Dict[EmissionType, np.ndarray]
+
+
+class SteamBoiler:
+    """Fuel-fired auxiliary boiler producing saturated steam for non-power thermal loads.
+
+    Rated capacity is in kg/h steam production. Thermal efficiency is the single source
+    of truth for fuel consumption; the two alternative curve input types are normalised
+    to thermal efficiency at construction time using the saturated steam lookup table and
+    the fuel LHV.
+    
+    Arguments:
+        name: Name of the boiler.
+        rated_steam_production_kg_per_h: Rated steam production in kg/h.
+        working_pressure_barg: Working (gauge) pressure of the saturated steam in bar gauge (barg).
+            Atmospheric pressure (1 bar) is added internally before the IAPWS-IF97 lookup.
+            A boiler operating at 6 barg produces steam at 7 bara.
+        thermal_efficiency_curve: 2D array (N x 2) of (load_ratio, thermal_efficiency)
+        kg_fuel_per_h_curve: 2D array (N x 2) of (load_ratio, kg_fuel_per_h)
+        kg_fuel_per_kg_steam_curve: 2D array (N x 2) of (load_ratio, kg_fuel_per_kg_steam)
+        fuel_type: TypeFuel of the fuel used by the boiler.
+        fuel_origin: FuelOrigin of the fuel used by the boiler.
+        feed_water_temperature_c: Temperature of the feed water in °C, used for calculating
+            the enthalpy difference dh of the steam produced by the boiler.
+        emissions_curves: List of EmissionCurve, optional.
+        multi_fuel_characteristics: List of FuelCharacteristics for multi-fuel boilers,
+            optional. If provided, fuel_type and fuel_origin are taken from the first entry
+            in the list, and the active fuel mode can be switched using set_fuel_in_use.
+        uid: Optional unique identifier for the component instance.
+
+    The boiler is standalone — not connected to any switchboard or shaft line.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str = "",
+        rated_steam_production_kg_per_h: float,
+        working_pressure_barg: float,
+        thermal_efficiency_curve: Optional[np.ndarray] = None,
+        kg_fuel_per_h_curve: Optional[np.ndarray] = None,
+        kg_fuel_per_kg_steam_curve: Optional[np.ndarray] = None,
+        fuel_type: TypeFuel = TypeFuel.HFO,
+        fuel_origin: FuelOrigin = FuelOrigin.FOSSIL,
+        feed_water_temperature_c: float = 80.0,
+        emissions_curves: Optional[List[EmissionCurve]] = None,
+        multi_fuel_characteristics: Optional[List["FuelCharacteristics"]] = None,
+        uid: Optional[str] = None,
+    ):
+        from ..exceptions import InputError
+
+        self.name = name
+        self.type = TypeComponent.STEAM_BOILER
+        self.steam_out_kg_per_h: Optional[np.ndarray] = None
+        if rated_steam_production_kg_per_h <= 0:
+            raise InputError(
+                f"SteamBoiler '{name}': rated_steam_production_kg_per_h must be > 0, "
+                f"got {rated_steam_production_kg_per_h}."
+            )
+        self.rated_steam_production_kg_per_h = rated_steam_production_kg_per_h
+        self.working_pressure_barg = working_pressure_barg
+        self.feed_water_temperature_c = feed_water_temperature_c
+        self.fuel_type = fuel_type
+        self.fuel_origin = fuel_origin
+        self.uid = uid
+        self.multi_fuel_characteristics = multi_fuel_characteristics
+        self._fuel_in_use: Optional["FuelCharacteristics"] = None
+
+        #: Δh = h_g(P_abs) − cp_water * T_fw  (kJ/kg); P_abs = working_pressure_barg + 1 bara
+        h_g = get_saturated_steam_h_g_kj_per_kg(working_pressure_barg + 1.0)  # raises InputError if OOB
+        self.delta_h_kj_per_kg: float = h_g - _CP_WATER_KJ_PER_KG_K * feed_water_temperature_c
+        if self.delta_h_kj_per_kg <= 0:
+            raise InputError(
+                f"SteamBoiler '{name}': computed enthalpy rise delta_h={self.delta_h_kj_per_kg:.1f} kJ/kg "
+                f"is not positive — feed_water_temperature_c={feed_water_temperature_c} °C is too high "
+                f"for working_pressure_barg={working_pressure_barg} barg."
+            )
+
+        self._eta_curve: Optional[np.ndarray] = None
+        if multi_fuel_characteristics is not None:
+            if len(multi_fuel_characteristics) == 0:
+                raise ValueError(f"SteamBoiler '{name}': multi_fuel_characteristics must not be empty.")
+            self.fuel_type = multi_fuel_characteristics[0].main_fuel_type
+            self.fuel_origin = multi_fuel_characteristics[0].main_fuel_origin
+            self._fuel_in_use = multi_fuel_characteristics[0]
+            first_eff = multi_fuel_characteristics[0].eff_curve
+            if first_eff is None:
+                raise ValueError(
+                    f"SteamBoiler '{name}': each FuelCharacteristics entry must have eff_curve set."
+                )
+            self._thermal_efficiency_interp, _ = get_efficiency_curve_from_points(first_eff)
+            self._eta_curve = None  # eff_curve lives in each FuelCharacteristics
+        else:
+            #: Resolve which curve was supplied and normalise to thermal efficiency
+            n_curves = sum(c is not None for c in [
+                thermal_efficiency_curve, kg_fuel_per_h_curve, kg_fuel_per_kg_steam_curve
+            ])
+            if n_curves == 0:
+                raise InputError(
+                    f"SteamBoiler '{name}': one of thermal_efficiency_curve, "
+                    "kg_fuel_per_h_curve, or kg_fuel_per_kg_steam_curve must be provided."
+                )
+            if n_curves > 1:
+                raise InputError(
+                    f"SteamBoiler '{name}': only one curve input type may be provided."
+                )
+
+            if thermal_efficiency_curve is not None:
+                eta_curve = thermal_efficiency_curve
+            else:
+                #: Obtain LHV from a zero-mass Fuel object so we can normalise the curve
+                lhv_kj_per_kg = self._get_lhv_kj_per_kg()
+                if kg_fuel_per_kg_steam_curve is not None:
+                    eta_curve = self._normalise_sfc_curve(kg_fuel_per_kg_steam_curve, lhv_kj_per_kg)
+                else:
+                    eta_curve = self._normalise_kg_fuel_per_h_curve(kg_fuel_per_h_curve, lhv_kj_per_kg)
+
+            self._thermal_efficiency_interp, _ = get_efficiency_curve_from_points(eta_curve)
+            #: Store the normalised curve for serialisation (e.g. proto converters)
+            self._eta_curve = eta_curve
+
+        #: Emission curves — store originals for serialisation, build interpolators for computation
+        self.emissions_curves: Optional[List[EmissionCurve]] = emissions_curves
+        self._emissions_per_kwh_interp: Dict[EmissionType, Callable[[np.ndarray], np.ndarray]] = {}
+        if emissions_curves:
+            for ec in emissions_curves:
+                if len(ec.points_per_kwh) > 0:
+                    self._emissions_per_kwh_interp[ec.emission] = get_emission_curve_from_points(
+                        ec.points_per_kwh
+                    )
+
+        # Cache active-fuel hot-path values; rebuilt by set_fuel_in_use on fuel switch
+        self._lhv_kj_per_kg: float = self._get_lhv_kj_per_kg()
+        self._active_eff_interp = self._thermal_efficiency_interp
+        self._active_emission_interp: Dict[EmissionType, Callable[[np.ndarray], np.ndarray]] = (
+            self._build_mode_emission_interp(self._fuel_in_use)
+            if self._fuel_in_use is not None
+            else self._emissions_per_kwh_interp
+        )
+
+    # ------------------------------------------------------------------
+    # Curve normalisation helpers
+    # ------------------------------------------------------------------
+
+    def _build_mode_emission_interp(
+        self, fc: "FuelCharacteristics"
+    ) -> Dict[EmissionType, Callable[[np.ndarray], np.ndarray]]:
+        """Return emission interpolators for a fuel mode, falling back to top-level curves."""
+        if not fc or not fc.emission_curves:
+            return self._emissions_per_kwh_interp
+        result = {
+            ec.emission: get_emission_curve_from_points(ec.points_per_kwh)
+            for ec in fc.emission_curves
+            if len(ec.points_per_kwh) > 0
+        }
+        return result or self._emissions_per_kwh_interp
+
+    def _get_lhv_kj_per_kg(self) -> float:
+        ref_fuel = Fuel(
+            fuel_type=self.fuel_type,
+            origin=self.fuel_origin,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            mass_or_mass_fraction=0.0,
+        )
+        # lhv_mj_per_g × 1000 (kJ/MJ) × 1000 (g/kg) = kJ/kg
+        return ref_fuel.lhv_mj_per_g * 1e6
+
+    def _normalise_sfc_curve(
+        self, sfc_curve: np.ndarray, lhv_kj_per_kg: float
+    ) -> np.ndarray:
+        """Convert kg_fuel/kg_steam vs. load_ratio to thermal efficiency vs. load_ratio."""
+        result = sfc_curve.copy()
+        result[:, 1] = self.delta_h_kj_per_kg / (sfc_curve[:, 1] * lhv_kj_per_kg)
+        return result
+
+    def _normalise_kg_fuel_per_h_curve(
+        self, kg_fuel_per_h_curve: np.ndarray, lhv_kj_per_kg: float
+    ) -> np.ndarray:
+        """Convert kg_fuel/h vs. load_ratio to thermal efficiency vs. load_ratio."""
+        from ..exceptions import InputError
+
+        load_ratios = kg_fuel_per_h_curve[:, 0]
+        if np.any(load_ratios == 0):
+            raise InputError(
+                f"SteamBoiler '{self.name}': kg_fuel_per_h_curve must not contain "
+                "load_ratio=0 — steam production is zero at that point."
+            )
+        result = kg_fuel_per_h_curve.copy()
+        steam_kg_per_h_at_load = load_ratios * self.rated_steam_production_kg_per_h
+        sfc = kg_fuel_per_h_curve[:, 1] / steam_kg_per_h_at_load  # kg_fuel/kg_steam
+        result[:, 1] = self.delta_h_kj_per_kg / (sfc * lhv_kj_per_kg)
+        return result
+
+    # ------------------------------------------------------------------
+    # Multi-fuel support
+    # ------------------------------------------------------------------
+
+    def set_fuel_in_use(
+        self, fuel_type: Optional[TypeFuel] = None, fuel_origin: Optional[FuelOrigin] = None
+    ) -> None:
+        """Select the active fuel mode from multi_fuel_characteristics.
+
+        No-op for single-fuel boilers. If fuel_type/fuel_origin are None, resets to the first mode.
+        Raises ValueError if the combination is not in the list.
+        """
+        if not self.multi_fuel_characteristics:
+            return
+        if fuel_type is None or fuel_origin is None:
+            fc = self.multi_fuel_characteristics[0]
+        else:
+            fc = next(
+                (
+                    f
+                    for f in self.multi_fuel_characteristics
+                    if f.main_fuel_type == fuel_type and f.main_fuel_origin == fuel_origin
+                ),
+                None,
+            )
+            if fc is None:
+                raise ValueError(
+                    f"No FuelCharacteristics for fuel_type={fuel_type}, fuel_origin={fuel_origin}."
+                )
+        self._fuel_in_use = fc
+        self.fuel_type = fc.main_fuel_type
+        self.fuel_origin = fc.main_fuel_origin
+        if fc.eff_curve is not None:
+            self._active_eff_interp, _ = get_efficiency_curve_from_points(fc.eff_curve)
+        self._lhv_kj_per_kg = self._get_lhv_kj_per_kg()
+        self._active_emission_interp = self._build_mode_emission_interp(fc)
+
+    # ------------------------------------------------------------------
+    # Run point
+    # ------------------------------------------------------------------
+
+    def get_boiler_run_point(
+        self,
+        steam_demand_kg_per_h: np.ndarray,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+    ) -> BoilerRunPoint:
+        """Calculate boiler operating state for the given steam demand.
+
+        Args:
+            steam_demand_kg_per_h: Instantaneous steam demand in kg/h.
+            fuel_specified_by: Fuel specification method (IMO or FUEL_EU_MARITIME).
+
+        Returns:
+            BoilerRunPoint with load ratio, fuel flow, steam production, efficiency, emissions.
+        """
+        steam_demand_kg_per_h = np.asarray(steam_demand_kg_per_h, dtype=float)
+        if not np.all(np.isfinite(steam_demand_kg_per_h)) or np.any(steam_demand_kg_per_h < 0):
+            raise ValueError(
+                f"SteamBoiler '{self.name}': steam_demand_kg_per_h must be finite and >= 0."
+            )
+
+        load_ratio = steam_demand_kg_per_h / self.rated_steam_production_kg_per_h
+
+        efficiency_steam_boiler = np.clip(self._active_eff_interp(load_ratio), 1e-6, 1.0)
+
+        steam_kg_per_s = steam_demand_kg_per_h / 3600.0
+        heat_flow_steam_kw = steam_kg_per_s * self.delta_h_kj_per_kg
+        heat_flow_fuel_kw = np.where(steam_kg_per_s > 0, heat_flow_steam_kw / efficiency_steam_boiler, 0.0)
+
+        fuel_kg_per_s = heat_flow_fuel_kw / self._lhv_kj_per_kg
+
+        fuel_obj = Fuel(
+            fuel_type=self.fuel_type,
+            origin=self.fuel_origin,
+            fuel_specified_by=fuel_specified_by,
+            mass_or_mass_fraction=fuel_kg_per_s,
+        )
+
+        # Emission curves are in g/kWh of fuel energy input
+        fuel_energy_kwh_per_s = heat_flow_fuel_kw / 3600.0
+        emissions_g_per_s: Dict[EmissionType, np.ndarray] = {
+            et: interp(load_ratio) * fuel_energy_kwh_per_s
+            for et, interp in self._active_emission_interp.items()
+        }
+
+        return BoilerRunPoint(
+            load_ratio=load_ratio,
+            fuel_flow_rate_kg_per_s=FuelConsumption(fuels=[fuel_obj]),
+            steam_production_kg_per_s=steam_kg_per_s,
+            thermal_efficiency=efficiency_steam_boiler,
+            emissions_g_per_s=emissions_g_per_s,
+        )

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import reduce
 from operator import itemgetter
 from typing import Dict, List, NamedTuple, NewType, Optional, Set, Tuple, Union
@@ -30,11 +31,12 @@ from .components_model.component_electric import (
     SuperCapacitor,
     SuperCapacitorSystem,
 )
-from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel
-from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard
-from .components_model.utility import IntegrationMethod
+from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel, SteamBoiler
+from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard, get_duration_s
+from .components_model.utility import IntegrationMethod, integrate_data, integrate_multi_fuel_consumption
 from .exceptions import ConfigurationError, InputError
 from .types_for_feems import (
+    EmissionType,
     FEEMSResult,
     TimeIntervalList,
     TypeComponent,
@@ -45,6 +47,20 @@ from .types_for_feems import (
 BusId = NewType("BusId", int)
 
 logger = get_logger(__name__)
+
+_BOILER_DETAIL_COLUMNS = [
+    "multi fuel consumption [kg]",
+    "electric energy consumption [MJ]",
+    "mechanical energy consumption [MJ]",
+    "energy_stored [MJ]",
+    "running hours [h]",
+    "CO2 emission [kg]",
+    "NOx emission [kg]",
+    "component type",
+    "rated capacity",
+    "rated capacity unit",
+    "fuel consumer type",
+]
 
 
 class FEEMSResultForMachinerySystem(NamedTuple):
@@ -199,6 +215,7 @@ def _extract_fuel_options_from_component(component: object) -> List[FuelOption]:
 class MachinerySystem:
     time_interval_s: float
     integration_method: IntegrationMethod
+    boiler: Optional[SteamBoiler] = None
 
     def set_time_interval(
         self, time_interval_s: TimeIntervalList, integration_method: IntegrationMethod
@@ -244,6 +261,15 @@ class MachinerySystem:
 
         inventory = self.multi_fuel_engine_inventory
         if not inventory:
+            # Allow if the attached boiler supports this fuel (boiler-only fuel switching).
+            if self.boiler is not None and self.boiler.multi_fuel_characteristics:
+                boiler_supports = any(
+                    fc.main_fuel_type == fuel_option.fuel_type
+                    and fc.main_fuel_origin == fuel_option.fuel_origin
+                    for fc in self.boiler.multi_fuel_characteristics
+                )
+                if boiler_supports:
+                    return fuel_option
             option_repr = f"{fuel_option.fuel_type.name}/{fuel_option.fuel_origin.name}"
             raise InputError(
                 "Fuel option '{option}' cannot be selected because this system has no multi-fuel engines.".format(
@@ -264,6 +290,90 @@ class MachinerySystem:
             )
 
         return fuel_option
+
+    def _calculate_boiler_result(
+        self,
+        boiler: SteamBoiler,
+        time_interval_s: TimeIntervalList,
+        integration_method: IntegrationMethod,
+        fuel_specified_by: FuelSpecifiedBy = FuelSpecifiedBy.IMO,
+        fuel_option: Optional[FuelOption] = None,
+    ) -> FEEMSResult:
+        """Calculate fuel, steam, and running-hour totals for the system boiler.
+
+        Reads steam_out_kg_per_h from boiler.steam_out_kg_per_h (set by the caller before
+        invoking get_fuel_energy_consumption_running_time).
+        The boiler fuel is included in both fuel_consumption_boiler_total and
+        multi_fuel_consumption_total_kg so that overall fuel figures stay consistent.
+        fuel_option is applied only if the boiler supports the requested fuel; otherwise the
+        boiler's current fuel is used unchanged (same scoping pattern as mechanical/electric
+        sub-systems).
+        """
+        if boiler.steam_out_kg_per_h is None:
+            raise ValueError(f"SteamBoiler '{boiler.name}': steam_out_kg_per_h must be set before simulation.")
+        if fuel_option is not None and boiler.multi_fuel_characteristics:
+            supported = any(
+                fc.main_fuel_type == fuel_option.fuel_type and fc.main_fuel_origin == fuel_option.fuel_origin
+                for fc in boiler.multi_fuel_characteristics
+            )
+            if supported:
+                boiler.set_fuel_in_use(fuel_option.fuel_type, fuel_option.fuel_origin)
+        rp = boiler.get_boiler_run_point(boiler.steam_out_kg_per_h, fuel_specified_by)
+        steam_kg_per_s = rp.steam_production_kg_per_s
+
+        boiler_fc = integrate_multi_fuel_consumption(
+            fuel_consumption_kg_per_s=rp.fuel_flow_rate_kg_per_s,
+            time_interval_s=time_interval_s,
+            integration_method=integration_method,
+        )
+        total_steam_kg = float(integrate_data(
+            data_to_integrate=steam_kg_per_s,
+            time_interval_s=time_interval_s,
+            integration_method=integration_method,
+        ))
+        running_hr = float(
+            np.sum((steam_kg_per_s > 0).astype(float) * np.asarray(time_interval_s)) / 3600.0
+        )
+
+        total_emission_kg: dict = defaultdict(float)
+        for et, g_per_s in rp.emissions_g_per_s.items():
+            total_emission_kg[et] += integrate_data(
+                data_to_integrate=g_per_s,
+                time_interval_s=time_interval_s,
+                integration_method=integration_method,
+            ) / 1000.0
+
+        merged_emission_kg = defaultdict(float, total_emission_kg) if total_emission_kg else None
+        co2_kg = boiler_fc.get_total_co2_emissions()
+        n_steps = len(np.atleast_1d(steam_kg_per_s))
+        duration_s = get_duration_s(integration_method, n_steps, time_interval_s)
+        detail_row = pd.Series(
+            [
+                boiler_fc,
+                0.0,
+                0.0,
+                0.0,
+                running_hr,
+                co2_kg,
+                (merged_emission_kg[EmissionType.NOX] if merged_emission_kg else None),
+                TypeComponent.STEAM_BOILER.name,
+                boiler.rated_steam_production_kg_per_h,
+                "kg/h",
+                "None",
+            ],
+            index=_BOILER_DETAIL_COLUMNS,
+            name=boiler.name,
+        )
+        return FEEMSResult(
+            duration_s=duration_s,
+            running_hours_boiler_total_hr=running_hr,
+            steam_production_boiler_total_kg=total_steam_kg,
+            fuel_consumption_boiler_total=boiler_fc,
+            multi_fuel_consumption_total_kg=boiler_fc,
+            co2_emission_total_kg=co2_kg,
+            total_emission_kg=merged_emission_kg,
+            detail_result=detail_row.to_frame().T,
+        )
 
 
 class ElectricPowerSystem(MachinerySystem):
@@ -923,6 +1033,7 @@ class ElectricPowerSystem(MachinerySystem):
             of the power consumers, pti_pto, energy storage devices
           - setting power input to the power sources with asymmetric load sharing
           - doing power balance calculation
+          - if a boiler is attached: setting boiler.steam_out_kg_per_h
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
@@ -946,9 +1057,11 @@ class ElectricPowerSystem(MachinerySystem):
         fuel_type = selected_option.fuel_type if selected_option else None
         fuel_origin = selected_option.fuel_origin if selected_option else None
         res = FEEMSResult(detail_result=pd.DataFrame())
+        has_boiler_output = self.boiler is not None and self.boiler.steam_out_kg_per_h is not None
         if len(self.switchboards) == 0:
             logger.warning("There is no switchboard in the system")
-            return FEEMSResult(duration_s=0)
+            if not has_boiler_output:
+                return FEEMSResult(duration_s=0)
         for _, switchboard in self.switchboards.items():
             result_swb: FEEMSResult = switchboard.get_fuel_energy_consumption_running_time(
                 time_interval_s=self.time_interval_s,
@@ -961,6 +1074,12 @@ class ElectricPowerSystem(MachinerySystem):
             )
             result_swb.detail_result["switchboard id"] = switchboard.id
             res = res.sum_with_freeze_duration(result_swb)
+
+        if has_boiler_output:
+            boiler_res = self._calculate_boiler_result(
+                self.boiler, self.time_interval_s, self.integration_method, fuel_specified_by, selected_option
+            )
+            res = res.sum_with_freeze_duration(boiler_res)
 
         return res
 
@@ -1435,6 +1554,7 @@ class MechanicalPropulsionSystem(MachinerySystem):
           - setting load on the power consumers,
           - setting status (on/off) of the main engines and PTI/PTOs
           - doing power balance calculation
+          - if a boiler is attached: setting boiler.steam_out_kg_per_h
 
         Args:
             fuel_specified_by: FuelSpecifiedBy.IMO/EU. Default is IMO
@@ -1466,9 +1586,11 @@ class MechanicalPropulsionSystem(MachinerySystem):
             running_hours_pti_pto_total_hr=0,
             detail_result=pd.DataFrame(),
         )
+        has_boiler_output = self.boiler is not None and self.boiler.steam_out_kg_per_h is not None
         if len(self.shaft_line) == 0:
             logger.warning("There is no shaftline in the system")
-            return FEEMSResult(duration_s=0)
+            if not has_boiler_output:
+                return FEEMSResult(duration_s=0)
         for shaft_line in self.shaft_line:
             result_shaft_line: FEEMSResult = shaft_line.get_fuel_calculation_running_hours(
                 time_step=self.time_interval_s,
@@ -1481,6 +1603,13 @@ class MechanicalPropulsionSystem(MachinerySystem):
             )
             result_shaft_line.detail_result["shaftline id"] = shaft_line.id
             res = res.sum_with_freeze_duration(result_shaft_line)
+
+        if has_boiler_output:
+            boiler_res = self._calculate_boiler_result(
+                self.boiler, self.time_interval_s, self.integration_method, fuel_specified_by, selected_option
+            )
+            res = res.sum_with_freeze_duration(boiler_res)
+
         return res
 
 
@@ -1603,6 +1732,7 @@ class HybridPropulsionSystem(MachinerySystem):
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
             user_defined_fuels_by_component: Optional dict mapping component name to a list of
                 Fuel objects. Takes priority over user_defined_fuels for named components.
+            If a boiler is attached: set boiler.steam_out_kg_per_h before calling.
         Returns:
             FEEMSResultForMachinerySystem
         """
@@ -1643,6 +1773,13 @@ class HybridPropulsionSystem(MachinerySystem):
             user_defined_fuels=user_defined_fuels,
             user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
+
+        if self.boiler is not None and self.boiler.steam_out_kg_per_h is not None:
+            boiler_res = self._calculate_boiler_result(
+                self.boiler, time_interval_s, integration_method, fuel_specified_by, selected_option
+            )
+            result_elec = result_elec.sum_with_freeze_duration(boiler_res)
+
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
             mechanical_system=result_mech,
@@ -1708,6 +1845,7 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
                 matching a component's (fuel_type, origin) override the regulation-table lookup.
             user_defined_fuels_by_component: Optional dict mapping component name to a list of
                 Fuel objects. Takes priority over user_defined_fuels for named components.
+            If a boiler is attached: set boiler.steam_out_kg_per_h before calling.
         Returns:
             Tuple of FEEMSResult for mechanical system and electric system, respectively
         """
@@ -1748,6 +1886,13 @@ class MechanicalPropulsionSystemWithElectricPowerSystem(MachinerySystem):
             user_defined_fuels=user_defined_fuels,
             user_defined_fuels_by_component=user_defined_fuels_by_component,
         )
+
+        if self.boiler is not None and self.boiler.steam_out_kg_per_h is not None:
+            boiler_res = self._calculate_boiler_result(
+                self.boiler, time_interval_s, integration_method, fuel_specified_by, selected_option
+            )
+            result_elec = result_elec.sum_with_freeze_duration(boiler_res)
+
         return FEEMSResultForMachinerySystem(
             electric_system=result_elec,
             mechanical_system=result_mech,

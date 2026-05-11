@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, auto, unique
 from functools import reduce
@@ -44,9 +45,12 @@ class FEEMSResult:
     running_hours_genset_total_hr: float = 0.0
     running_hours_fuel_cell_total_hr: float = 0.0
     running_hours_pti_pto_total_hr: float = 0.0
+    running_hours_boiler_total_hr: float = 0.0
+    steam_production_boiler_total_kg: float = 0.0
     total_emission_kg: Optional[DefaultDict[EmissionType, float]] = None
     detail_result: Optional[pd.DataFrame] = None
     multi_fuel_consumption_total_kg: FuelConsumption = field(default_factory=FuelConsumption)
+    fuel_consumption_boiler_total: FuelConsumption = field(default_factory=FuelConsumption)
     co2_emission_total_kg: GHGEmissions = field(default_factory=GHGEmissions)
     energy_input_mechanical_total_mj: float = (
         0.0  # Energy input for generator / PTO (electric side) or PTI (mechanical side)
@@ -102,7 +106,8 @@ class FEEMSResult:
                             self.duration_s + other.duration_s
                         )
                 elif field_name == "total_emission_kg":
-                    value = {k: self_value[k] + other_value[k] for k in self_value}
+                    all_keys = set(self_value) | set(other_value)
+                    value = defaultdict(float, {k: self_value[k] + other_value[k] for k in all_keys})
                 elif field_name == "duration_s" and freeze_duration:
                     assert self_value == other_value, (
                         f"The duration of the two results are not "
@@ -171,6 +176,7 @@ class TypeComponent(Enum):
     SHORE_POWER = 27
     COGAS = 28
     COGES = 29
+    STEAM_BOILER = 30
 
 
 @unique

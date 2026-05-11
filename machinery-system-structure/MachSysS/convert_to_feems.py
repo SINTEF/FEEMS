@@ -1,5 +1,6 @@
 
 __all__ = [
+    "proto_to_steam_boiler",
     "convert_proto_point_to_list",
     "convert_proto_curve1d_to_np_array",
     "convert_proto_efficiency_bsfc_power_to_np_array",
@@ -62,6 +63,7 @@ from feems.components_model.component_mechanical import (
     EngineDualFuel,
     EngineMultiFuel,
     FuelCharacteristics,
+    SteamBoiler,
     _DEFAULT_BRAYTON_C_SLIP_PERCENT,
     _DEFAULT_BRAYTON_CH4_GFUEL,
     _DEFAULT_BRAYTON_N2O_GFUEL,
@@ -385,6 +387,59 @@ def convert_proto_cogas_to_feems(
         n2o_factor_gn2o_per_gfuel=n2o,
         c_slip_percent=c_slip,
     )
+
+
+def proto_to_steam_boiler(pb: proto.SteamBoiler) -> SteamBoiler:
+    """Convert a proto.SteamBoiler message to a SteamBoiler instance."""
+    emissions_curves = (
+        [convert_emission_curve_to_feems(ec) for ec in pb.emission_curves]
+        if pb.emission_curves
+        else None
+    )
+    uid = pb.uid if len(pb.uid) > _MIN_LENGTH_UID else None
+
+    if pb.fuel_modes:
+        multi_fuel_characteristics = []
+        for fuel_mode in pb.fuel_modes:
+            fc = FuelCharacteristics()
+            fc.main_fuel_type = TypeFuel(fuel_mode.main_fuel.fuel_type)
+            fc.main_fuel_origin = FuelOrigin(fuel_mode.main_fuel.fuel_origin)
+            fc.eff_curve = (
+                convert_proto_efficiency_bsfc_power_to_np_array(fuel_mode.eff)
+                if fuel_mode.HasField("eff")
+                else None
+            )
+            if len(fuel_mode.emission_curves) > 0:
+                fc.emission_curves = [
+                    convert_emission_curve_to_feems(e) for e in fuel_mode.emission_curves
+                ]
+            multi_fuel_characteristics.append(fc)
+        return SteamBoiler(
+            name=pb.name,
+            rated_steam_production_kg_per_h=pb.rated_steam_production_kg_per_h,
+            working_pressure_barg=pb.working_pressure_barg,
+            feed_water_temperature_c=pb.feed_water_temperature_c,
+            emissions_curves=emissions_curves,
+            multi_fuel_characteristics=multi_fuel_characteristics,
+            uid=uid,
+        )
+    else:
+        eta_curve = (
+            convert_proto_curve1d_to_np_array(pb.thermal_efficiency_curve.curve)
+            if len(pb.thermal_efficiency_curve.curve.points) > 0
+            else None
+        )
+        return SteamBoiler(
+            name=pb.name,
+            rated_steam_production_kg_per_h=pb.rated_steam_production_kg_per_h,
+            working_pressure_barg=pb.working_pressure_barg,
+            feed_water_temperature_c=pb.feed_water_temperature_c,
+            fuel_type=TypeFuel(pb.fuel_type),
+            fuel_origin=FuelOrigin(pb.fuel_origin),
+            thermal_efficiency_curve=eta_curve,
+            emissions_curves=emissions_curves,
+            uid=uid,
+        )
 
 
 def convert_proto_genset_to_feems(subsystem: proto.Subsystem, switchboard_id: int) -> Genset:
@@ -913,22 +968,29 @@ def convert_proto_propulsion_system_to_feems(
     HybridPropulsionSystem,
     None,
 ]:
+    boiler = proto_to_steam_boiler(system.steam_boiler) if system.HasField("steam_boiler") else None
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.MECHANICAL:
-        return MechanicalPropulsionSystemWithElectricPowerSystem(
+        feems_system = MechanicalPropulsionSystemWithElectricPowerSystem(
             name=system.name,
             electric_system=convert_proto_electric_system_to_feems(system.electric_system),
             mechanical_system=convert_proto_mechanical_system_to_feems(system.mechanical_system),
         )
+        feems_system.boiler = boiler
+        return feems_system
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.ELECTRIC:
-        return convert_proto_electric_system_to_feems(system.electric_system)
+        feems_system = convert_proto_electric_system_to_feems(system.electric_system)
+        feems_system.boiler = boiler
+        return feems_system
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.HYBRID:
         electric_system = convert_proto_electric_system_to_feems(system.electric_system)
         pti_ptos = electric_system.pti_pto if len(electric_system.pti_pto) > 0 else None
-        return HybridPropulsionSystem(
+        feems_system = HybridPropulsionSystem(
             name=system.name,
             electric_system=electric_system,
             mechanical_system=convert_proto_mechanical_system_to_feems(
                 system=system.mechanical_system, pti_ptos=pti_ptos
             ),
         )
+        feems_system.boiler = boiler
+        return feems_system
     return None

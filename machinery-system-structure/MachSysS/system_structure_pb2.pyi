@@ -519,6 +519,7 @@ class Subsystem(_message.Message):
         SHORE_POWER: _ClassVar[Subsystem.ComponentType]
         COGAS: _ClassVar[Subsystem.ComponentType]
         COGES: _ClassVar[Subsystem.ComponentType]
+        STEAM_BOILER: _ClassVar[Subsystem.ComponentType]
     NONE: Subsystem.ComponentType
     MAIN_ENGINE: Subsystem.ComponentType
     AUXILIARY_ENGINE: Subsystem.ComponentType
@@ -549,6 +550,7 @@ class Subsystem(_message.Message):
     SHORE_POWER: Subsystem.ComponentType
     COGAS: Subsystem.ComponentType
     COGES: Subsystem.ComponentType
+    STEAM_BOILER: Subsystem.ComponentType
     GEAR_FIELD_NUMBER: _ClassVar[int]
     ENGINE_FIELD_NUMBER: _ClassVar[int]
     ELECTRIC_MACHINE_FIELD_NUMBER: _ClassVar[int]
@@ -640,7 +642,7 @@ class FuelStorage(_message.Message):
     def __init__(self, fuel_type: _Optional[_Union[FuelType, str]] = ..., capacity_kg: _Optional[float] = ...) -> None: ...
 
 class MachinerySystem(_message.Message):
-    __slots__ = ("name", "propulsion_type", "fuel_storage", "maximum_allowed_genset_load_percentage", "mechanical_system", "electric_system", "maximum_allowed_fuel_cell_load_percentage", "average_base_load_percentage")
+    __slots__ = ("name", "propulsion_type", "fuel_storage", "maximum_allowed_genset_load_percentage", "mechanical_system", "electric_system", "maximum_allowed_fuel_cell_load_percentage", "average_base_load_percentage", "steam_boiler")
     class PropulsionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         MECHANICAL: _ClassVar[MachinerySystem.PropulsionType]
@@ -657,6 +659,7 @@ class MachinerySystem(_message.Message):
     ELECTRIC_SYSTEM_FIELD_NUMBER: _ClassVar[int]
     MAXIMUM_ALLOWED_FUEL_CELL_LOAD_PERCENTAGE_FIELD_NUMBER: _ClassVar[int]
     AVERAGE_BASE_LOAD_PERCENTAGE_FIELD_NUMBER: _ClassVar[int]
+    STEAM_BOILER_FIELD_NUMBER: _ClassVar[int]
     name: str
     propulsion_type: MachinerySystem.PropulsionType
     fuel_storage: _containers.RepeatedCompositeFieldContainer[FuelStorage]
@@ -665,7 +668,41 @@ class MachinerySystem(_message.Message):
     electric_system: ElectricSystem
     maximum_allowed_fuel_cell_load_percentage: float
     average_base_load_percentage: float
-    def __init__(self, name: _Optional[str] = ..., propulsion_type: _Optional[_Union[MachinerySystem.PropulsionType, str]] = ..., fuel_storage: _Optional[_Iterable[_Union[FuelStorage, _Mapping]]] = ..., maximum_allowed_genset_load_percentage: _Optional[float] = ..., mechanical_system: _Optional[_Union[MechanicalSystem, _Mapping]] = ..., electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ..., maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ..., average_base_load_percentage: _Optional[float] = ...) -> None: ...
+    steam_boiler: SteamBoiler
+    def __init__(self, name: _Optional[str] = ..., propulsion_type: _Optional[_Union[MachinerySystem.PropulsionType, str]] = ..., fuel_storage: _Optional[_Iterable[_Union[FuelStorage, _Mapping]]] = ..., maximum_allowed_genset_load_percentage: _Optional[float] = ..., mechanical_system: _Optional[_Union[MechanicalSystem, _Mapping]] = ..., electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ..., maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ..., average_base_load_percentage: _Optional[float] = ..., steam_boiler: _Optional[_Union[SteamBoiler, _Mapping]] = ...) -> None: ...
+
+class SteamBoiler(_message.Message):
+    __slots__ = ("name", "uid", "rated_steam_production_kg_per_h", "working_pressure_barg", "feed_water_temperature_c", "fuel_type", "fuel_origin", "thermal_efficiency_curve", "emission_curves", "fuel_modes")
+    class FuelMode(_message.Message):
+        __slots__ = ("main_fuel", "eff", "emission_curves")
+        MAIN_FUEL_FIELD_NUMBER: _ClassVar[int]
+        EFF_FIELD_NUMBER: _ClassVar[int]
+        EMISSION_CURVES_FIELD_NUMBER: _ClassVar[int]
+        main_fuel: Fuel
+        eff: Efficiency
+        emission_curves: _containers.RepeatedCompositeFieldContainer[EmissionCurve]
+        def __init__(self, main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., eff: _Optional[_Union[Efficiency, _Mapping]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ...) -> None: ...
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    RATED_STEAM_PRODUCTION_KG_PER_H_FIELD_NUMBER: _ClassVar[int]
+    WORKING_PRESSURE_BARG_FIELD_NUMBER: _ClassVar[int]
+    FEED_WATER_TEMPERATURE_C_FIELD_NUMBER: _ClassVar[int]
+    FUEL_TYPE_FIELD_NUMBER: _ClassVar[int]
+    FUEL_ORIGIN_FIELD_NUMBER: _ClassVar[int]
+    THERMAL_EFFICIENCY_CURVE_FIELD_NUMBER: _ClassVar[int]
+    EMISSION_CURVES_FIELD_NUMBER: _ClassVar[int]
+    FUEL_MODES_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    uid: str
+    rated_steam_production_kg_per_h: float
+    working_pressure_barg: float
+    feed_water_temperature_c: float
+    fuel_type: FuelType
+    fuel_origin: FuelOrigin
+    thermal_efficiency_curve: EfficiencyCurve
+    emission_curves: _containers.RepeatedCompositeFieldContainer[EmissionCurve]
+    fuel_modes: _containers.RepeatedCompositeFieldContainer[SteamBoiler.FuelMode]
+    def __init__(self, name: _Optional[str] = ..., uid: _Optional[str] = ..., rated_steam_production_kg_per_h: _Optional[float] = ..., working_pressure_barg: _Optional[float] = ..., feed_water_temperature_c: _Optional[float] = ..., fuel_type: _Optional[_Union[FuelType, str]] = ..., fuel_origin: _Optional[_Union[FuelOrigin, str]] = ..., thermal_efficiency_curve: _Optional[_Union[EfficiencyCurve, _Mapping]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., fuel_modes: _Optional[_Iterable[_Union[SteamBoiler.FuelMode, _Mapping]]] = ...) -> None: ...
 
 class MultiFuelEngine(_message.Message):
     __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "fuel_modes", "order_from_switchboard_or_shaftline", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid")
