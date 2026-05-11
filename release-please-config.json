@@ -1,5 +1,6 @@
 {
   "include-component-in-tag": true,
+  "pull-request-title-pattern": "chore${scope}: release ${component} ${version}",
   "packages": {
     "feems": {
       "changelog-path": "CHANGELOG.md",
@@ -23,7 +24,7 @@
       "prerelease": false,
       "package-name": "MachSysS",
       "extra-files": [
-        "settings.ini"
+        "pyproject.toml"
       ]
     },
     "RunFEEMSSim": {
@@ -33,7 +34,10 @@
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
       "prerelease": false,
-      "package-name": "RunFeemsSim"
+      "package-name": "RunFeemsSim",
+      "extra-files": [
+        "pyproject.toml"
+      ]
     }
   },
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"

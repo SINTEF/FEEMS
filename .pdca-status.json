@@ -1,0 +1,9 @@
+{
+  "user-defined-fuel-support": {
+    "phase": "archived",
+    "matchRate": 95,
+    "startedAt": "2026-02-19T00:00:00Z",
+    "archivedAt": "2026-02-22T00:00:00Z",
+    "archivedTo": "docs/archive/2026-02/user-defined-fuel-support/"
+  }
+}

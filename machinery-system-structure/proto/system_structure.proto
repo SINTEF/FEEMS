@@ -99,6 +99,11 @@ enum FuelType {
   ETHANOL = 7;
   METHANOL = 8;
   LFO = 9;
+  LSFO_CRUDE = 10;
+  LSFO_BLEND = 11;
+  ULSFO = 12;
+  VLSFO = 13;
+  NONE3 = 99;
 }
 
 enum FuelOrigin {
@@ -118,6 +123,7 @@ enum FuelSpecifiedBy {
 message Fuel {
   FuelType fuel_type = 1;
   FuelOrigin fuel_origin = 2;
+  string name = 3;
 }
 
 message Engine {
@@ -140,6 +146,7 @@ message Engine {
     DIESEL = 1;
     OTTO = 2;
     LEAN_BURN_SPARK_IGNITION = 3;
+    BRAYTON = 4;
   }
   NOxCalculationMethod nox_calculation_method = 9;
   repeated EmissionCurve emission_curves = 10;
@@ -151,6 +158,14 @@ message Engine {
 }
 
 message COGAS {
+  message FuelMode {
+    Fuel main_fuel = 1;
+    optional Fuel secondary_fuel = 2;    // support/secondary fuel for this operating mode
+    optional Efficiency eff = 3;         // combined GT+ST efficiency vs load-ratio
+    repeated EmissionCurve emission_curves = 4;
+    Engine.EngineCycleType engine_cycle_type = 5;
+    Engine.NOxCalculationMethod nox_calculation_method = 6;
+  }
   string name = 1;
   double rated_power_kw = 2;
   double rated_speed_rpm = 3;
@@ -165,6 +180,10 @@ message COGAS {
   double start_delay_s = 12;
   double turn_off_power_kw = 13;
   string uid = 14;
+  repeated COGAS.FuelMode fuel_modes = 15;
+  optional double ch4_factor_gch4_per_gfuel = 16;
+  optional double n2o_factor_gn2o_per_gfuel = 17;
+  optional double c_slip_percent = 18;
 }
 
 message ElectricMachine {
@@ -301,6 +320,7 @@ message Subsystem {
     SHORE_POWER = 27;
     COGAS = 28;
     COGES = 29;
+    STEAM_BOILER = 30;
   }
   PowerType power_type = 14;
   ComponentType component_type = 15;
@@ -311,6 +331,10 @@ message Subsystem {
   double ramp_down_rate_limit_percent_per_second = 20;
   uint32 base_load_order = 21; // The order of the power source in the base load calculation. 1 is the primary base load, 2 is the secondary base load, etc.
   string uid = 22;
+  MultiFuelEngine multi_fuel_engine = 23;
+  double start_delay_s = 24;
+  double turn_off_power_kw = 25;
+  double power_minimum_specific = 26;
 }
 
 message Switchboard {
@@ -350,4 +374,47 @@ message MachinerySystem {
   ElectricSystem electric_system = 6;
   double maximum_allowed_fuel_cell_load_percentage = 7;
   double average_base_load_percentage = 8;
+  SteamBoiler steam_boiler = 9;
 }
+
+message SteamBoiler {
+  // Field numbers for main_fuel (1), eff (3), and emission_curves (4) intentionally match
+  // COGAS.FuelMode to preserve wire compatibility with any previously serialised data.
+  message FuelMode {
+    Fuel main_fuel = 1;
+    optional Efficiency eff = 3;
+    repeated EmissionCurve emission_curves = 4;
+  }
+  string name = 1;
+  string uid = 2;
+  double rated_steam_production_kg_per_h = 3;
+  double working_pressure_barg = 4;
+  double feed_water_temperature_c = 5;
+  FuelType fuel_type = 6;
+  FuelOrigin fuel_origin = 7;
+  EfficiencyCurve thermal_efficiency_curve = 8;
+  repeated EmissionCurve emission_curves = 9;
+  repeated FuelMode fuel_modes = 10;
+}
+
+message MultiFuelEngine {
+  message FuelMode {
+    Fuel main_fuel = 1;
+    BSFC main_bsfc = 2;
+    optional Fuel pilot_fuel = 3;
+    optional BSFC pilot_bsfc = 4;
+    repeated EmissionCurve emission_curves = 5;
+    Engine.EngineCycleType engine_cycle_type = 6;
+    Engine.NOxCalculationMethod nox_calculation_method = 7;
+  }
+  string name = 1;
+  double rated_power_kw = 2;
+  double rated_speed_rpm = 3;
+  repeated FuelMode fuel_modes = 4;
+  uint32 order_from_switchboard_or_shaftline = 5;
+  double unit_price_usd = 8;
+  double start_delay_s = 9;
+  double turn_off_power_kw = 10;
+  string uid = 11;
+}
+

@@ -1,18 +1,17 @@
 import logging
-from dataclasses import fields
-from enum import unique, Enum
-from typing import Union, List, Callable, Tuple, Optional
+from enum import Enum, unique
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from numpy import cumsum
-from scipy.integrate import trapezoid, simpson
+from scipy.integrate import simpson, trapezoid
 from scipy.interpolate import PchipInterpolator
 
 from feems import get_logger
 from feems.exceptions import InputError
 from feems.fuel import FuelConsumption
-from feems.types_for_feems import TimeIntervalList, EmissionCurvePoint
+from feems.types_for_feems import EmissionCurvePoint, TimeIntervalList
 
 logger = get_logger(__name__)
 
@@ -63,10 +62,7 @@ def integrate_data(
     time_interval_s_is_scalar_number = np.isscalar(time_interval_s) and isinstance(
         time_interval_s, (float, int)
     )
-    if (
-        len(data_to_integrate) == 1
-        and integration_method != IntegrationMethod.sum_with_time
-    ):
+    if len(data_to_integrate) == 1 and integration_method != IntegrationMethod.sum_with_time:
         logger.warning(
             "The integration method is not 'sum_with_time' while the data to integrate "
             "has only one point. 'sum_with_time' will be used for integration to avoid "
@@ -101,10 +97,7 @@ def integrate_data(
             result = result[0]
         return result
     else:
-        msg = (
-            "The given method (%s) for the integration is not valid"
-            % integration_method
-        )
+        msg = "The given method (%s) for the integration is not valid" % integration_method
         logging.error(msg)
         raise TypeError(msg)
 
@@ -118,10 +111,7 @@ def integrate_multi_fuel_consumption(
     Integrates fuel consumption rate of each fuel component.
     """
     fuel_consumption_kg = FuelConsumption(
-        fuels=[
-            fuel.copy_except_mass_or_mass_fraction
-            for fuel in fuel_consumption_kg_per_s.fuels
-        ]
+        fuels=[fuel.copy_except_mass_or_mass_fraction for fuel in fuel_consumption_kg_per_s.fuels]
     )
     for each_fuel_rate, each_fuel_mass in zip(
         fuel_consumption_kg_per_s.fuels, fuel_consumption_kg.fuels
@@ -161,10 +151,7 @@ def integrate_data_accumulative(
         res = np.insert(res, 0, 0, axis=0)
         return res
     else:
-        msg = (
-            "The given method (%s) for the integration is not valid"
-            % integration_method
-        )
+        msg = "The given method (%s) for the integration is not valid" % integration_method
         logging.error(msg)
         raise TypeError(msg)
 
@@ -186,7 +173,10 @@ def get_efficiency_curve_from_points(
         curve_points = np.append(
             np.array([0, 1]).reshape(-1, 1), np.array([eff, eff]).reshape(-1, 1), axis=1
         )
-        function = lambda x: eff
+
+        def function(x):
+            return eff
+
         return function, curve_points
     else:
         eff_curve = eff_curve[eff_curve[:, 0].argsort()]
@@ -205,13 +195,13 @@ def get_emission_curve_from_points(
         return lambda x: emission[0].emission_g_per_kwh
     else:
         power = np.array([point.load_ratio for point in emission])
-        emission = np.array([point.emission_g_per_kwh for point in emission])
-        return PchipInterpolator(power, emission, extrapolate=True)
+        emission_factor = np.array([point.emission_g_per_kwh for point in emission])
+        return PchipInterpolator(power, emission_factor, extrapolate=True)
 
 
 def get_efficiency_curve_from_dataframe(
     df: pd.DataFrame, key_word: str = "efficiency"
-) -> Union[PchipInterpolator, np.ndarray]:
+) -> Tuple[PchipInterpolator, np.ndarray]:
     """
     Returns the efficiency interpolating class object from the DataFrame provided
     :param df: DataFrame for the component information
@@ -227,9 +217,7 @@ def get_efficiency_curve_from_dataframe(
         curve_points = np.ravel(df[eff_columns].values)
     else:
         for i, eff_column in enumerate(eff_columns):
-            curve_points[i, 0] = float(
-                eff_column[eff_column.find("@") + 1 : eff_column.find("%")]
-            )
+            curve_points[i, 0] = float(eff_column[eff_column.find("@") + 1 : eff_column.find("%")])
             curve_points[i, 1] = df[eff_column].values[0]
         curve_points = curve_points[curve_points[:, 0].argsort()]
     return get_efficiency_curve_from_points(curve_points)

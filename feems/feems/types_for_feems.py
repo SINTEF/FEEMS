@@ -1,7 +1,8 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import Enum, unique, auto
+from enum import Enum, auto, unique
 from functools import reduce
-from typing import NewType, NamedTuple, Union, List, Optional, TypeVar, DefaultDict
+from typing import DefaultDict, List, NamedTuple, NewType, Optional, TypeVar, Union
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ class EngineCycleType(Enum):
     DIESEL = auto()
     OTTO = auto()
     LEAN_BURN_SPARK_IGNITION = auto()
+    BRAYTON = auto()
 
 
 class EmissionType(Enum):
@@ -30,7 +32,7 @@ class EmissionType(Enum):
 
 @dataclass
 class FEEMSResult:
-    from feems.fuel import FuelConsumption, FuelByMassFraction
+    from feems.fuel import FuelByMassFraction, FuelConsumption, GHGEmissions
 
     duration_s: Optional[float] = None
     energy_consumption_electric_total_mj: float = 0.0
@@ -43,19 +45,18 @@ class FEEMSResult:
     running_hours_genset_total_hr: float = 0.0
     running_hours_fuel_cell_total_hr: float = 0.0
     running_hours_pti_pto_total_hr: float = 0.0
+    running_hours_boiler_total_hr: float = 0.0
+    steam_production_boiler_total_kg: float = 0.0
     total_emission_kg: Optional[DefaultDict[EmissionType, float]] = None
     detail_result: Optional[pd.DataFrame] = None
-    multi_fuel_consumption_total_kg: FuelConsumption = field(
-        default_factory=FuelConsumption
-    )
-    co2_emission_total_kg: float = 0.0
+    multi_fuel_consumption_total_kg: FuelConsumption = field(default_factory=FuelConsumption)
+    fuel_consumption_boiler_total: FuelConsumption = field(default_factory=FuelConsumption)
+    co2_emission_total_kg: GHGEmissions = field(default_factory=GHGEmissions)
     energy_input_mechanical_total_mj: float = (
         0.0  # Energy input for generator / PTO (electric side) or PTI (mechanical side)
     )
     energy_input_electric_total_mj: float = 0.0  # Energy input for shore power
-    energy_consumption_propulsion_total_mj: float = (
-        0.0  # Energy consumption of propulsion shaft
-    )
+    energy_consumption_propulsion_total_mj: float = 0.0  # Energy consumption of propulsion shaft
     energy_consumption_auxiliary_total_mj: float = (
         0.0  # Energy consumption of auxiliary (electric) or mechanical load (mechanical)
     )
@@ -67,8 +68,7 @@ class FEEMSResult:
     @property
     def fuel_energy_total_mj(self):
         return reduce(
-            lambda acc, fuel: acc
-            + fuel.lhv_mj_per_g * fuel.mass_or_mass_fraction * 1e3,
+            lambda acc, fuel: acc + fuel.lhv_mj_per_g * fuel.mass_or_mass_fraction * 1e3,
             self.multi_fuel_consumption_total_kg.fuels,
             0.0,
         )
@@ -102,12 +102,12 @@ class FEEMSResult:
                     elif other.duration_s is None:
                         value = self_value
                     else:
-                        value = (
-                            self_value * self.duration_s
-                            + other_value * other.duration_s
-                        ) / (self.duration_s + other.duration_s)
+                        value = (self_value * self.duration_s + other_value * other.duration_s) / (
+                            self.duration_s + other.duration_s
+                        )
                 elif field_name == "total_emission_kg":
-                    value = {k: self_value[k] + other_value[k] for k in self_value}
+                    all_keys = set(self_value) | set(other_value)
+                    value = defaultdict(float, {k: self_value[k] + other_value[k] for k in all_keys})
                 elif field_name == "duration_s" and freeze_duration:
                     assert self_value == other_value, (
                         f"The duration of the two results are not "
@@ -129,11 +129,7 @@ class FEEMSResult:
             + (self.running_hours_pti_pto_total_hr or 0.0)
             + (self.running_hours_fuel_cell_total_hr or 0.0),
             self.co2_emission_total_kg,
-            (
-                self.total_emission_kg[EmissionType.NOX]
-                if self.total_emission_kg
-                else None
-            ),
+            (self.total_emission_kg[EmissionType.NOX] if self.total_emission_kg else None),
         ]
 
     def to_list_for_mechanical_component(self) -> List[Optional[float]]:
@@ -144,11 +140,7 @@ class FEEMSResult:
             (self.running_hours_main_engines_hr or 0.0)
             + (self.running_hours_pti_pto_total_hr or 0.0),
             self.co2_emission_total_kg,
-            (
-                self.total_emission_kg[EmissionType.NOX]
-                if self.total_emission_kg
-                else None
-            ),
+            (self.total_emission_kg[EmissionType.NOX] if self.total_emission_kg else None),
         ]
 
 
@@ -184,6 +176,7 @@ class TypeComponent(Enum):
     SHORE_POWER = 27
     COGAS = 28
     COGES = 29
+    STEAM_BOILER = 30
 
 
 @unique
