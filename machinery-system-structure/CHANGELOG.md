@@ -5,6 +5,16 @@ All notable changes to the MachSysS (Machinery System Structure) package will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.11.0...MachSysS-v0.12.0) (2026-05-11)
+
+
+### Features
+
+* add SteamBoiler component with multi-fuel and proto round-trip support ([0725ac7](https://github.com/SINTEF/FEEMS/commit/0725ac7f6391eb6f5b5a844b14c2b8aadcffa569))
+* add SteamBoiler component with multi-fuel and proto round-trip support ([1d379b3](https://github.com/SINTEF/FEEMS/commit/1d379b3202979166052a0c27693fc2e94d55a27f))
+* add SteamBoiler detail_result rows, CO2 accounting, and boiler-only fuel_option ([75901e7](https://github.com/SINTEF/FEEMS/commit/75901e74789d843b0da299ea49d970dbf389bc5a))
+* serialize SteamBoiler in MachinerySystem proto ([911cc23](https://github.com/SINTEF/FEEMS/commit/911cc23d108f304cec16adefb307d11e5e5c3cb7))
+
 ## [0.11.0](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.10.0...MachSysS-v0.11.0) (2026-04-27)
 
 
