@@ -10,7 +10,7 @@ from feems.components_model import (
     MainEngineForMechanicalPropulsion,
     MainEngineWithGearBoxForMechanicalPropulsion,
 )
-from feems.fuel import Fuel, FuelConsumption, FuelOrigin, FuelSpecifiedBy, GHGEmissions, TypeFuel
+from feems.fuel import Fuel, FuelOrigin, FuelSpecifiedBy, TypeFuel
 
 from . import get_logger
 from .components_model.component_electric import (
@@ -32,7 +32,7 @@ from .components_model.component_electric import (
     SuperCapacitorSystem,
 )
 from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel, SteamBoiler
-from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard
+from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard, get_duration_s
 from .components_model.utility import IntegrationMethod, integrate_data, integrate_multi_fuel_consumption
 from .exceptions import ConfigurationError, InputError
 from .types_for_feems import (
@@ -345,6 +345,8 @@ class MachinerySystem:
 
         merged_emission_kg = defaultdict(float, total_emission_kg) if total_emission_kg else None
         co2_kg = boiler_fc.get_total_co2_emissions()
+        n_steps = len(np.atleast_1d(steam_kg_per_s))
+        duration_s = get_duration_s(integration_method, n_steps, time_interval_s)
         detail_row = pd.Series(
             [
                 boiler_fc,
@@ -363,6 +365,7 @@ class MachinerySystem:
             name=boiler.name,
         )
         return FEEMSResult(
+            duration_s=duration_s,
             running_hours_boiler_total_hr=running_hr,
             steam_production_boiler_total_kg=total_steam_kg,
             fuel_consumption_boiler_total=boiler_fc,
