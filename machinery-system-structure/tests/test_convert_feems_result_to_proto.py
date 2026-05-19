@@ -127,5 +127,112 @@ class TestConvertFEEMSResultToProto(unittest.TestCase):
         res_proto = res_converter.get_feems_result_proto()
         self.assertIsNotNone(res_proto)
 
+class TestConvertCOGESResultToProto(unittest.TestCase):
+    """COGES branch in FEEMSResultConverter: build a minimal EPS with a single COGES,
+    run the energy-balance calculation, and round-trip through get_feems_result_proto."""
+
+    def _build_eps_with_coges(self):
+        from feems.components_model.component_electric import COGES, ElectricMachine
+        from feems.components_model.component_mechanical import COGAS
+        from feems.components_model.utility import IntegrationMethod
+        from feems.fuel import FuelOrigin, TypeFuel
+        from feems.system_model import ElectricPowerSystem
+        from feems.types_for_feems import TypeComponent, TypePower
+
+        cogas = COGAS(
+            name="COGAS",
+            rated_power=5000.0,
+            rated_speed=3600.0,
+            eff_curve=np.array([[0.1, 0.30], [0.5, 0.40], [1.0, 0.42]]),
+            fuel_type=TypeFuel.NATURAL_GAS,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        generator = ElectricMachine(
+            type_=TypeComponent.SYNCHRONOUS_MACHINE,
+            name="generator",
+            rated_power=cogas.rated_power * 0.9,
+            rated_speed=cogas.rated_speed,
+            power_type=TypePower.POWER_SOURCE,
+            eff_curve=np.array([[0.1, 0.97], [1.0, 0.97]]),
+            switchboard_id=1,
+        )
+        coges = COGES(name="COGES", cogas=cogas, generator=generator)
+        coges.power_output = np.array([2000.0, 3000.0])
+
+        system = ElectricPowerSystem(
+            name="test EPS with COGES",
+            power_plant_components=[coges],
+            bus_tie_connections=[],
+        )
+        system.set_time_interval(
+            time_interval_s=np.array([3600.0, 3600.0]),
+            integration_method=IntegrationMethod.sum_with_time,
+        )
+        return system, coges
+
+    def test_coges_time_series_has_fuel_consumption(self):
+        """The new COGES branch should populate fuel_consumption_kg_per_s.fuels in the
+        per-component time-series proto (regression for missing TypeComponent.COGES handling)."""
+        system, coges = self._build_eps_with_coges()
+        res = system.get_fuel_energy_consumption_running_time(
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+
+        converter = FEEMSResultConverter(
+            feems_result=res,
+            system_feems=system,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+        proto_result = converter.get_feems_result_proto(include_time_series_for_components=True)
+
+        self.assertIsNotNone(proto_result)
+        # The converter must have recorded a time-series entry for the COGES power source.
+        ts_entries = converter._time_series_data_for_electric_component
+        self.assertEqual(len(ts_entries), 1)
+        coges_entry = ts_entries[0]
+        self.assertEqual(coges_entry["name"], coges.name)
+        self.assertEqual(coges_entry["node_id"], coges.switchboard_id)
+
+        # Fuel consumption array must be populated by the new branch.
+        fuels = coges_entry["data"].fuel_consumption_kg_per_s.fuels
+        self.assertGreater(len(fuels), 0, "COGES fuel array is empty — branch did not run")
+        for fuel in fuels:
+            self.assertEqual(len(fuel.mass_or_mass_fraction), len(coges.power_output))
+            self.assertTrue(
+                np.all(np.asarray(fuel.mass_or_mass_fraction) > 0),
+                "COGES fuel flow must be strictly positive at non-zero power output",
+            )
+
+    def test_coges_detail_result_joined_to_time_series(self):
+        """detail_result row for the COGES must be matched on (name, switchboard_id)
+        so that result_time_series is attached on the per-component proto."""
+        system, coges = self._build_eps_with_coges()
+        res = system.get_fuel_energy_consumption_running_time(
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+
+        converter = FEEMSResultConverter(
+            feems_result=res,
+            system_feems=system,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+        proto_result = converter.get_feems_result_proto(include_time_series_for_components=True)
+
+        detailed = list(proto_result.electric_system.detailed_result)
+        coges_rows = [row for row in detailed if row.component_name == coges.name]
+        self.assertEqual(len(coges_rows), 1)
+        coges_row = coges_rows[0]
+        # The join at convert_feems_result_to_proto.py should have populated result_time_series.
+        self.assertGreater(
+            len(coges_row.result_time_series.power_output_kw),
+            0,
+            "COGES detail row has no joined time-series — (name, switchboard_id) mismatch",
+        )
+        self.assertEqual(
+            len(coges_row.result_time_series.power_output_kw),
+            len(coges.power_output),
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
