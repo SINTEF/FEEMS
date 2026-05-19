@@ -162,6 +162,22 @@ class FEEMSResultConverter:
                             name=fuel.name,
                         )
                     )
+            elif power_source.type == TypeComponent.COGES:
+                coges_result = power_source.get_system_run_point_from_power_output_kw(
+                    power_output_kw=power_source.power_output,
+                    fuel_specified_by=self.fuel_specified_by,
+                )
+                for fuel in coges_result.cogas.fuel_flow_rate_kg_per_s.fuels:
+                    result_proto.fuel_consumption_kg_per_s.fuels.append(
+                        proto.FuelArray(
+                            fuel_type=fuel.fuel_type.value,
+                            fuel_origin=fuel.origin.value,
+                            fuel_specified_by=fuel.fuel_specified_by.value,
+                            mass_or_mass_fraction=fuel.mass_or_mass_fraction.tolist(),
+                            lhv_mj_per_g=fuel.lhv_mj_per_g,
+                            name=fuel.name,
+                        )
+                    )
             elif power_source.type in [
                 TypeComponent.FUEL_CELL_SYSTEM,
                 TypeComponent.FUEL_CELL,
