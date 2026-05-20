@@ -286,13 +286,16 @@ def scenario_main_engine() -> None:
 def scenario_pti_pto() -> None:
     _section(
         "SCENARIO 4 — PTI/PTO bidirectional split\n"
-        "           (-300, -300, 0, +100, +100, +200 → PTO avg 300, PTI avg 133.33)"
+        "           (PTO: |elec_out|=300, |mech_in|=330  /  PTI: |elec_in|=100, |mech_out|=90)\n"
+        "           Realistic ≈10 % loss so efficiency reports below 1.0."
     )
 
     pp = _make_pti_pto()
-    # power_input > 0 → PTI (electric in); power_input < 0 → PTO (electric out)
+    # power_input > 0 → PTI (electric in);  power_input < 0 → PTO (electric out)
+    # PTO mode: shaft drives PTI/PTO which delivers electric to bus; |mech_in| > |elec_out|.
+    # PTI mode: bus drives PTI/PTO which delivers mechanical to shaft; |elec_in| > |mech_out|.
     pp.power_input = np.array([-300.0, -300.0, 0.0, 100.0, 100.0, 200.0])
-    pp.power_output = np.array([-270.0, -270.0, 0.0, 90.0, 90.0, 180.0])
+    pp.power_output = np.array([330.0, 330.0, 0.0, 90.0, 90.0, 180.0])
     pp.full_pti_mode = np.array([False, False, False, True, True, True])
     pp.full_pto_mode = np.array([True, True, False, False, False, False])
     pp.status = (pp.power_input != 0).astype(bool)
@@ -305,16 +308,22 @@ def scenario_pti_pto() -> None:
     )
 
     print(f"  power_input            = {pp.power_input} kW")
+    print(f"  power_output           = {pp.power_output} kW")
     _print_metrics(
         res,
         expected_avg_power=300.0,
         expected_reversible=(100.0 + 100.0 + 200.0) / 3.0,
     )
+    # Expected combined efficiency = (mech_out_pti + elec_out_pto) / (elec_in_pti + mech_in_pto)
+    #   PTI: |mech_out| Σ = 90+90+180 = 360, |elec_in| Σ = 100+100+200 = 400
+    #   PTO: |elec_out| Σ = 300+300 = 600, |mech_in| Σ = 330+330 = 660
+    #   eff = (360 + 600) / (400 + 660) = 960 / 1060 ≈ 0.906
+    print("  → expected efficiency ≈ 960 / 1060 ≈ 0.906")
 
     print()
     print("  Variant — pure PTO (no PTI; reversible must stay 0):")
     pp.power_input = np.array([-500.0, -500.0, 0.0, 0.0])
-    pp.power_output = np.array([-450.0, -450.0, 0.0, 0.0])
+    pp.power_output = np.array([550.0, 550.0, 0.0, 0.0])
     pp.full_pti_mode = np.zeros(4, dtype=bool)
     pp.full_pto_mode = np.array([True, True, False, False])
     pp.status = (pp.power_input != 0).astype(bool)
@@ -323,10 +332,13 @@ def scenario_pti_pto() -> None:
         time_interval_s=60.0,
         integration_method=IntegrationMethod.simpson,
         fuel_specified_by=FuelSpecifiedBy.IMO,
+        isSystemMechanical=False,  # switchboard context — regression for the bug
     )
     print(f"    power_input    = {pp.power_input}")
+    print(f"    power_output   = {pp.power_output}")
     print(f"    avg power      = {res2.operating_avg_power_kw} kW")
     print(f"    avg reversible = {res2.operating_avg_reversible_power_kw} kW")
+    print(f"    avg efficiency = {res2.operating_avg_efficiency}  (= 500/550 ≈ 0.909, was 0.0 pre-fix)")
 
 
 # ---------------------------------------------------------------------------

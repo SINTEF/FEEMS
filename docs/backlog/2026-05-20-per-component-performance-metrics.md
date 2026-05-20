@@ -94,6 +94,6 @@ In Progress
 ## PDCA Links
 
 - Plan doc: `docs/01-plan/features/per-component-performance-metrics.plan.md`
-- Design doc: `docs/02-design/per-component-performance-metrics.md`
+- Design doc: `docs/02-design/features/per-component-performance-metrics.design.md`
 - Analysis: `docs/03-analysis/per-component-performance-metrics.analysis.md`
 - Report: `docs/04-report/per-component-performance-metrics.report.md`

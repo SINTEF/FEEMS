@@ -537,10 +537,14 @@ def _assign_operating_avg_metrics(
         res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
             power, time_interval_s, mask
         )
-        # Engine-side shaft energy (matches existing energy_consumption_mechanical_total_mj
-        # convention in the ShaftLine wiring further below).
+        # Use the *delivered* shaft power (component.power_output) — for
+        # MAIN_ENGINE_WITH_GEARBOX, component.engine.power_output is upstream of
+        # the gearbox (= power / eff_gearbox in the get_engine_run_point call),
+        # which would inflate efficiency and deflate SFC vs the documented
+        # "avg shaft kW / g_fuel per shaft kWh" semantics. For MAIN_ENGINE
+        # (no gearbox) the two are equal — nothing changes.
         shaft_mj = _integrate_kw_signal_to_mj(
-            component.engine.power_output, time_interval_s, integration_method
+            component.power_output, time_interval_s, integration_method
         )
         fuel_mj = res.fuel_energy_total_mj
         res.operating_avg_efficiency = _efficiency_from_totals(shaft_mj, fuel_mj)
@@ -572,22 +576,38 @@ def _assign_operating_avg_metrics(
     # PTI/PTO — bidirectional split -----------------------------------------
     if type_ == TypeComponent.PTI_PTO_SYSTEM:
         power_input = np.atleast_1d(component.power_input)
-        pti_mask = power_input > 0  # electric in
-        pto_mask = power_input < 0  # electric out
+        power_output = np.atleast_1d(component.power_output)
+        pti_mask = power_input > 0  # electric in  (PTI)
+        pto_mask = power_input < 0  # electric out (PTO)
         res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
             power_input, time_interval_s, pto_mask
         )
         res.operating_avg_reversible_power_kw = _time_weighted_avg_magnitude_kw(
             power_input, time_interval_s, pti_mask
         )
-        # Total useful energy out / total energy in across both directions.
-        # These integrated quantities were already set inside the PTI_PTO branch above.
-        energy_out = (
-            res.energy_input_electric_total_mj + res.energy_consumption_mechanical_total_mj
+        # Compute energy_in / energy_out directly from the power signals — not
+        # from res.energy_*_total_mj, which the PTI_PTO branch above populates
+        # differently depending on isSystemMechanical (electric fields when
+        # called by Switchboard, mechanical fields when called by ShaftLine).
+        # Relying on those would report 0.0 for pure-PTO or pure-PTI runs.
+        # Convention (see node.py PTI_PTO branch): in PTI mode electric flows in
+        # and mechanical flows out (shaft delivered); in PTO mode mechanical
+        # flows in and electric flows out. We integrate |·| of the relevant
+        # signal on each mask and sum across directions.
+        pti_elec_in_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_input) * pti_mask, time_interval_s, integration_method
         )
-        energy_in = (
-            res.energy_consumption_electric_total_mj + res.energy_input_mechanical_total_mj
+        pti_mech_out_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_output) * pti_mask, time_interval_s, integration_method
         )
+        pto_mech_in_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_output) * pto_mask, time_interval_s, integration_method
+        )
+        pto_elec_out_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_input) * pto_mask, time_interval_s, integration_method
+        )
+        energy_out = pti_mech_out_mj + pto_elec_out_mj
+        energy_in = pti_elec_in_mj + pto_mech_in_mj
         res.operating_avg_efficiency = _efficiency_from_totals(energy_out, energy_in)
         return
 

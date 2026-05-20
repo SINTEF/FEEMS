@@ -17,6 +17,7 @@ from feems.components_model.component_base import BasicComponent
 from feems.components_model.component_mechanical import (
     Engine,
     MainEngineForMechanicalPropulsion,
+    MainEngineWithGearBoxForMechanicalPropulsion,
 )
 from feems.components_model.node import (
     _efficiency_from_totals,
@@ -65,7 +66,8 @@ class TestHelpers(TestCase):
     """Direct tests of the small numeric helpers (cheap, deterministic)."""
 
     def test_time_weighted_avg_scalar_dt_mean_over_mask(self):
-        # 4 timesteps, mask selects 3 of them, all-equal dt → arithmetic mean
+        # 4 timesteps, mask selects 2 of them (the non-zero entries),
+        # uniform dt → arithmetic mean of the selected magnitudes
         p = np.array([0.0, 100.0, 200.0, 0.0])
         mask = p != 0
         avg = _time_weighted_avg_magnitude_kw(p, time_interval_s=60.0, mask=mask)
@@ -153,6 +155,66 @@ class TestMainEngineMetrics(TestCase):
         self.assertEqual(res.operating_avg_efficiency, 0.0)
         self.assertEqual(res.operating_avg_sfc_g_per_kwh, 0.0)
 
+    def test_main_engine_with_gearbox_uses_delivered_shaft_power(self):
+        """Regression for PR #98 Copilot review: MAIN_ENGINE_WITH_GEARBOX must
+        use `component.power_output` (delivered shaft kW) for efficiency/SFC,
+        NOT `component.engine.power_output` which is upstream of the gearbox
+        (= power / eff_gearbox).
+        """
+        engine = Engine(
+            type_=TypeComponent.MAIN_ENGINE,
+            name="inner",
+            rated_power=1000.0,
+            rated_speed=900.0,
+            bsfc_curve=_bsfc_curve_constant(),
+            nox_calculation_method=NOxCalculationMethod.TIER_2,
+            fuel_type=TypeFuel.DIESEL,
+            fuel_origin=FuelOrigin.FOSSIL,
+        )
+        gearbox = BasicComponent(
+            type_=TypeComponent.GEARBOX,
+            power_type=TypePower.POWER_TRANSMISSION,
+            name="gearbox",
+            rated_power=1000.0,
+            rated_speed=900.0,
+            eff_curve=np.array([0.95]),  # flat 95 % gearbox efficiency
+        )
+        me_gb = MainEngineWithGearBoxForMechanicalPropulsion(
+            name="ME-with-gearbox", engine=engine, gearbox=gearbox
+        )
+        # Drive the delivered shaft at 500 kW; engine side will be 500/0.95 ≈ 526.3 kW
+        delivered = np.array([0.0, 500.0, 500.0, 500.0])
+        me_gb.power_output = delivered
+        # Important: the dispatcher runs AFTER get_engine_run_point_from_power_out_kw
+        # has set engine.power_output = power / eff_gearbox. Mirror that here.
+        me_gb.get_engine_run_point_from_power_out_kw(power=delivered)
+
+        res = get_fuel_emission_energy_balance_for_component(
+            component=me_gb,
+            time_interval_s=60.0,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+
+        # operating_avg_power_kw uses component.power_output → 500 kW (delivered shaft)
+        self.assertAlmostEqual(res.operating_avg_power_kw, 500.0, places=6)
+
+        # Bug-before-fix: efficiency used engine.power_output (~526 kW), giving
+        # eff = 526*dt / fuel_MJ. After fix, eff = 500*dt / fuel_MJ — strictly
+        # smaller because the gearbox loss is now correctly debited.
+        # Compute the "old" (buggy) efficiency for comparison:
+        from feems.components_model.node import _integrate_kw_signal_to_mj
+
+        buggy_shaft_mj = _integrate_kw_signal_to_mj(
+            me_gb.engine.power_output, 60.0, IntegrationMethod.simpson
+        )
+        fixed_shaft_mj = _integrate_kw_signal_to_mj(
+            me_gb.power_output, 60.0, IntegrationMethod.simpson
+        )
+        self.assertLess(fixed_shaft_mj, buggy_shaft_mj)  # by ~5 % (gearbox loss)
+        # The reported efficiency must come from the fixed (smaller) shaft energy.
+        self.assertLess(res.operating_avg_efficiency, buggy_shaft_mj / res.fuel_energy_total_mj)
+
 
 class TestPTIPTOMetrics(TestCase):
     """PTI/PTO: bidirectional. Mixed-sign signal must populate both avg fields."""
@@ -200,6 +262,36 @@ class TestPTIPTOMetrics(TestCase):
         )
         self.assertAlmostEqual(res.operating_avg_power_kw, 300.0, places=6)
         self.assertEqual(res.operating_avg_reversible_power_kw, 0.0)
+
+    def test_pure_pto_has_nonzero_efficiency(self):
+        """Regression for PR #98 Copilot review: PTI/PTO efficiency must be
+        computed directly from power signals — not from res.energy_*_total_mj,
+        which the existing branch populates differently depending on
+        isSystemMechanical. A pure-PTO run called from a switchboard context
+        (isSystemMechanical=False) used to report efficiency = 0.0.
+        """
+        pti_pto = create_a_pti_pto()
+        # Pure PTO: electric out (power_input < 0), mech in (power_output > 0).
+        pti_pto.power_input = np.array([-300.0, -300.0, -300.0, -300.0])
+        pti_pto.power_output = np.array([330.0, 330.0, 330.0, 330.0])
+        pti_pto.full_pti_mode = np.zeros(4, dtype=bool)
+        pti_pto.full_pto_mode = np.ones(4, dtype=bool)
+        pti_pto.status = np.ones(4, dtype=bool)
+
+        # Switchboard context — would have left mech_total_mj unpopulated under
+        # the old formula, giving energy_in = 0 → efficiency = 0.0.
+        res = get_fuel_emission_energy_balance_for_component(
+            component=pti_pto,
+            time_interval_s=60.0,
+            integration_method=IntegrationMethod.simpson,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+            isSystemMechanical=False,
+        )
+        # Useful out / required in = 300 / 330 ≈ 0.909 for this fixture.
+        # The exact value depends on the test fixture's eff curves, but it
+        # must be > 0 (the bug) and ≤ 1.
+        self.assertGreater(res.operating_avg_efficiency, 0.0)
+        self.assertLessEqual(res.operating_avg_efficiency, 1.0)
 
 
 class TestNonFuelLoadMetrics(TestCase):
