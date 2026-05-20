@@ -18,9 +18,9 @@ from ..fuel import (
     find_user_fuel,
 )
 from ..types_for_feems import (
+    OPERATING_AVG_COLUMNS,
     FEEMSResult,
     Numeric,
-    OPERATING_AVG_COLUMNS,
     SwbId,
     TimeIntervalList,
     TypeComponent,

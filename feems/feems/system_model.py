@@ -45,9 +45,9 @@ from .components_model.node import (
 from .components_model.utility import IntegrationMethod, integrate_data, integrate_multi_fuel_consumption
 from .exceptions import ConfigurationError, InputError
 from .types_for_feems import (
+    OPERATING_AVG_COLUMNS,
     EmissionType,
     FEEMSResult,
-    OPERATING_AVG_COLUMNS,
     TimeIntervalList,
     TypeComponent,
     TypePower,
