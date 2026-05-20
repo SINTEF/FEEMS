@@ -5,6 +5,14 @@ All notable changes to the MachSysS (Machinery System Structure) package will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.12.1...MachSysS-v0.13.0) (2026-05-20)
+
+
+### Features
+
+* **#97:** expose operating averages via ResultPerComponent proto (IDs 16-19) ([bac8d96](https://github.com/SINTEF/FEEMS/commit/bac8d96046fc37e43e1e9f8499ce883ce4d7c790))
+* **#97:** per-component operating-average metrics in FEEMSResult ([21a7513](https://github.com/SINTEF/FEEMS/commit/21a7513f1fb0ea262f2c6dac44979c95ce68362b))
+
 ## [0.12.1](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.12.0...MachSysS-v0.12.1) (2026-05-19)
 
 
