@@ -233,6 +233,46 @@ class TestConvertCOGESResultToProto(unittest.TestCase):
             len(coges.power_output),
         )
 
+    def test_operating_avg_metrics_roundtrip_to_proto(self):
+        """Issue #97 — the 4 new operating-average fields round-trip via the converter."""
+        system, coges = self._build_eps_with_coges()
+        res = system.get_fuel_energy_consumption_running_time(
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+
+        converter = FEEMSResultConverter(
+            feems_result=res,
+            system_feems=system,
+            fuel_specified_by=FuelSpecifiedBy.IMO,
+        )
+        proto_result = converter.get_feems_result_proto(include_time_series_for_components=False)
+
+        detailed = list(proto_result.electric_system.detailed_result)
+        coges_rows = [row for row in detailed if row.component_name == coges.name]
+        self.assertEqual(len(coges_rows), 1)
+        coges_row = coges_rows[0]
+
+        # The DataFrame must carry the new columns…
+        df_row = res.detail_result.loc[coges.name]
+        df_power = float(df_row["operating avg power [kW]"])
+        df_rev = float(df_row["operating avg reversible power [kW]"])
+        df_eff = float(df_row["operating avg efficiency"])
+        df_sfc = float(df_row["operating avg SFC [g/kWh]"])
+
+        # …and the converter must propagate them to the proto with the same values.
+        self.assertAlmostEqual(coges_row.operating_avg_power_kw, df_power, places=6)
+        self.assertAlmostEqual(coges_row.operating_avg_reversible_power_kw, df_rev, places=6)
+        self.assertAlmostEqual(coges_row.operating_avg_efficiency, df_eff, places=6)
+        self.assertAlmostEqual(coges_row.operating_avg_sfc_g_per_kwh, df_sfc, places=6)
+
+        # COGES is a fuel-consuming power source: all four fields should be populated
+        # (reversible stays 0; everything else > 0).
+        self.assertGreater(coges_row.operating_avg_power_kw, 0.0)
+        self.assertEqual(coges_row.operating_avg_reversible_power_kw, 0.0)
+        self.assertGreater(coges_row.operating_avg_efficiency, 0.0)
+        self.assertLessEqual(coges_row.operating_avg_efficiency, 1.0)
+        self.assertGreater(coges_row.operating_avg_sfc_g_per_kwh, 0.0)
+
 
 if __name__ == '__main__':
     unittest.main()

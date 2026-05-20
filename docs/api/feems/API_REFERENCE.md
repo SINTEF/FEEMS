@@ -1060,6 +1060,37 @@ Comprehensive results object returned by `ElectricPowerSystem.get_fuel_energy_co
   - Positive: Energy stored; Negative: Energy depleted
 - `load_ratio_genset: Optional[float]` - Average genset load ratio
 
+**Per-Component Operating Averages** (issue #97):
+
+Averages are computed over each component's on-state timesteps only
+(mask = `power_output != 0`, matching the existing `running_hours_h` semantics).
+Non-applicable metrics are reported as `0.0`. These scalars are populated on the
+per-component `FEEMSResult` returned by `get_fuel_emission_energy_balance_for_component`
+and surfaced as columns on `detail_result`.
+
+- `operating_avg_power_kw: float` — average `|primary output|` while running
+- `operating_avg_reversible_power_kw: float` — PTI-direction average for PTI/PTO; `0.0` for all other components
+- `operating_avg_efficiency: float` — `energy_out / energy_in` over the run, clamped to `[0, 1]`
+- `operating_avg_sfc_g_per_kwh: float` — `fuel × 1000 / useful_kWh`; `0.0` for non-fuel components
+
+| Component                          | `operating_avg_power_kw`        | `operating_avg_reversible_power_kw` | `operating_avg_efficiency`        | `operating_avg_sfc_g_per_kwh`    |
+|------------------------------------|---------------------------------|-------------------------------------|-----------------------------------|----------------------------------|
+| MainEngine / w-Gearbox             | avg shaft kW                    | 0                                   | shaft_MJ / fuel_MJ                | g_fuel / shaft_kWh               |
+| Genset                             | avg generator kW                | 0                                   | elec_MJ / fuel_MJ                 | g_fuel / elec_kWh                |
+| FuelCell / FuelCellSystem          | avg electric kW                 | 0                                   | elec_MJ / fuel_MJ                 | g_fuel / elec_kWh                |
+| COGES                              | avg electric kW                 | 0                                   | elec_MJ / fuel_MJ                 | g_fuel / elec_kWh                |
+| SteamBoiler                        | avg steam-thermal kW            | 0                                   | steam_MJ / fuel_MJ                | g_fuel / steam_kWh               |
+| PTI/PTO                            | avg \|elec out\| during PTO     | avg \|elec in\| during PTI          | total_out / total_in              | 0                                |
+| Battery / SuperCap                 | avg net flow kW                 | 0                                   | 0                                 | 0                                |
+| ShorePower                         | avg \|power_input\| kW          | 0                                   | 0                                 | 0                                |
+| OtherLoad / Propeller / Propulsion | avg \|power_output\| kW         | 0                                   | 0                                 | 0                                |
+
+DataFrame column labels (added to every per-row assembly in `detail_result`):
+- `"operating avg power [kW]"`
+- `"operating avg reversible power [kW]"`
+- `"operating avg efficiency"`
+- `"operating avg SFC [g/kWh]"`
+
 **Per-Component Results:**
 - `detail_result: pd.DataFrame` - Detailed breakdown for each component
 

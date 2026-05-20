@@ -1133,6 +1133,42 @@ class TestBoilerDetailResult:
         assert isinstance(co2, GHGEmissions)
         assert co2.tank_to_wake_kg_or_gco2eq_per_gfuel > 0
 
+    def test_boiler_detail_operating_avg_metrics_present(self):
+        # Issue #97 — per-component operating averages on detail_result row.
+        row = self.res.detail_result.loc[self.boiler.name]
+        for col in (
+            "operating avg power [kW]",
+            "operating avg reversible power [kW]",
+            "operating avg efficiency",
+            "operating avg SFC [g/kWh]",
+        ):
+            assert col in self.res.detail_result.columns, f"missing column: {col}"
+            assert row[col] is not None
+
+    def test_boiler_operating_avg_power_is_steam_thermal_kw(self):
+        # Steam-thermal kW = ṁ_steam · Δh. With 10 000 kg/h steam and the system
+        # boiler's delta_h, the on-state mean should equal that product.
+        steam_kg_per_s = self.boiler.steam_out_kg_per_h[0] / 3600.0
+        expected_kw = steam_kg_per_s * self.boiler.delta_h_kj_per_kg
+        row = self.res.detail_result.loc[self.boiler.name]
+        assert float(row["operating avg power [kW]"]) == pytest.approx(expected_kw, rel=1e-6)
+
+    def test_boiler_operating_avg_efficiency_in_range(self):
+        # Boiler runs at flat 85 % efficiency (see _flat_efficiency_curve fixture).
+        row = self.res.detail_result.loc[self.boiler.name]
+        eta = float(row["operating avg efficiency"])
+        assert 0.80 < eta < 0.90
+
+    def test_boiler_operating_avg_sfc_positive(self):
+        row = self.res.detail_result.loc[self.boiler.name]
+        sfc = float(row["operating avg SFC [g/kWh]"])
+        assert sfc > 0.0
+
+    def test_boiler_reversible_power_is_zero(self):
+        # Reversible field is PTI-only; boiler must report 0.
+        row = self.res.detail_result.loc[self.boiler.name]
+        assert float(row["operating avg reversible power [kW]"]) == 0.0
+
 
 # ---------------------------------------------------------------------------
 # T14 — fuel_option on boiler-only system (no multi-fuel engines)

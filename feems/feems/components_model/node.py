@@ -18,6 +18,7 @@ from ..fuel import (
     find_user_fuel,
 )
 from ..types_for_feems import (
+    OPERATING_AVG_COLUMNS,
     FEEMSResult,
     Numeric,
     SwbId,
@@ -61,6 +62,76 @@ from .utility import (
 
 # Define logger
 logger = get_logger(__name__)
+
+
+# ---------- Operating-average helpers (issue #97) --------------------------
+# On-state mask: power != 0 (matches existing running_hours_h semantics).
+# Helpers return 0.0 when the mask is empty so a never-running component
+# reports zero rather than NaN.
+
+
+def _time_weighted_avg_magnitude_kw(
+    power: Union[np.ndarray, float],
+    time_interval_s: Union[np.ndarray, float],
+    mask: Union[np.ndarray, bool],
+) -> float:
+    """Return ⟨|power|⟩ over the masked timesteps.
+
+    - Scalar dt → arithmetic mean of |power|[mask] (uniform-timestep case).
+    - Array dt → Σ(|power|·dt) / Σ(dt) over the mask.
+    Returns 0.0 if the mask selects no timesteps.
+    """
+    p = np.atleast_1d(power).astype(float)
+    m = np.atleast_1d(mask).astype(bool)
+    if p.size == 1 and m.size == 1:
+        return float(abs(p[0])) if m[0] else 0.0
+    if p.size != m.size:
+        m = np.broadcast_to(m, p.shape)
+    if np.isscalar(time_interval_s) or (
+        hasattr(time_interval_s, "size") and time_interval_s.size == 1
+    ):
+        sel = np.abs(p)[m]
+        return float(sel.mean()) if sel.size else 0.0
+    dt = np.atleast_1d(time_interval_s).astype(float)
+    if dt.size != p.size:
+        dt = np.broadcast_to(dt, p.shape)
+    sel_p = np.abs(p)[m]
+    sel_dt = dt[m]
+    total = float(sel_dt.sum())
+    return float((sel_p * sel_dt).sum() / total) if total > 0 else 0.0
+
+
+def _efficiency_from_totals(energy_out_mj: float, energy_in_mj: float) -> float:
+    """Cumulative energy_out / energy_in clamped to [0, 1]; 0.0 if input is zero."""
+    if energy_in_mj <= 0:
+        return 0.0
+    return max(0.0, min(1.0, float(energy_out_mj) / float(energy_in_mj)))
+
+
+def _sfc_g_per_kwh(total_fuel_kg: float, useful_energy_kwh: float) -> float:
+    """fuel × 1000 / useful_energy_kWh; 0.0 if useful_energy is zero."""
+    if useful_energy_kwh <= 0:
+        return 0.0
+    return float(total_fuel_kg) * 1000.0 / float(useful_energy_kwh)
+
+
+def _integrate_kw_signal_to_mj(
+    signal_kw: Union[np.ndarray, float],
+    time_interval_s: TimeIntervalList,
+    integration_method: "IntegrationMethod",
+) -> float:
+    """Integrate a kW signal to MJ. Returns 0.0 on integration error (e.g. single-point sums)."""
+    try:
+        return float(
+            integrate_data(
+                data_to_integrate=signal_kw,
+                time_interval_s=time_interval_s,
+                integration_method=integration_method,
+            )
+            / 1000.0
+        )
+    except IntegrationError:
+        return 0.0
 
 
 PowerSource = Union[
@@ -429,7 +500,164 @@ def get_fuel_emission_energy_balance_for_component(
             f"Component type {component.type} not supported for energy balance calculation"
         )
 
+    _assign_operating_avg_metrics(
+        res=res,
+        component=component,
+        time_interval_s=time_interval_s,
+        integration_method=integration_method,
+    )
+
     return res
+
+
+def _assign_operating_avg_metrics(
+    *,
+    res: FEEMSResult,
+    component: Union[PowerSource, PowerConsumer],
+    time_interval_s: TimeIntervalList,
+    integration_method: IntegrationMethod,
+) -> None:
+    """Populate res.operating_avg_* scalars based on the component's type.
+
+    Averages are computed over the component's on-state timesteps (mask = power != 0).
+    Non-applicable metrics are left at their default 0.0. PTI/PTO is the one component
+    type where output direction is genuinely bidirectional; it populates both
+    operating_avg_power_kw (PTO direction) and operating_avg_reversible_power_kw
+    (PTI direction).
+    """
+    type_ = component.type
+
+    # Engines (main / main-with-gearbox) ------------------------------------
+    if type_ in (
+        TypeComponent.MAIN_ENGINE,
+        TypeComponent.MAIN_ENGINE_WITH_GEARBOX,
+    ):
+        power = np.atleast_1d(component.power_output)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power, time_interval_s, mask
+        )
+        # Use the *delivered* shaft power (component.power_output) — for
+        # MAIN_ENGINE_WITH_GEARBOX, component.engine.power_output is upstream of
+        # the gearbox (= power / eff_gearbox in the get_engine_run_point call),
+        # which would inflate efficiency and deflate SFC vs the documented
+        # "avg shaft kW / g_fuel per shaft kWh" semantics. For MAIN_ENGINE
+        # (no gearbox) the two are equal — nothing changes.
+        shaft_mj = _integrate_kw_signal_to_mj(
+            component.power_output, time_interval_s, integration_method
+        )
+        fuel_mj = res.fuel_energy_total_mj
+        res.operating_avg_efficiency = _efficiency_from_totals(shaft_mj, fuel_mj)
+        fuel_kg = float(res.multi_fuel_consumption_total_kg.total_fuel_consumption or 0.0)
+        res.operating_avg_sfc_g_per_kwh = _sfc_g_per_kwh(fuel_kg, shaft_mj / 3.6)
+        return
+
+    # Genset / Fuel cell / COGES — all report electric output ---------------
+    if type_ in (
+        TypeComponent.GENSET,
+        TypeComponent.FUEL_CELL,
+        TypeComponent.FUEL_CELL_SYSTEM,
+        TypeComponent.COGES,
+    ):
+        power = np.atleast_1d(component.power_output)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power, time_interval_s, mask
+        )
+        elec_mj = _integrate_kw_signal_to_mj(
+            component.power_output, time_interval_s, integration_method
+        )
+        fuel_mj = res.fuel_energy_total_mj
+        res.operating_avg_efficiency = _efficiency_from_totals(elec_mj, fuel_mj)
+        fuel_kg = float(res.multi_fuel_consumption_total_kg.total_fuel_consumption or 0.0)
+        res.operating_avg_sfc_g_per_kwh = _sfc_g_per_kwh(fuel_kg, elec_mj / 3.6)
+        return
+
+    # PTI/PTO — bidirectional split -----------------------------------------
+    if type_ == TypeComponent.PTI_PTO_SYSTEM:
+        power_input = np.atleast_1d(component.power_input)
+        power_output = np.atleast_1d(component.power_output)
+        pti_mask = power_input > 0  # electric in  (PTI)
+        pto_mask = power_input < 0  # electric out (PTO)
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power_input, time_interval_s, pto_mask
+        )
+        res.operating_avg_reversible_power_kw = _time_weighted_avg_magnitude_kw(
+            power_input, time_interval_s, pti_mask
+        )
+        # Compute energy_in / energy_out directly from the power signals — not
+        # from res.energy_*_total_mj, which the PTI_PTO branch above populates
+        # differently depending on isSystemMechanical (electric fields when
+        # called by Switchboard, mechanical fields when called by ShaftLine).
+        # Relying on those would report 0.0 for pure-PTO or pure-PTI runs.
+        # Convention (see node.py PTI_PTO branch): in PTI mode electric flows in
+        # and mechanical flows out (shaft delivered); in PTO mode mechanical
+        # flows in and electric flows out. We integrate |·| of the relevant
+        # signal on each mask and sum across directions.
+        pti_elec_in_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_input) * pti_mask, time_interval_s, integration_method
+        )
+        pti_mech_out_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_output) * pti_mask, time_interval_s, integration_method
+        )
+        pto_mech_in_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_output) * pto_mask, time_interval_s, integration_method
+        )
+        pto_elec_out_mj = _integrate_kw_signal_to_mj(
+            np.abs(power_input) * pto_mask, time_interval_s, integration_method
+        )
+        energy_out = pti_mech_out_mj + pto_elec_out_mj
+        energy_in = pti_elec_in_mj + pto_mech_in_mj
+        res.operating_avg_efficiency = _efficiency_from_totals(energy_out, energy_in)
+        return
+
+    # Standalone generator (power-source-side) ------------------------------
+    if type_ == TypeComponent.GENERATOR:
+        power = np.atleast_1d(component.power_output)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power, time_interval_s, mask
+        )
+        e_out_mj = _integrate_kw_signal_to_mj(
+            component.power_output, time_interval_s, integration_method
+        )
+        e_in_mj = res.energy_input_mechanical_total_mj
+        res.operating_avg_efficiency = _efficiency_from_totals(e_out_mj, e_in_mj)
+        return
+
+    # Energy storage (battery, super-capacitor) -----------------------------
+    if component.power_type == TypePower.ENERGY_STORAGE:
+        power = np.atleast_1d(component.power_output)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power, time_interval_s, mask
+        )
+        return
+
+    # Shore power -----------------------------------------------------------
+    if type_ == TypeComponent.SHORE_POWER:
+        power = np.atleast_1d(component.power_input)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power, time_interval_s, mask
+        )
+        return
+
+    # Loads (auxiliary / mechanical / propulsion / propeller) ---------------
+    if type_ in (
+        TypeComponent.OTHER_LOAD,
+        TypeComponent.OTHER_MECHANICAL_LOAD,
+        TypeComponent.PROPELLER_LOAD,
+        TypeComponent.PROPULSION_DRIVE,
+    ):
+        power = np.atleast_1d(component.power_output)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            power, time_interval_s, mask
+        )
+        return
+
+    # Any other type: leave all metrics at 0.0 (e.g. NONE, AUXILIARY_ENGINE).
 
 
 def set_emission(
@@ -902,6 +1130,7 @@ class Switchboard(Node):
             "rated capacity",
             "rated capacity unit",
             "fuel consumer type",
+            *OPERATING_AVG_COLUMNS,
         ]
         res = FEEMSResult(
             detail_result=pd.DataFrame(columns=column_names),
@@ -952,6 +1181,10 @@ class Switchboard(Node):
                     if component.fuel_consumer_type_fuel_eu_maritime
                     else "None"
                 ),
+                res_comp.operating_avg_power_kw,
+                res_comp.operating_avg_reversible_power_kw,
+                res_comp.operating_avg_efficiency,
+                res_comp.operating_avg_sfc_g_per_kwh,
             ]
 
             res.detail_result = pd.concat(
@@ -1393,6 +1626,7 @@ class ShaftLine(Node):
             "rated capacity",
             "rated capacity unit",
             "fuel consumer type",
+            *OPERATING_AVG_COLUMNS,
         ]
         res = FEEMSResult(detail_result=pd.DataFrame(columns=column_names))
 
@@ -1441,6 +1675,10 @@ class ShaftLine(Node):
                     if component.fuel_consumer_type_fuel_eu_maritime
                     else "None"
                 ),
+                res_comp.operating_avg_power_kw,
+                res_comp.operating_avg_reversible_power_kw,
+                res_comp.operating_avg_efficiency,
+                res_comp.operating_avg_sfc_g_per_kwh,
             ]
             res.detail_result = pd.concat(
                 [

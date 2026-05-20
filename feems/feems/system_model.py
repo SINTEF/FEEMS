@@ -32,10 +32,20 @@ from .components_model.component_electric import (
     SuperCapacitorSystem,
 )
 from .components_model.component_mechanical import Engine, EngineDualFuel, EngineMultiFuel, SteamBoiler
-from .components_model.node import BusBreaker, ShaftLine, SwbId, Switchboard, get_duration_s
+from .components_model.node import (
+    BusBreaker,
+    ShaftLine,
+    SwbId,
+    Switchboard,
+    _efficiency_from_totals,
+    _sfc_g_per_kwh,
+    _time_weighted_avg_magnitude_kw,
+    get_duration_s,
+)
 from .components_model.utility import IntegrationMethod, integrate_data, integrate_multi_fuel_consumption
 from .exceptions import ConfigurationError, InputError
 from .types_for_feems import (
+    OPERATING_AVG_COLUMNS,
     EmissionType,
     FEEMSResult,
     TimeIntervalList,
@@ -60,6 +70,7 @@ _BOILER_DETAIL_COLUMNS = [
     "rated capacity",
     "rated capacity unit",
     "fuel consumer type",
+    *OPERATING_AVG_COLUMNS,
 ]
 
 
@@ -347,6 +358,33 @@ class MachinerySystem:
         co2_kg = boiler_fc.get_total_co2_emissions()
         n_steps = len(np.atleast_1d(steam_kg_per_s))
         duration_s = get_duration_s(integration_method, n_steps, time_interval_s)
+
+        # Per-component operating-average metrics for the boiler row (issue #97).
+        # Steam-thermal power [kW] = ṁ_steam (kg/s) × Δh (kJ/kg).
+        steam_thermal_kw_series = np.atleast_1d(steam_kg_per_s) * boiler.delta_h_kj_per_kg
+        on_mask = np.atleast_1d(steam_kg_per_s) > 0
+        operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
+            steam_thermal_kw_series, time_interval_s, on_mask
+        )
+        steam_thermal_mj = float(
+            integrate_data(
+                data_to_integrate=steam_thermal_kw_series,
+                time_interval_s=time_interval_s,
+                integration_method=integration_method,
+            )
+        ) / 1000.0
+        fuel_mj = float(
+            sum(
+                (f.lhv_mj_per_g or 0.0) * (f.mass_or_mass_fraction or 0.0) * 1e3
+                for f in boiler_fc.fuels
+            )
+        )
+        operating_avg_efficiency = _efficiency_from_totals(steam_thermal_mj, fuel_mj)
+        operating_avg_sfc_g_per_kwh = _sfc_g_per_kwh(
+            float(boiler_fc.total_fuel_consumption or 0.0),
+            steam_thermal_mj / 3.6,
+        )
+
         detail_row = pd.Series(
             [
                 boiler_fc,
@@ -360,6 +398,10 @@ class MachinerySystem:
                 boiler.rated_steam_production_kg_per_h,
                 "kg/h",
                 "None",
+                operating_avg_power_kw,
+                0.0,  # reversible (PTI direction) — N/A for boilers
+                operating_avg_efficiency,
+                operating_avg_sfc_g_per_kwh,
             ],
             index=_BOILER_DETAIL_COLUMNS,
             name=boiler.name,
@@ -372,6 +414,9 @@ class MachinerySystem:
             multi_fuel_consumption_total_kg=boiler_fc,
             co2_emission_total_kg=co2_kg,
             total_emission_kg=merged_emission_kg,
+            operating_avg_power_kw=operating_avg_power_kw,
+            operating_avg_efficiency=operating_avg_efficiency,
+            operating_avg_sfc_g_per_kwh=operating_avg_sfc_g_per_kwh,
             detail_result=detail_row.to_frame().T,
         )
 
