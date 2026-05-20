@@ -91,6 +91,40 @@ Represents a standalone fuel-fired auxiliary boiler. Not embedded in a `Subsyste
 | `emission_curves` | `repeated EmissionCurve` | Boiler-level per-pollutant emission curves |
 | `fuel_modes` | `repeated SteamBoiler.FuelMode` | Multi-fuel mode definitions. When present, `thermal_efficiency_curve` and `fuel_type`/`fuel_origin` are ignored during deserialization. |
 
+### ResultPerComponent message
+
+`machinery-system-structure/proto/feems_result.proto`
+
+One row per component in `FeemsResult.detailed_result`. The four operating-average fields
+(IDs 16-19) were added in issue #97; they are computed over the component's on-state
+timesteps only. Non-applicable metrics serialise as `0.0` rather than absent, which keeps
+the wire format homogeneous and lets old clients ignore the new IDs without special-casing.
+
+| Field | Proto ID | Type | Description |
+|---|---|---|---|
+| `component_name` | 1 | `string` | Component name |
+| `multi_fuel_consumption_kg` | 2 | `FuelConsumptionScalar` | Per-fuel totals (kg) |
+| `electric_energy_consumption_mj` | 3 | `double` | Electrical energy consumed (MJ) |
+| `mechanical_energy_consumption_mj` | 4 | `double` | Mechanical energy consumed (MJ) |
+| `energy_stored_mj` | 5 | `double` | Net stored energy change (MJ) |
+| `running_hours_h` | 6 | `double` | Total on-state hours |
+| `co2_emissions_kg` | 7 | `GHGEmissions` | CO₂-equivalent breakdown |
+| `nox_emissions_kg` | 8 | `double` | NOx total (kg) |
+| `component_type` | 9 | `string` | `TypeComponent` enum name |
+| `rated_capacity` | 10 | `double` | Rated capacity (kW or kg/h) |
+| `rated_capacity_unit` | 11 | `string` | Unit of rated capacity |
+| `switchboard_id` | 12 | `uint32` | Connected switchboard ID |
+| `shaftline_id` | 13 | `uint32` | Connected shaft-line ID |
+| `result_time_series` | 14 | `TimeSeriesResultForComponent` | Optional per-timestep series |
+| `fuel_consumer_type` | 15 | `string` | FuelEU Maritime fuel-consumer class |
+| `operating_avg_power_kw` | **16** | `double` | Average \|primary output\| over on-state timesteps |
+| `operating_avg_reversible_power_kw` | **17** | `double` | PTI-direction average for PTI/PTO; `0.0` for all other components |
+| `operating_avg_efficiency` | **18** | `double` | `energy_out / energy_in` over the run, clamped to `[0, 1]`; `0.0` if not applicable |
+| `operating_avg_sfc_g_per_kwh` | **19** | `double` | `fuel × 1000 / useful_kWh`; `0.0` for non-fuel components |
+
+See `docs/api/feems/API_REFERENCE.md#per-component-operating-averages` for the per-component
+semantics matrix.
+
 ### Engine.EngineCycleType enum
 
 ```protobuf
