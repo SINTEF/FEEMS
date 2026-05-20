@@ -5,6 +5,19 @@ All notable changes to the FEEMS package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.17.0...feems-v0.18.0) (2026-05-20)
+
+
+### Features
+
+* **#97:** per-component operating-average metrics in FEEMSResult ([21a7513](https://github.com/SINTEF/FEEMS/commit/21a7513f1fb0ea262f2c6dac44979c95ce68362b))
+* **#97:** per-component operating-average metrics on FEEMSResult ([cd70b0d](https://github.com/SINTEF/FEEMS/commit/cd70b0de5cf54cfebcfff41e5697c1c86ca9ace4))
+
+
+### Bug Fixes
+
+* **#97:** address Copilot review — engine gearbox + PTI/PTO efficiency ([c9b688e](https://github.com/SINTEF/FEEMS/commit/c9b688e3ad13e12f0454387ea1d67d2b9c348d59))
+
 ## [0.17.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.16.0...feems-v0.17.0) (2026-05-11)
 
 
