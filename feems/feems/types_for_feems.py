@@ -11,6 +11,24 @@ Power_kW = NewType("Power_kW", float)
 Speed_rpm = NewType("Speed_rpm", float)
 SwbId = NewType("SwbId", int)
 
+# Ordered column labels for the per-component operating-average metrics in
+# FEEMSResult.detail_result. Used as a single source of truth so the Switchboard,
+# ShaftLine, and SteamBoiler assembly sites share the same column names + order.
+OPERATING_AVG_COLUMNS: tuple = (
+    "operating avg power [kW]",
+    "operating avg reversible power [kW]",
+    "operating avg efficiency",
+    "operating avg SFC [g/kWh]",
+)
+_OPERATING_AVG_FIELDS: frozenset = frozenset(
+    {
+        "operating_avg_power_kw",
+        "operating_avg_reversible_power_kw",
+        "operating_avg_efficiency",
+        "operating_avg_sfc_g_per_kwh",
+    }
+)
+
 
 class EngineCycleType(Enum):
     NONE = 0
@@ -60,6 +78,14 @@ class FEEMSResult:
     energy_consumption_auxiliary_total_mj: float = (
         0.0  # Energy consumption of auxiliary (electric) or mechanical load (mechanical)
     )
+    # Per-component operating averages over the component's on-state timesteps only
+    # (on-state = power_output != 0; matches the existing running_hours_h semantics).
+    # Aggregated FEEMSResult values for these fields are kept by `__merge` as the max of
+    # contributors; only the per-component row in detail_result is intended for consumers.
+    operating_avg_power_kw: float = 0.0
+    operating_avg_reversible_power_kw: float = 0.0  # PTI direction for PTI/PTO; 0.0 elsewhere
+    operating_avg_efficiency: float = 0.0
+    operating_avg_sfc_g_per_kwh: float = 0.0
 
     @property
     def fuel_consumption_total_kg(self):
@@ -105,6 +131,8 @@ class FEEMSResult:
                         value = (self_value * self.duration_s + other_value * other.duration_s) / (
                             self.duration_s + other.duration_s
                         )
+                elif field_name in _OPERATING_AVG_FIELDS:
+                    value = max(self_value, other_value)
                 elif field_name == "total_emission_kg":
                     all_keys = set(self_value) | set(other_value)
                     value = defaultdict(float, {k: self_value[k] + other_value[k] for k in all_keys})
@@ -137,8 +165,7 @@ class FEEMSResult:
             self.multi_fuel_consumption_total_kg,
             self.energy_consumption_electric_total_mj,
             self.energy_consumption_mechanical_total_mj,
-            (self.running_hours_main_engines_hr or 0.0)
-            + (self.running_hours_pti_pto_total_hr or 0.0),
+            (self.running_hours_main_engines_hr or 0.0) + (self.running_hours_pti_pto_total_hr or 0.0),
             self.co2_emission_total_kg,
             (self.total_emission_kg[EmissionType.NOX] if self.total_emission_kg else None),
         ]
