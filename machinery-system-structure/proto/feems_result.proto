@@ -67,6 +67,12 @@ message ResultPerComponent {
     uint32 shaftline_id = 13;
     TimeSeriesResultForComponent result_time_series = 14;
     string fuel_consumer_type = 15;
+    // Per-component operating averages, computed over the component's on-state timesteps only.
+    // Non-applicable metrics are reported as 0.0 for a homogeneous wire format.
+    double operating_avg_power_kw = 16;
+    double operating_avg_reversible_power_kw = 17;  // PTI direction for PTI/PTO; 0.0 elsewhere
+    double operating_avg_efficiency = 18;
+    double operating_avg_sfc_g_per_kwh = 19;
 }
 
 message FeemsResult {

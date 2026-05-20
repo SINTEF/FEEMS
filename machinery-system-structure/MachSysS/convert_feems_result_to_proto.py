@@ -50,6 +50,10 @@ _COLUMN_NAMES = {
     "switchboard id": "switchboard_id",
     "shaftline id": "shaftline_id",
     "fuel consumer type": "fuel_consumer_type",
+    "operating avg power [kW]": "operating_avg_power_kw",
+    "operating avg reversible power [kW]": "operating_avg_reversible_power_kw",
+    "operating avg efficiency": "operating_avg_efficiency",
+    "operating avg SFC [g/kWh]": "operating_avg_sfc_g_per_kwh",
 }
 
 
