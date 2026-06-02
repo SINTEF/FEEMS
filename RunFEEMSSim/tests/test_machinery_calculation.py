@@ -13,6 +13,7 @@ from feems.components_model.component_mechanical import (
     COGAS,
     EngineMultiFuel,
     FuelCharacteristics,
+    SteamBoiler,
 )
 from feems.fuel import FuelOrigin, FuelSpecifiedBy, TypeFuel
 from feems.system_model import ElectricPowerSystem, FuelOption
@@ -20,6 +21,7 @@ from feems.types_for_feems import EngineCycleType, TypeComponent, TypePower
 from MachSysS.convert_to_feems import convert_proto_propulsion_system_to_feems
 from MachSysS.gymir_result_pb2 import (
     GymirResult,
+    PropulsionPowerInstance,
     PropulsionPowerInstanceForMultiplePropulsors,
     SimulationInstance,
     TimeSeriesResult,
@@ -461,3 +463,209 @@ def test_machinery_calculation_multifuel_coges():
         rtol=1e-6,
     ), "Explicit LNG option should match default"
 
+
+
+# --- Boiler steam demand carried through TimeSeriesResult ---------------------------------
+#
+# These tests cover boiler_steam_demand_kg_per_h on the TimeSeriesResult proto: the value is
+# read back by the converter and applied to the system boiler, producing boiler fuel/CO2 that
+# matches the equivalent table-mode path (calculate_..._from_propulsion_power_time_series with
+# the same steam_demand_kg_per_h array). Both paths use a timestamp series, so the last point is
+# dropped during integration; the helper that builds the proto and the table array shares the
+# same epochs/steam values, so they stay aligned.
+
+_BOILER_EPOCHS = [0, 60, 120, 180]
+_BOILER_PROPULSION_KW = [1500.0, 1600.0, 1700.0, 1800.0]
+_BOILER_AUX_KW = 200.0
+
+
+def _make_steam_boiler() -> SteamBoiler:
+    flat_eff = np.array([[0.25, 0.85], [0.50, 0.85], [0.75, 0.85], [1.00, 0.85]])
+    return SteamBoiler(
+        name="test boiler",
+        rated_steam_production_kg_per_h=10_000.0,
+        working_pressure_barg=6.0,
+        thermal_efficiency_curve=flat_eff,
+        fuel_type=TypeFuel.HFO,
+        fuel_origin=FuelOrigin.FOSSIL,
+        feed_water_temperature_c=80.0,
+        uid="boiler-uid-ts",
+    )
+
+
+def _build_boiler_machinery_calculation() -> MachineryCalculation:
+    """Fresh MachineryCalculation (electric system) with a standalone boiler attached.
+
+    A fresh instance is required per run because boiler.steam_out_kg_per_h is mutated in place.
+    """
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(package_dir, "system_proto.mss")
+    system_feems = convert_proto_propulsion_system_to_feems(retrieve_machinery_system_from_file(path))
+    system_feems.boiler = _make_steam_boiler()
+    return MachineryCalculation(feems_system=system_feems)
+
+
+def _table_mode_boiler_result(steam_demand_kg_per_h: np.ndarray):
+    series = pd.Series(index=_BOILER_EPOCHS, data=_BOILER_PROPULSION_KW)
+    return _build_boiler_machinery_calculation().calculate_machinery_system_output_from_propulsion_power_time_series(
+        propulsion_power=series,
+        auxiliary_power_kw=_BOILER_AUX_KW,
+        steam_demand_kg_per_h=steam_demand_kg_per_h,
+    )
+
+
+def test_time_series_result_per_instance_boiler_steam_matches_table_mode():
+    """AC1: per-timestep boiler_steam_demand_kg_per_h matches the table-mode path."""
+    steam = np.array([2000.0, 3000.0, 4000.0, 5000.0])
+    time_series = TimeSeriesResult(
+        propulsion_power_timeseries=[
+            PropulsionPowerInstance(
+                epoch_s=epoch,
+                propulsion_power_kw=prop,
+                auxiliary_power_kw=_BOILER_AUX_KW,
+                boiler_steam_demand_kg_per_h=s,
+            )
+            for epoch, prop, s in zip(_BOILER_EPOCHS, _BOILER_PROPULSION_KW, steam)
+        ],
+    )
+    res_proto = _build_boiler_machinery_calculation().calculate_machinery_system_output_from_time_series_result(
+        time_series=time_series
+    )
+    res_table = _table_mode_boiler_result(steam)
+
+    # Boiler actually ran (guards against a silently-zero comparison).
+    assert res_proto.fuel_consumption_boiler_total.total_fuel_consumption > 0
+    assert res_proto.steam_production_boiler_total_kg > 0
+    # Independent absolute check so a bug in the shared steam-alignment helper can't be hidden by
+    # the proto==table comparison (both route through it). The last timestamp is dropped, so the
+    # integrated steam is [2000, 3000, 4000] kg/h over three 60 s intervals = 9000/3600*60 = 150 kg.
+    assert np.isclose(res_proto.steam_production_boiler_total_kg, 150.0)
+    assert np.isclose(
+        res_proto.fuel_consumption_boiler_total.total_fuel_consumption,
+        res_table.fuel_consumption_boiler_total.total_fuel_consumption,
+    )
+    assert np.isclose(
+        res_proto.fuel_consumption_boiler_total.get_total_co2_emissions().tank_to_wake_kg_or_gco2eq_per_gfuel,
+        res_table.fuel_consumption_boiler_total.get_total_co2_emissions().tank_to_wake_kg_or_gco2eq_per_gfuel,
+    )
+    assert np.isclose(
+        res_proto.steam_production_boiler_total_kg,
+        res_table.steam_production_boiler_total_kg,
+    )
+
+
+def test_time_series_result_constant_boiler_steam_fallback():
+    """AC2: all-zero per-instance values + non-zero top-level constant behaves as a constant."""
+    constant = 3500.0
+    time_series = TimeSeriesResult(
+        propulsion_power_timeseries=[
+            PropulsionPowerInstance(
+                epoch_s=epoch,
+                propulsion_power_kw=prop,
+                auxiliary_power_kw=_BOILER_AUX_KW,
+                # boiler_steam_demand_kg_per_h left at 0 on every instance
+            )
+            for epoch, prop in zip(_BOILER_EPOCHS, _BOILER_PROPULSION_KW)
+        ],
+        boiler_steam_demand_kg_per_h=constant,
+    )
+    res_proto = _build_boiler_machinery_calculation().calculate_machinery_system_output_from_time_series_result(
+        time_series=time_series
+    )
+    res_table = _table_mode_boiler_result(np.full(len(_BOILER_EPOCHS), constant))
+
+    assert res_proto.fuel_consumption_boiler_total.total_fuel_consumption > 0
+    assert np.isclose(
+        res_proto.fuel_consumption_boiler_total.total_fuel_consumption,
+        res_table.fuel_consumption_boiler_total.total_fuel_consumption,
+    )
+    assert np.isclose(
+        res_proto.steam_production_boiler_total_kg,
+        res_table.steam_production_boiler_total_kg,
+    )
+
+
+def test_time_series_result_zero_boiler_steam_no_contribution():
+    """AC3: all fields zero produces zero boiler contribution (no regression)."""
+    time_series = TimeSeriesResult(
+        propulsion_power_timeseries=[
+            PropulsionPowerInstance(
+                epoch_s=epoch,
+                propulsion_power_kw=prop,
+                auxiliary_power_kw=_BOILER_AUX_KW,
+            )
+            for epoch, prop in zip(_BOILER_EPOCHS, _BOILER_PROPULSION_KW)
+        ],
+    )
+    res_proto = _build_boiler_machinery_calculation().calculate_machinery_system_output_from_time_series_result(
+        time_series=time_series
+    )
+    assert res_proto.fuel_consumption_boiler_total.total_fuel_consumption == 0.0
+    assert res_proto.steam_production_boiler_total_kg == 0.0
+
+
+def test_time_series_result_explicit_steam_demand_overrides_proto():
+    """The explicit steam_demand_kg_per_h argument takes precedence over the proto value."""
+    explicit = np.array([2000.0, 3000.0, 4000.0, 5000.0])
+    # Proto carries a different (constant) value that must be ignored when the arg is given.
+    time_series = TimeSeriesResult(
+        propulsion_power_timeseries=[
+            PropulsionPowerInstance(
+                epoch_s=epoch,
+                propulsion_power_kw=prop,
+                auxiliary_power_kw=_BOILER_AUX_KW,
+            )
+            for epoch, prop in zip(_BOILER_EPOCHS, _BOILER_PROPULSION_KW)
+        ],
+        boiler_steam_demand_kg_per_h=9999.0,
+    )
+    res_override = _build_boiler_machinery_calculation().calculate_machinery_system_output_from_time_series_result(
+        time_series=time_series,
+        steam_demand_kg_per_h=explicit,
+    )
+    res_table = _table_mode_boiler_result(explicit)
+    assert np.isclose(
+        res_override.fuel_consumption_boiler_total.total_fuel_consumption,
+        res_table.fuel_consumption_boiler_total.total_fuel_consumption,
+    )
+
+
+def test_time_series_result_multiple_propulsors_boiler_steam():
+    """Per-instance boiler steam is carried through the multi-propulsor time-series path.
+
+    The boiler depends only on steam demand and the integration intervals, not on how propulsion
+    power is split across drives, so the boiler fuel/steam must match the single-propulsor
+    table-mode result for the same epochs and steam profile.
+    """
+    steam = np.array([2000.0, 3000.0, 4000.0, 5000.0])
+    machinery_calculation = _build_boiler_machinery_calculation()
+    propulsor_names = [drive.name for drive in machinery_calculation.electric_system.propulsion_drives]
+    # Split the same total propulsion power equally across the drives.
+    per_drive_power = [[prop / len(propulsor_names)] * len(propulsor_names) for prop in _BOILER_PROPULSION_KW]
+    time_series = TimeSeriesResultForMultiplePropulsors(
+        propulsion_power_timeseries=[
+            PropulsionPowerInstanceForMultiplePropulsors(
+                epoch_s=epoch,
+                propulsion_power_kw=power_row,
+                auxiliary_power_kw=_BOILER_AUX_KW,
+                boiler_steam_demand_kg_per_h=s,
+            )
+            for epoch, power_row, s in zip(_BOILER_EPOCHS, per_drive_power, steam)
+        ],
+        propulsor_names=propulsor_names,
+    )
+    res_proto = machinery_calculation.calculate_machinery_system_output_from_time_series_result(
+        time_series=time_series
+    )
+    res_table = _table_mode_boiler_result(steam)
+
+    assert res_proto.fuel_consumption_boiler_total.total_fuel_consumption > 0
+    assert np.isclose(res_proto.steam_production_boiler_total_kg, 150.0)
+    assert np.isclose(
+        res_proto.fuel_consumption_boiler_total.total_fuel_consumption,
+        res_table.fuel_consumption_boiler_total.total_fuel_consumption,
+    )
+    assert np.isclose(
+        res_proto.steam_production_boiler_total_kg,
+        res_table.steam_production_boiler_total_kg,
+    )

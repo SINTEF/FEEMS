@@ -23,6 +23,9 @@ This document covers the public API for the `machinery-system-structure` (MachSy
   - [convert_multi_fuel_engine_to_protobuf](#convert_multi_fuel_engine_to_protobuf)
   - [convert_electric_system_to_protobuf](#convert_electric_system_to_protobuf)
   - [convert_mechanical_system_to_protobuf](#convert_mechanical_system_to_protobuf)
+- [Time-Series Result (gymir_result.proto)](#time-series-result-gymir_resultproto)
+  - [convert_proto_timeseries_to_pd_dataframe](#convert_proto_timeseries_to_pd_dataframe)
+  - [convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe](#convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe)
 
 ---
 
@@ -344,3 +347,49 @@ Converts a `SteamBoiler` instance to a `proto.SteamBoiler` message.
 - **Single-fuel**: serializes `_eta_curve` as `thermal_efficiency_curve` (`EfficiencyCurve`) plus `fuel_type` and `fuel_origin`.
 - **Multi-fuel**: serializes each `FuelCharacteristics` as a `COGAS.FuelMode` entry in `fuel_modes`; `thermal_efficiency_curve` is left empty.
 - Emission curves (if any) are serialized to `emission_curves`.
+
+---
+
+## Time-Series Result (gymir_result.proto)
+
+The `TimeSeriesResult` / `TimeSeriesResultForMultiplePropulsors` messages carry the operational
+load profile fed into a simulation. Each per-timestep instance carries a propulsion power, an
+auxiliary power, and a boiler steam demand; the message also holds a top-level constant for the
+latter two used as a fall-back when the per-instance values are all zero.
+
+| Message | Field | Number | Type | Description |
+|---|---|---|---|---|
+| `PropulsionPowerInstance` | `auxiliary_power_kw` | 3 | `double` | Per-timestep auxiliary (electric) load. |
+| `PropulsionPowerInstance` | `boiler_steam_demand_kg_per_h` | 4 | `double` | Per-timestep boiler steam demand (kg/h). |
+| `PropulsionPowerInstanceForMultiplePropulsors` | `boiler_steam_demand_kg_per_h` | 4 | `double` | As above, multi-propulsor variant. |
+| `TimeSeriesResult` | `auxiliary_power_kw` | 2 | `double` | Constant auxiliary-power fall-back. |
+| `TimeSeriesResult` | `boiler_steam_demand_kg_per_h` | 4 | `double` | Constant boiler steam-demand fall-back (kg/h). |
+| `TimeSeriesResultForMultiplePropulsors` | `boiler_steam_demand_kg_per_h` | 5 | `double` | Constant boiler steam-demand fall-back (kg/h). |
+
+### convert_proto_timeseries_to_pd_dataframe
+
+```python
+def convert_proto_timeseries_to_pd_dataframe(
+    proto_timeseries: proto.TimeSeriesResult,
+) -> pd.DataFrame
+```
+
+Converts a `TimeSeriesResult` to a `pandas.DataFrame` indexed by `epoch_s`, with columns
+`propulsion_power_kw`, `auxiliary_power_kw`, and `boiler_steam_demand_kg_per_h` (plus `speed_kn`
+and `draft_m` when an operation profile is present).
+
+- For both `auxiliary_power_kw` and `boiler_steam_demand_kg_per_h`, the per-instance values are
+  used as-is; if they are **all zero**, the corresponding top-level constant on the message is
+  broadcast to every timestep instead.
+
+### convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe
+
+```python
+def convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe(
+    proto_timeseries: proto.TimeSeriesResultForMultiplePropulsors,
+) -> pd.DataFrame
+```
+
+As above, but one column per propulsor (named via `propulsor_names`) alongside the
+`auxiliary_power_kw` and `boiler_steam_demand_kg_per_h` columns, with the same all-zero
+top-level fall-back behaviour.
