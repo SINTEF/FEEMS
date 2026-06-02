@@ -163,11 +163,11 @@ Runs a simulation from a protobuf time-series result message.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `time_series` | `TimeSeriesResult \| TimeSeriesResultForMultiplePropulsors` | Protobuf time-series. `TimeSeriesResult` carries a single propulsion power column plus auxiliary load; `TimeSeriesResultForMultiplePropulsors` carries one column per propulsor. |
+| `time_series` | `TimeSeriesResult \| TimeSeriesResultForMultiplePropulsors` | Protobuf time-series. `TimeSeriesResult` carries a single propulsion power column plus auxiliary load; `TimeSeriesResultForMultiplePropulsors` carries one column per propulsor. Both also carry `boiler_steam_demand_kg_per_h` (per-instance, with a top-level constant fall-back). |
 | `fuel_specified_by` | `FuelSpecifiedBy` | Emission factor set. Default `FuelSpecifiedBy.IMO`. |
 | `ignore_power_balance` | `bool` | Skip PMS scheduling. Default `False`. |
 | `fuel_option` | `FuelOption \| None` | Alternative fuel. See [fuel_option behaviour](#fuel_option-behaviour). |
-| `steam_demand_kg_per_h` | `np.ndarray \| None` | Per-timestep steam demand in kg/h. Length must match the number of rows in the decoded time-series. See [steam_demand_kg_per_h behaviour](#steam_demand_kg_per_h-behaviour). |
+| `steam_demand_kg_per_h` | `np.ndarray \| None` | Explicit per-timestep steam demand in kg/h. **Takes precedence** over the value carried by `time_series`. When `None`, the boiler demand is taken from the proto's `boiler_steam_demand_kg_per_h` (per-instance values, or the top-level constant when those are all zero). Length must match the number of rows in the decoded time-series. See [steam_demand_kg_per_h behaviour](#steam_demand_kg_per_h-behaviour). |
 
 **Raises**
 - `TypeError` — if `time_series` is neither `TimeSeriesResult` nor `TimeSeriesResultForMultiplePropulsors`
@@ -299,8 +299,11 @@ Both types are defined in `feems.types_for_feems` / `feems.system_model`. See th
 The `steam_demand_kg_per_h` parameter is accepted by three of the four calculation methods (all except the Gymir-result method). It controls the per-timestep steam output of the `SteamBoiler` attached to the system.
 
 - If the system has no boiler (`system_feems.boiler is None`), this parameter is silently ignored.
-- If `steam_demand_kg_per_h=None` and a boiler is present, the boiler demand is set to zero for all timesteps (boiler is not running).
+- If `steam_demand_kg_per_h=None` and a boiler is present:
+  - For `calculate_machinery_system_output_from_time_series_result`, the boiler demand is taken from the proto's `boiler_steam_demand_kg_per_h` (per-instance values, or the top-level constant when those are all zero). An explicit `steam_demand_kg_per_h` argument overrides the proto value.
+  - For the other methods, the boiler demand is set to zero for all timesteps (boiler is not running).
 - The array length must exactly match the number of timesteps in the input data; a mismatch raises `ValueError`.
+- **Integration alignment:** when the load is given as a timestamp series (the default for the time-series and propulsion-power methods), the final timestamp is dropped to form `n-1` integration intervals — the same truncation applied to the propulsion power. The steam demand is truncated to those `n-1` points accordingly, so the boiler fuel integration stays aligned with the engine integration.
 
 The boiler's fuel consumption, CO2 emissions, and running hours appear in the returned `FEEMSResult` / `FEEMSResultForMachinerySystem` and in its `detail_result` DataFrame under the component row named after the boiler.
 

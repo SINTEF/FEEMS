@@ -290,6 +290,25 @@ class MachineryCalculation:
             fuel_option=fuel_option,
         )
 
+    def _set_boiler_steam_demand(self, steam_demand_kg_per_h: Optional[np.ndarray]) -> None:
+        """Set the boiler steam demand aligned to the simulation's integration intervals.
+
+        The number of integration points equals ``len(time_interval_s)``, which is one less
+        than the number of timestamps when the load is given as a timestamp series (the last
+        point is dropped, mirroring how the propulsion power is handled). The steam demand is
+        therefore truncated to the same number of points so the boiler fuel integration matches
+        the engine integration. No-op when the system has no boiler.
+        """
+        if self.system_feems.boiler is None:
+            return
+        n_points = len(np.atleast_1d(self.electric_system.time_interval_s))
+        if steam_demand_kg_per_h is None:
+            self.system_feems.boiler.steam_out_kg_per_h = np.zeros(n_points)
+        else:
+            self.system_feems.boiler.steam_out_kg_per_h = (
+                np.asarray(steam_demand_kg_per_h, dtype=float)[:n_points]
+            )
+
     def calculate_machinery_system_output_from_propulsion_power_time_series(
         self,
         *,
@@ -362,11 +381,7 @@ class MachineryCalculation:
             propulsion_power_time_series=propulsion_power,
             auxiliary_load_kw=auxiliary_power_kw,
         )
-        if self.system_feems.boiler is not None:
-            self.system_feems.boiler.steam_out_kg_per_h = (
-                steam_demand_kg_per_h if steam_demand_kg_per_h is not None
-                else np.zeros(n_steps)
-            )
+        self._set_boiler_steam_demand(steam_demand_kg_per_h)
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
@@ -394,7 +409,10 @@ class MachineryCalculation:
             fuel_option(FuelOption): The fuel option to be used in the simulation. If None, the
                 default fuel option in the system will be used.
             steam_demand_kg_per_h: Steam demand time series (kg/h). Must have the same length as
-                the time series. If None and a boiler is attached, demand is treated as zero.
+                the time series. Takes precedence over the boiler_steam_demand_kg_per_h carried by
+                the time_series proto; if None, that proto value is used instead (per-instance, or
+                the top-level constant when the per-instance values are all zero). If both are
+                absent and a boiler is attached, demand is treated as zero.
 
         Returns:
             The result of the simulation. FEEMSResult or FEEMSResultForMachinery system.
@@ -423,11 +441,18 @@ class MachineryCalculation:
                     f"The length of steam_demand_kg_per_h ({len(steam_demand_kg_per_h)}) must match "
                     f"the time series ({n_steps})."
                 )
-        if self.system_feems.boiler is not None:
-            self.system_feems.boiler.steam_out_kg_per_h = (
-                steam_demand_kg_per_h if steam_demand_kg_per_h is not None
-                else np.zeros(n_steps)
-            )
+        # The explicit steam_demand_kg_per_h argument takes precedence; otherwise fall back to the
+        # boiler_steam_demand_kg_per_h carried by the time-series proto (per-instance values, with a
+        # top-level constant fallback resolved by the converter).
+        steam_demand_from_proto = (
+            df["boiler_steam_demand_kg_per_h"].values
+            if "boiler_steam_demand_kg_per_h" in df.columns
+            else None
+        )
+        effective_steam_demand = (
+            steam_demand_kg_per_h if steam_demand_kg_per_h is not None else steam_demand_from_proto
+        )
+        self._set_boiler_steam_demand(effective_steam_demand)
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
@@ -480,11 +505,10 @@ class MachineryCalculation:
             auxiliary_load_kw=auxiliary_power_kw,
             time_is_given_as_interval=True,
         )
-        if self.system_feems.boiler is not None:
-            self.system_feems.boiler.steam_out_kg_per_h = (
-                steam_demand_kg_per_h if steam_demand_kg_per_h is not None
-                else np.zeros(n_steps)
-            )
+        # Time is given as intervals here, so there is no last-point truncation: the helper's
+        # alignment is a no-op (n_points == n_steps). Routed through the helper anyway to keep a
+        # single boiler-steam code path across all calculation methods.
+        self._set_boiler_steam_demand(steam_demand_kg_per_h)
         return self._run_simulation(
             fuel_specified_by=fuel_specified_by,
             ignore_power_balance=ignore_power_balance,
