@@ -1287,6 +1287,10 @@ class SteamBoiler:
     # Run point
     # ------------------------------------------------------------------
 
+    @property
+    def fuel_consumer_type_fuel_eu_maritime(self) -> FuelConsumerClassFuelEUMaritime:
+        return FuelConsumerClassFuelEUMaritime.BOILER
+
     def get_boiler_run_point(
         self,
         steam_demand_kg_per_h: np.ndarray,
