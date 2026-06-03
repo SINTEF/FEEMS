@@ -355,7 +355,9 @@ class MachinerySystem:
             ) / 1000.0
 
         merged_emission_kg = defaultdict(float, total_emission_kg) if total_emission_kg else None
-        co2_kg = boiler_fc.get_total_co2_emissions()
+        co2_kg = boiler_fc.get_total_co2_emissions(
+            fuel_consumer_class=boiler.fuel_consumer_type_fuel_eu_maritime
+        )
         n_steps = len(np.atleast_1d(steam_kg_per_s))
         duration_s = get_duration_s(integration_method, n_steps, time_interval_s)
 
@@ -397,7 +399,7 @@ class MachinerySystem:
                 TypeComponent.STEAM_BOILER.name,
                 boiler.rated_steam_production_kg_per_h,
                 "kg/h",
-                "None",
+                boiler.fuel_consumer_type_fuel_eu_maritime.name,
                 operating_avg_power_kw,
                 0.0,  # reversible (PTI direction) — N/A for boilers
                 operating_avg_efficiency,
