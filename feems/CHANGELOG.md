@@ -5,6 +5,14 @@ All notable changes to the FEEMS package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.1](https://github.com/SINTEF/FEEMS/compare/feems-v0.18.0...feems-v0.18.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* add Boiler fuel consumer class for FuelEU Maritime boiler GHG calculation ([a0cf720](https://github.com/SINTEF/FEEMS/commit/a0cf720ea77b4e4b1d2ed95c85d06022ea1c6d74))
+* add Boiler fuel consumer class for FuelEU Maritime boiler GHG calculation ([f3a69ac](https://github.com/SINTEF/FEEMS/commit/f3a69acced870926939904f14ba7c8e834bbeb7a))
+
 ## [0.18.0](https://github.com/SINTEF/FEEMS/compare/feems-v0.17.0...feems-v0.18.0) (2026-05-20)
 
 
