@@ -994,6 +994,37 @@ class ShorePowerConnectionSystem(ShorePowerConnection):
         self.converter = converter
 
 
+class OrganicRankineCycle(ElectricComponent):
+    """
+    Organic Rankine cycle: fuel-free electric power source driven by waste heat.
+
+    The ORC output depends on the heat of its host (e.g. a main engine) and is
+    therefore not dispatched by the power balance. Set its power as a fixed
+    setpoint (``load_sharing_mode = power / rated_power``, ``status = 1``); the
+    load-balancing units cover the rest. It burns no fuel.
+
+    :param name: Component name
+    :param rated_power: Rated electric power in kW
+    :param switchboard_id: Switchboard ID
+    """
+
+    def __init__(
+        self,
+        name: str,
+        rated_power: Power_kW,
+        switchboard_id: SwbId = SwbId(0),
+        uid: Optional[str] = None,
+    ):
+        super().__init__(
+            TypeComponent.ORGANIC_RANKINE_CYCLE,
+            name,
+            rated_power,
+            power_type=TypePower.POWER_SOURCE,
+            switchboard_id=switchboard_id,
+            uid=uid,
+        )
+
+
 class COGES(Component):
     """
     Class for serial configuration for a COGES system.

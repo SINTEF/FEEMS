@@ -206,6 +206,8 @@ class FEEMSResultConverter:
                 pass
             elif power_source.type == TypeComponent.PTI_PTO_SYSTEM:
                 pass
+            elif power_source.type == TypeComponent.ORGANIC_RANKINE_CYCLE:
+                pass  # fuel-free source: power output only
             else:
                 raise NotImplementedError(
                     f"Retrieving time series data for component type {power_source.type} "

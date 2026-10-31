@@ -611,6 +611,31 @@ shore_system = ShorePowerConnectionSystem(
 - `shore_power_connection: ShorePowerConnection`
 - `converter: ElectricComponent`
 
+#### `OrganicRankineCycle`
+
+Fuel-free electric power source driven by waste heat (organic Rankine cycle). Its output
+depends on the heat of its host and is therefore not dispatched by the power balance: set it
+as a fixed setpoint (`load_sharing_mode = power / rated_power`, `status = 1`); the
+load-balancing units cover the rest.
+
+```python
+from feems.components_model.component_electric import OrganicRankineCycle
+
+orc = OrganicRankineCycle(
+    name="ORC main engine",
+    rated_power=Power_kW(300),
+    switchboard_id=SwbId(1),
+    uid="main_engine_orc",
+)
+```
+
+**Attributes:**
+- Same as `ElectricComponent` with `type_=TypeComponent.ORGANIC_RANKINE_CYCLE`
+- Automatically set to `power_type=TypePower.POWER_SOURCE`
+
+**Results:** no fuel; the recovered electric energy is reported as
+`FEEMSResult.energy_input_waste_heat_recovery_total_mj` and in its own `detail_result` row.
+
 ### Serial Systems
 
 Serial systems combine multiple components in series to represent subsystems like gensets (engine + generator) or propulsion drives (transformer + converter + motor). FEEMS uses a mathematical framework for calculating power flow and efficiency through series-connected components.
@@ -1363,6 +1388,7 @@ TypeComponent.SUPERCAPACITOR_SYSTEM
 TypeComponent.SHORE_POWER
 TypeComponent.COGAS
 TypeComponent.COGES
+TypeComponent.ORGANIC_RANKINE_CYCLE
 ```
 
 ### `TypePower`

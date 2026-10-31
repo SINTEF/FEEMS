@@ -245,5 +245,82 @@ class TestConvertToFeems(unittest.TestCase):
                         f"has been modified: {diff_component.__str__()}"
                     )
 
+
+
+class TestConvertOrganicRankineCycle(unittest.TestCase):
+    """Main engine ORC (switchboard_id > 0) becomes a feems power source on that switchboard."""
+
+    def _system_with_main_engine_orc(self, switchboard_id=None):
+        current_dir = os.path.dirname(__file__)
+        system_proto = retrieve_machinery_system_from_file(
+            os.path.join(current_dir, "mechanical_propulsion_with_electric_system.mss")
+        )
+        main_engine_subsystem = next(
+            subsystem
+            for shaft_line in system_proto.mechanical_system.shaft_lines
+            for subsystem in shaft_line.subsystems
+            if subsystem.HasField("engine")
+        )
+        orc = main_engine_subsystem.engine.orc
+        orc.name = "ORC main engine"
+        orc.uid = "main_engine_orc"
+        orc.rated_power_kw = 300.0
+        orc.switchboard_id = (
+            system_proto.electric_system.switchboards[0].switchboard_id
+            if switchboard_id is None
+            else switchboard_id
+        )
+        return system_proto
+
+    def _orc_power_sources(self, system_feems):
+        return [
+            component
+            for component in system_feems.electric_system.power_sources
+            if component.type == TypeComponent.ORGANIC_RANKINE_CYCLE
+        ]
+
+    def test_main_engine_orc_becomes_power_source(self):
+        system_proto = self._system_with_main_engine_orc()
+        orc_power_sources = self._orc_power_sources(convert_proto_propulsion_system_to_feems(system_proto))
+        self.assertEqual(len(orc_power_sources), 1)
+        self.assertEqual(orc_power_sources[0].uid, "main_engine_orc")
+        self.assertEqual(orc_power_sources[0].name, "ORC main engine")
+        self.assertEqual(orc_power_sources[0].rated_power, 300.0)
+        self.assertEqual(
+            orc_power_sources[0].switchboard_id,
+            system_proto.electric_system.switchboards[0].switchboard_id,
+        )
+
+    def test_integrated_orc_is_not_converted(self):
+        system_proto = self._system_with_main_engine_orc(switchboard_id=0)
+        self.assertEqual(self._orc_power_sources(convert_proto_propulsion_system_to_feems(system_proto)), [])
+
+    def test_orc_without_rated_power_is_not_converted(self):
+        system_proto = self._system_with_main_engine_orc()
+        for shaft_line in system_proto.mechanical_system.shaft_lines:
+            for subsystem in shaft_line.subsystems:
+                if subsystem.HasField("engine"):
+                    subsystem.engine.orc.rated_power_kw = 0.0
+        self.assertEqual(self._orc_power_sources(convert_proto_propulsion_system_to_feems(system_proto)), [])
+
+    def test_orc_on_unknown_switchboard_raises(self):
+        system_proto = self._system_with_main_engine_orc(switchboard_id=99)
+        with self.assertRaises(ValueError):
+            convert_proto_propulsion_system_to_feems(system_proto)
+
+    def test_conversion_back_to_proto_skips_orc_component(self):
+        system_proto = self._system_with_main_engine_orc()
+        system_feems = convert_proto_propulsion_system_to_feems(system_proto)
+        system_proto_reconverted = convert_mechanical_propulsion_system_with_electric_system_to_protobuf(
+            system_feems
+        )
+        component_types = [
+            subsystem.component_type
+            for switchboard in system_proto_reconverted.electric_system.switchboards
+            for subsystem in switchboard.subsystems
+        ]
+        self.assertNotIn(TypeComponent.ORGANIC_RANKINE_CYCLE.value, component_types)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -54,6 +54,7 @@ from feems.components_model.component_electric import (
     FuelCell,
     FuelCellSystem,
     Genset,
+    OrganicRankineCycle,
     SerialSystemElectric,
     SuperCapacitor,
     SuperCapacitorSystem,
@@ -698,7 +699,48 @@ def convert_generic_electric_subsystem_to_feems(
             )
 
 
-def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switchboard:
+def convert_proto_orc_to_feems(orc: proto.OrganicRankineCycle) -> OrganicRankineCycle:
+    return OrganicRankineCycle(
+        name=orc.name,
+        rated_power=orc.rated_power_kw,
+        switchboard_id=orc.switchboard_id,
+        uid=orc.uid,
+    )
+
+
+def collect_orcs_on_switchboards(
+    system: proto.MachinerySystem,
+) -> Dict[int, List[OrganicRankineCycle]]:
+    """ORCs of main engines that feed a switchboard (switchboard_id > 0), by switchboard id.
+
+    ORCs with switchboard_id == 0 (e.g. on gensets) are integrated in their host and are
+    not converted to a separate component. ORCs without rated power are skipped.
+    """
+    orcs_by_switchboard_id: Dict[int, List[OrganicRankineCycle]] = {}
+    for shaft_line in system.mechanical_system.shaft_lines:
+        for subsystem in shaft_line.subsystems:
+            if subsystem.HasField("engine"):
+                engine = subsystem.engine
+            elif subsystem.HasField("multi_fuel_engine"):
+                engine = subsystem.multi_fuel_engine
+            else:
+                continue
+            if (
+                not engine.HasField("orc")
+                or engine.orc.switchboard_id == 0
+                or engine.orc.rated_power_kw <= 0
+            ):
+                continue
+            orcs_by_switchboard_id.setdefault(engine.orc.switchboard_id, []).append(
+                convert_proto_orc_to_feems(engine.orc)
+            )
+    return orcs_by_switchboard_id
+
+
+def convert_proto_switchboard_to_feems(
+    switchboard: proto.Switchboard,
+    additional_components: Optional[List[Any]] = None,
+) -> Switchboard:
     components = []
     switchboard_id = switchboard.switchboard_id
     for subsystem in switchboard.subsystems:
@@ -747,6 +789,8 @@ def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switch
                     subsystem=subsystem, switchboard_id=switchboard_id
                 )
             )
+
+    components.extend(additional_components or [])
 
     return Switchboard(
         name=f"SWBD {switchboard.switchboard_id}",
@@ -920,9 +964,22 @@ def convert_feems_shaftlines_to_feems_mechanical_propulsion_system(
 
 def convert_proto_electric_system_to_feems(
     system: proto.ElectricSystem,
+    additional_components_by_switchboard: Optional[Dict[int, List[Any]]] = None,
 ) -> ElectricPowerSystem:
+    additional_components_by_switchboard = additional_components_by_switchboard or {}
+    unknown_switchboard_ids = set(additional_components_by_switchboard) - {
+        proto_switchboard.switchboard_id for proto_switchboard in system.switchboards
+    }
+    if unknown_switchboard_ids:
+        raise ValueError(
+            f"Components refer to switchboard ids {sorted(unknown_switchboard_ids)} "
+            "that do not exist in the electric system."
+        )
     switchboards = [
-        convert_proto_switchboard_to_feems(proto_switchboard)
+        convert_proto_switchboard_to_feems(
+            proto_switchboard,
+            additional_components=additional_components_by_switchboard.get(proto_switchboard.switchboard_id),
+        )
         for proto_switchboard in system.switchboards
     ]
     return convert_feems_switchboards_to_feems_electric_power_system(switchboards)
@@ -972,7 +1029,10 @@ def convert_proto_propulsion_system_to_feems(
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.MECHANICAL:
         feems_system = MechanicalPropulsionSystemWithElectricPowerSystem(
             name=system.name,
-            electric_system=convert_proto_electric_system_to_feems(system.electric_system),
+            electric_system=convert_proto_electric_system_to_feems(
+                system.electric_system,
+                additional_components_by_switchboard=collect_orcs_on_switchboards(system),
+            ),
             mechanical_system=convert_proto_mechanical_system_to_feems(system.mechanical_system),
         )
         feems_system.boiler = boiler
@@ -982,7 +1042,10 @@ def convert_proto_propulsion_system_to_feems(
         feems_system.boiler = boiler
         return feems_system
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.HYBRID:
-        electric_system = convert_proto_electric_system_to_feems(system.electric_system)
+        electric_system = convert_proto_electric_system_to_feems(
+            system.electric_system,
+            additional_components_by_switchboard=collect_orcs_on_switchboards(system),
+        )
         pti_ptos = electric_system.pti_pto if len(electric_system.pti_pto) > 0 else None
         feems_system = HybridPropulsionSystem(
             name=system.name,

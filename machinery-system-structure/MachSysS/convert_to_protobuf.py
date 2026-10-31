@@ -496,6 +496,9 @@ def convert_switchboard_to_protobuf(
     switchboard_proto.switchboard_id = switchboard_feems.id
 
     for component in switchboard_feems.components:
+        if component.type == TypeComponent.ORGANIC_RANKINE_CYCLE:
+            # stored on its host engine in the proto, not as a switchboard subsystem
+            continue
         subsystem = proto.Subsystem(
             power_type=component.power_type.value,
             component_type=component.type.value,

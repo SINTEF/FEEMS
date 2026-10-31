@@ -130,6 +130,26 @@ class Efficiency(_message.Message):
     value: float
     def __init__(self, curve: _Optional[_Union[EfficiencyCurve, _Mapping]] = ..., value: _Optional[float] = ...) -> None: ...
 
+class OrganicRankineCycle(_message.Message):
+    __slots__ = ("rated_power_kw", "rated_efficiency", "relative_efficiency_curve", "waste_heat_fraction", "unit_price_usd", "uid", "switchboard_id", "name")
+    RATED_POWER_KW_FIELD_NUMBER: _ClassVar[int]
+    RATED_EFFICIENCY_FIELD_NUMBER: _ClassVar[int]
+    RELATIVE_EFFICIENCY_CURVE_FIELD_NUMBER: _ClassVar[int]
+    WASTE_HEAT_FRACTION_FIELD_NUMBER: _ClassVar[int]
+    UNIT_PRICE_USD_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    SWITCHBOARD_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    rated_power_kw: float
+    rated_efficiency: float
+    relative_efficiency_curve: Curve1D
+    waste_heat_fraction: float
+    unit_price_usd: float
+    uid: str
+    switchboard_id: int
+    name: str
+    def __init__(self, rated_power_kw: _Optional[float] = ..., rated_efficiency: _Optional[float] = ..., relative_efficiency_curve: _Optional[_Union[Curve1D, _Mapping]] = ..., waste_heat_fraction: _Optional[float] = ..., unit_price_usd: _Optional[float] = ..., uid: _Optional[str] = ..., switchboard_id: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+
 class PowerCurve(_message.Message):
     __slots__ = ("x_label", "y_label", "curve")
     X_LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -215,7 +235,7 @@ class Fuel(_message.Message):
     def __init__(self, fuel_type: _Optional[_Union[FuelType, str]] = ..., fuel_origin: _Optional[_Union[FuelOrigin, str]] = ..., name: _Optional[str] = ...) -> None: ...
 
 class Engine(_message.Message):
-    __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "bsfc", "main_fuel", "order_from_switchboard_or_shaftline", "pilot_bsfc", "pilot_fuel", "nox_calculation_method", "emission_curves", "engine_cycle_type", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid")
+    __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "bsfc", "main_fuel", "order_from_switchboard_or_shaftline", "pilot_bsfc", "pilot_fuel", "nox_calculation_method", "emission_curves", "engine_cycle_type", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid", "orc")
     class NOxCalculationMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         TIER_2: _ClassVar[Engine.NOxCalculationMethod]
@@ -253,6 +273,7 @@ class Engine(_message.Message):
     START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
     TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     UID_FIELD_NUMBER: _ClassVar[int]
+    ORC_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     rated_speed_rpm: float
@@ -268,7 +289,8 @@ class Engine(_message.Message):
     start_delay_s: float
     turn_off_power_kw: float
     uid: str
-    def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., pilot_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., pilot_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ...) -> None: ...
+    orc: OrganicRankineCycle
+    def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., main_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., pilot_bsfc: _Optional[_Union[BSFC, _Mapping]] = ..., pilot_fuel: _Optional[_Union[Fuel, _Mapping]] = ..., nox_calculation_method: _Optional[_Union[Engine.NOxCalculationMethod, str]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., engine_cycle_type: _Optional[_Union[Engine.EngineCycleType, str]] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ..., orc: _Optional[_Union[OrganicRankineCycle, _Mapping]] = ...) -> None: ...
 
 class COGAS(_message.Message):
     __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "efficiency", "gas_turbine_power_curve", "steam_turbine_power_curve", "fuel", "order_from_switchboard_or_shaftline", "nox_calculation_method", "emission_curves", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid", "fuel_modes", "ch4_factor_gch4_per_gfuel", "n2o_factor_gn2o_per_gfuel", "c_slip_percent")
@@ -642,7 +664,7 @@ class FuelStorage(_message.Message):
     def __init__(self, fuel_type: _Optional[_Union[FuelType, str]] = ..., capacity_kg: _Optional[float] = ...) -> None: ...
 
 class MachinerySystem(_message.Message):
-    __slots__ = ("name", "propulsion_type", "fuel_storage", "maximum_allowed_genset_load_percentage", "mechanical_system", "electric_system", "maximum_allowed_fuel_cell_load_percentage", "average_base_load_percentage", "steam_boiler")
+    __slots__ = ("name", "propulsion_type", "fuel_storage", "maximum_allowed_genset_load_percentage", "mechanical_system", "electric_system", "maximum_allowed_fuel_cell_load_percentage", "average_base_load_percentage", "steam_boiler", "fuel_cell_orc")
     class PropulsionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         MECHANICAL: _ClassVar[MachinerySystem.PropulsionType]
@@ -660,6 +682,7 @@ class MachinerySystem(_message.Message):
     MAXIMUM_ALLOWED_FUEL_CELL_LOAD_PERCENTAGE_FIELD_NUMBER: _ClassVar[int]
     AVERAGE_BASE_LOAD_PERCENTAGE_FIELD_NUMBER: _ClassVar[int]
     STEAM_BOILER_FIELD_NUMBER: _ClassVar[int]
+    FUEL_CELL_ORC_FIELD_NUMBER: _ClassVar[int]
     name: str
     propulsion_type: MachinerySystem.PropulsionType
     fuel_storage: _containers.RepeatedCompositeFieldContainer[FuelStorage]
@@ -669,7 +692,8 @@ class MachinerySystem(_message.Message):
     maximum_allowed_fuel_cell_load_percentage: float
     average_base_load_percentage: float
     steam_boiler: SteamBoiler
-    def __init__(self, name: _Optional[str] = ..., propulsion_type: _Optional[_Union[MachinerySystem.PropulsionType, str]] = ..., fuel_storage: _Optional[_Iterable[_Union[FuelStorage, _Mapping]]] = ..., maximum_allowed_genset_load_percentage: _Optional[float] = ..., mechanical_system: _Optional[_Union[MechanicalSystem, _Mapping]] = ..., electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ..., maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ..., average_base_load_percentage: _Optional[float] = ..., steam_boiler: _Optional[_Union[SteamBoiler, _Mapping]] = ...) -> None: ...
+    fuel_cell_orc: OrganicRankineCycle
+    def __init__(self, name: _Optional[str] = ..., propulsion_type: _Optional[_Union[MachinerySystem.PropulsionType, str]] = ..., fuel_storage: _Optional[_Iterable[_Union[FuelStorage, _Mapping]]] = ..., maximum_allowed_genset_load_percentage: _Optional[float] = ..., mechanical_system: _Optional[_Union[MechanicalSystem, _Mapping]] = ..., electric_system: _Optional[_Union[ElectricSystem, _Mapping]] = ..., maximum_allowed_fuel_cell_load_percentage: _Optional[float] = ..., average_base_load_percentage: _Optional[float] = ..., steam_boiler: _Optional[_Union[SteamBoiler, _Mapping]] = ..., fuel_cell_orc: _Optional[_Union[OrganicRankineCycle, _Mapping]] = ...) -> None: ...
 
 class SteamBoiler(_message.Message):
     __slots__ = ("name", "uid", "rated_steam_production_kg_per_h", "working_pressure_barg", "feed_water_temperature_c", "fuel_type", "fuel_origin", "thermal_efficiency_curve", "emission_curves", "fuel_modes")
@@ -705,7 +729,7 @@ class SteamBoiler(_message.Message):
     def __init__(self, name: _Optional[str] = ..., uid: _Optional[str] = ..., rated_steam_production_kg_per_h: _Optional[float] = ..., working_pressure_barg: _Optional[float] = ..., feed_water_temperature_c: _Optional[float] = ..., fuel_type: _Optional[_Union[FuelType, str]] = ..., fuel_origin: _Optional[_Union[FuelOrigin, str]] = ..., thermal_efficiency_curve: _Optional[_Union[EfficiencyCurve, _Mapping]] = ..., emission_curves: _Optional[_Iterable[_Union[EmissionCurve, _Mapping]]] = ..., fuel_modes: _Optional[_Iterable[_Union[SteamBoiler.FuelMode, _Mapping]]] = ...) -> None: ...
 
 class MultiFuelEngine(_message.Message):
-    __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "fuel_modes", "order_from_switchboard_or_shaftline", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid")
+    __slots__ = ("name", "rated_power_kw", "rated_speed_rpm", "fuel_modes", "order_from_switchboard_or_shaftline", "unit_price_usd", "start_delay_s", "turn_off_power_kw", "uid", "orc")
     class FuelMode(_message.Message):
         __slots__ = ("main_fuel", "main_bsfc", "pilot_fuel", "pilot_bsfc", "emission_curves", "engine_cycle_type", "nox_calculation_method")
         MAIN_FUEL_FIELD_NUMBER: _ClassVar[int]
@@ -732,6 +756,7 @@ class MultiFuelEngine(_message.Message):
     START_DELAY_S_FIELD_NUMBER: _ClassVar[int]
     TURN_OFF_POWER_KW_FIELD_NUMBER: _ClassVar[int]
     UID_FIELD_NUMBER: _ClassVar[int]
+    ORC_FIELD_NUMBER: _ClassVar[int]
     name: str
     rated_power_kw: float
     rated_speed_rpm: float
@@ -741,4 +766,5 @@ class MultiFuelEngine(_message.Message):
     start_delay_s: float
     turn_off_power_kw: float
     uid: str
-    def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., fuel_modes: _Optional[_Iterable[_Union[MultiFuelEngine.FuelMode, _Mapping]]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ...) -> None: ...
+    orc: OrganicRankineCycle
+    def __init__(self, name: _Optional[str] = ..., rated_power_kw: _Optional[float] = ..., rated_speed_rpm: _Optional[float] = ..., fuel_modes: _Optional[_Iterable[_Union[MultiFuelEngine.FuelMode, _Mapping]]] = ..., order_from_switchboard_or_shaftline: _Optional[int] = ..., unit_price_usd: _Optional[float] = ..., start_delay_s: _Optional[float] = ..., turn_off_power_kw: _Optional[float] = ..., uid: _Optional[str] = ..., orc: _Optional[_Union[OrganicRankineCycle, _Mapping]] = ...) -> None: ...

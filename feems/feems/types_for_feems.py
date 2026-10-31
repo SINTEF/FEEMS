@@ -74,6 +74,7 @@ class FEEMSResult:
         0.0  # Energy input for generator / PTO (electric side) or PTI (mechanical side)
     )
     energy_input_electric_total_mj: float = 0.0  # Energy input for shore power
+    energy_input_waste_heat_recovery_total_mj: float = 0.0  # Electric energy from waste heat (ORC)
     energy_consumption_propulsion_total_mj: float = 0.0  # Energy consumption of propulsion shaft
     energy_consumption_auxiliary_total_mj: float = (
         0.0  # Energy consumption of auxiliary (electric) or mechanical load (mechanical)
@@ -204,6 +205,7 @@ class TypeComponent(Enum):
     COGAS = 28
     COGES = 29
     STEAM_BOILER = 30
+    ORGANIC_RANKINE_CYCLE = 31
 
 
 @unique

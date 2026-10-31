@@ -129,7 +129,7 @@ class ResultPerComponent(_message.Message):
     def __init__(self, component_name: _Optional[str] = ..., multi_fuel_consumption_kg: _Optional[_Union[FuelConsumptionScalar, _Mapping]] = ..., electric_energy_consumption_mj: _Optional[float] = ..., mechanical_energy_consumption_mj: _Optional[float] = ..., energy_stored_mj: _Optional[float] = ..., running_hours_h: _Optional[float] = ..., co2_emissions_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ..., nox_emissions_kg: _Optional[float] = ..., component_type: _Optional[str] = ..., rated_capacity: _Optional[float] = ..., rated_capacity_unit: _Optional[str] = ..., switchboard_id: _Optional[int] = ..., shaftline_id: _Optional[int] = ..., result_time_series: _Optional[_Union[TimeSeriesResultForComponent, _Mapping]] = ..., fuel_consumer_type: _Optional[str] = ..., operating_avg_power_kw: _Optional[float] = ..., operating_avg_reversible_power_kw: _Optional[float] = ..., operating_avg_efficiency: _Optional[float] = ..., operating_avg_sfc_g_per_kwh: _Optional[float] = ...) -> None: ...
 
 class FeemsResult(_message.Message):
-    __slots__ = ("duration_s", "multi_fuel_consumption_total_kg", "energy_consumption_electric_total_mj", "energy_consumption_mechanical_total_mj", "energy_stored_total_mj", "running_hours_main_engines_hr", "running_hours_genset_total_hr", "running_hours_fuel_cell_total_hr", "running_hours_pti_pto_total_hr", "co2_emission_total_kg", "nox_emission_total_kg", "detailed_result", "energy_input_mechanical_total_mj", "energy_input_electric_total_mj", "energy_consumption_propulsion_total_mj", "energy_consumption_auxiliary_total_mj")
+    __slots__ = ("duration_s", "multi_fuel_consumption_total_kg", "energy_consumption_electric_total_mj", "energy_consumption_mechanical_total_mj", "energy_stored_total_mj", "running_hours_main_engines_hr", "running_hours_genset_total_hr", "running_hours_fuel_cell_total_hr", "running_hours_pti_pto_total_hr", "co2_emission_total_kg", "nox_emission_total_kg", "detailed_result", "energy_input_mechanical_total_mj", "energy_input_electric_total_mj", "energy_consumption_propulsion_total_mj", "energy_consumption_auxiliary_total_mj", "energy_input_waste_heat_recovery_total_mj")
     DURATION_S_FIELD_NUMBER: _ClassVar[int]
     MULTI_FUEL_CONSUMPTION_TOTAL_KG_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CONSUMPTION_ELECTRIC_TOTAL_MJ_FIELD_NUMBER: _ClassVar[int]
@@ -146,6 +146,7 @@ class FeemsResult(_message.Message):
     ENERGY_INPUT_ELECTRIC_TOTAL_MJ_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CONSUMPTION_PROPULSION_TOTAL_MJ_FIELD_NUMBER: _ClassVar[int]
     ENERGY_CONSUMPTION_AUXILIARY_TOTAL_MJ_FIELD_NUMBER: _ClassVar[int]
+    ENERGY_INPUT_WASTE_HEAT_RECOVERY_TOTAL_MJ_FIELD_NUMBER: _ClassVar[int]
     duration_s: float
     multi_fuel_consumption_total_kg: FuelConsumptionScalar
     energy_consumption_electric_total_mj: float
@@ -162,7 +163,8 @@ class FeemsResult(_message.Message):
     energy_input_electric_total_mj: float
     energy_consumption_propulsion_total_mj: float
     energy_consumption_auxiliary_total_mj: float
-    def __init__(self, duration_s: _Optional[float] = ..., multi_fuel_consumption_total_kg: _Optional[_Union[FuelConsumptionScalar, _Mapping]] = ..., energy_consumption_electric_total_mj: _Optional[float] = ..., energy_consumption_mechanical_total_mj: _Optional[float] = ..., energy_stored_total_mj: _Optional[float] = ..., running_hours_main_engines_hr: _Optional[float] = ..., running_hours_genset_total_hr: _Optional[float] = ..., running_hours_fuel_cell_total_hr: _Optional[float] = ..., running_hours_pti_pto_total_hr: _Optional[float] = ..., co2_emission_total_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ..., nox_emission_total_kg: _Optional[float] = ..., detailed_result: _Optional[_Iterable[_Union[ResultPerComponent, _Mapping]]] = ..., energy_input_mechanical_total_mj: _Optional[float] = ..., energy_input_electric_total_mj: _Optional[float] = ..., energy_consumption_propulsion_total_mj: _Optional[float] = ..., energy_consumption_auxiliary_total_mj: _Optional[float] = ...) -> None: ...
+    energy_input_waste_heat_recovery_total_mj: float
+    def __init__(self, duration_s: _Optional[float] = ..., multi_fuel_consumption_total_kg: _Optional[_Union[FuelConsumptionScalar, _Mapping]] = ..., energy_consumption_electric_total_mj: _Optional[float] = ..., energy_consumption_mechanical_total_mj: _Optional[float] = ..., energy_stored_total_mj: _Optional[float] = ..., running_hours_main_engines_hr: _Optional[float] = ..., running_hours_genset_total_hr: _Optional[float] = ..., running_hours_fuel_cell_total_hr: _Optional[float] = ..., running_hours_pti_pto_total_hr: _Optional[float] = ..., co2_emission_total_kg: _Optional[_Union[GHGEmissions, _Mapping]] = ..., nox_emission_total_kg: _Optional[float] = ..., detailed_result: _Optional[_Iterable[_Union[ResultPerComponent, _Mapping]]] = ..., energy_input_mechanical_total_mj: _Optional[float] = ..., energy_input_electric_total_mj: _Optional[float] = ..., energy_consumption_propulsion_total_mj: _Optional[float] = ..., energy_consumption_auxiliary_total_mj: _Optional[float] = ..., energy_input_waste_heat_recovery_total_mj: _Optional[float] = ...) -> None: ...
 
 class FeemsResultForMachinerySystem(_message.Message):
     __slots__ = ("electric_system", "mechanical_system")

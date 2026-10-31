@@ -24,6 +24,7 @@ from .components_model.component_electric import (
     FuelCellSystem,
     Genset,
     MechanicalComponent,
+    OrganicRankineCycle,
     PowerSystemComponent,
     SerialSystemElectric,
     ShorePowerConnection,
@@ -457,6 +458,7 @@ class ElectricPowerSystem(MachinerySystem):
                         COGES,
                         ShorePowerConnection,
                         ShorePowerConnectionSystem,
+                        OrganicRankineCycle,
                     ),
                 ):
                     self.power_sources.append(component)
@@ -466,7 +468,7 @@ class ElectricPowerSystem(MachinerySystem):
                     raise TypeError(
                         "The component was specified to be power source but is "
                         "not an instance of ElectricMachine, Genset, FuelCellSystem, "
-                        "COGES, ShorePowerConnection, ShorePowerConnectionSystem"
+                        "COGES, ShorePowerConnection, ShorePowerConnectionSystem, OrganicRankineCycle"
                     )
             elif component.type == TypeComponent.PROPULSION_DRIVE:
                 if isinstance(component, (ElectricComponent, SerialSystemElectric)):
@@ -1039,7 +1041,10 @@ class ElectricPowerSystem(MachinerySystem):
         for bus_id, sum_load in sum_load_kw_sources_symmetric_buses.items():
             sum_power_avail = sum_power_avail_power_sources_symmetric_buses[bus_id]
             no_points = sum_load.size
-            index_non_zero: np.ndarray = sum_load != 0
+            # a rounding residual (e.g. fixed sources exactly covering the load) with no
+            # balancing power available is zero load, not an infinite load ratio
+            is_rounding_residual_without_balancing_power = (sum_power_avail == 0) & (np.abs(sum_load) < 1e-6)
+            index_non_zero: np.ndarray = (sum_load != 0) & ~is_rounding_residual_without_balancing_power
             load_buses[bus_id] = np.zeros(shape=sum_load.shape)
             if index_non_zero.any():
                 load_buses[bus_id][index_non_zero] = (

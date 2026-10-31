@@ -7,6 +7,7 @@ This document covers the public API for the `machinery-system-structure` (MachSy
 - [Overview](#overview)
 - [Proto Schema — Key Messages](#proto-schema--key-messages)
   - [COGAS](#cogas-message)
+  - [OrganicRankineCycle](#organicrankinecycle-message)
   - [Engine.EngineCycleType](#engineenginecycletype-enum)
 - [Converters: Protobuf → FEEMS](#converters-protobuf--feems)
   - [convert_proto_cogas_to_feems](#convert_proto_cogas_to_feems)
@@ -15,6 +16,7 @@ This document covers the public API for the `machinery-system-structure` (MachSy
   - [convert_proto_multifuel_engine_to_feems](#convert_proto_multifuel_engine_to_feems)
   - [convert_proto_genset_to_feems](#convert_proto_genset_to_feems)
   - [convert_proto_electric_system_to_feems](#convert_proto_electric_system_to_feems)
+  - [convert_proto_orc_to_feems / collect_orcs_on_switchboards](#convert_proto_orc_to_feems--collect_orcs_on_switchboards)
   - [convert_proto_mechanical_system_to_feems](#convert_proto_mechanical_system_to_feems)
   - [convert_proto_propulsion_system_to_feems](#convert_proto_propulsion_system_to_feems)
 - [Converters: FEEMS → Protobuf](#converters-feems--protobuf)
@@ -125,6 +127,25 @@ the wire format homogeneous and lets old clients ignore the new IDs without spec
 See `docs/api/feems/API_REFERENCE.md#per-component-operating-averages` for the per-component
 semantics matrix.
 
+### OrganicRankineCycle message
+
+Waste-heat recovery bottoming cycle attached to its host:
+`Engine.orc = 16`, `MultiFuelEngine.orc = 12` (one per engine) and
+`MachinerySystem.fuel_cell_orc = 10` (one shared by all fuel cells).
+
+| Field | Type | Description |
+|---|---|---|
+| `rated_power_kw` | `double` | Electric output rating (kW) |
+| `rated_efficiency` | `double` | Thermal-to-electric efficiency at design heat input |
+| `relative_efficiency_curve` | `Curve1D` | x: heat input / design heat input, y: efficiency / rated efficiency |
+| `waste_heat_fraction` | `double` | Share of the host's rejected heat reaching the evaporator |
+| `unit_price_usd` | `double` | Unit price |
+| `uid` | `string` | Stable unique identifier |
+| `switchboard_id` | `uint32` | > 0: converted to a feems `OrganicRankineCycle` power source on this switchboard (main engine ORC); 0: integrated in its host, not converted |
+| `name` | `string` | Component name |
+
+`FeemsResult.energy_input_waste_heat_recovery_total_mj = 17` carries the recovered electric energy.
+
 ### Engine.EngineCycleType enum
 
 ```protobuf
@@ -217,11 +238,31 @@ Converts a genset subsystem proto to a FEEMS `Genset`.
 
 ```python
 def convert_proto_electric_system_to_feems(
-    system: proto.MachinerySystem,
+    system: proto.ElectricSystem,
+    additional_components_by_switchboard: Optional[Dict[int, List[Any]]] = None,
 ) -> ElectricPowerSystem
 ```
 
-Top-level converter for diesel-electric systems.
+Top-level converter for diesel-electric systems. `additional_components_by_switchboard` adds
+components that are not switchboard subsystems in the proto (e.g. main engine ORCs) to the given
+switchboards; an unknown switchboard id raises `ValueError`.
+`convert_proto_switchboard_to_feems(switchboard, additional_components=None)` takes the same list
+for one switchboard.
+
+---
+
+### convert_proto_orc_to_feems / collect_orcs_on_switchboards
+
+```python
+def convert_proto_orc_to_feems(orc: proto.OrganicRankineCycle) -> OrganicRankineCycle
+def collect_orcs_on_switchboards(system: proto.MachinerySystem) -> Dict[int, List[OrganicRankineCycle]]
+```
+
+`collect_orcs_on_switchboards` returns the ORCs of main engines with `switchboard_id > 0`, keyed by
+switchboard id. `convert_proto_propulsion_system_to_feems` uses it for mechanical and hybrid
+propulsion, so these ORCs appear as power sources in the electric system. ORCs with
+`switchboard_id == 0` or without rated power are not converted. `convert_switchboard_to_protobuf` skips ORC components
+(they are stored on their host engine).
 
 ---
 
