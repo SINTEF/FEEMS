@@ -1,11 +1,12 @@
-Table starts at,9,,,,,,,,,,
-Header at,10,,,,,,,,,,
-unit at,11,,,,,,,,,,
-Values start at,12,,,,,,,,,,
+Table starts at,10,,,,,,,,,,
+Header at,11,,,,,,,,,,
+unit at,12,,,,,,,,,,
+Values start at,13,,,,,,,,,,
 Data sources,,,,,,,,,,,
 Base,FuelEU Maritime,,,,,,,,,,
 Bio fuel,Directive (EU) 2018/2001 of the European Parliament and of the Council of 11 December 2018 on the promotion of the use of energy from renewable sources,,,,,,,,,,
 RFNBO,JEC Well-to-Tank report v5,,,,,,,,,,
+Boiler rows,Project convention; FuelEU Maritime Annex II defines no boiler consumer class. LCV / CO2_WtT / Cf_CO2 copied from each fuel's existing rows; Cf_CH4 = 0 and C_slip = 0; Cf_N2O taken from the fuel's ALL ICEs row (0.00018 liquid fuels; 0.00011 LNG; 0 for LPG/H2/NH3/Ethanol),,,,,,,,,,
 1,2,3,4,5,6,7,8,9,10,11,12
 fuel_class,pathway_name,LCV,CO2_WtT,fuel_consumer_unit_class,Cf_CO2,Cf_CH4,Cf_N2O,C_slip,TtW_energy,TtW_mass,WTW_energy
 ,,MJ/g,gCO2eq/MJ,,gCO2/gFuel,gCH4/gFuel,gN2O/gFuel,%,gCO2eq/MJ,gCO2eq/gFuel,gCO2eq/MJ
