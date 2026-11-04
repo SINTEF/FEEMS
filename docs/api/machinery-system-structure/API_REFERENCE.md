@@ -16,7 +16,7 @@ This document covers the public API for the `machinery-system-structure` (MachSy
   - [convert_proto_multifuel_engine_to_feems](#convert_proto_multifuel_engine_to_feems)
   - [convert_proto_genset_to_feems](#convert_proto_genset_to_feems)
   - [convert_proto_electric_system_to_feems](#convert_proto_electric_system_to_feems)
-  - [convert_proto_orc_to_feems / collect_orcs_on_switchboards](#convert_proto_orc_to_feems--collect_orcs_on_switchboards)
+  - [ORC conversion](#orc-conversion)
   - [convert_proto_mechanical_system_to_feems](#convert_proto_mechanical_system_to_feems)
   - [convert_proto_propulsion_system_to_feems](#convert_proto_propulsion_system_to_feems)
 - [Converters: FEEMS → Protobuf](#converters-feems--protobuf)
@@ -141,10 +141,11 @@ Waste-heat recovery bottoming cycle attached to its host:
 | `waste_heat_fraction` | `double` | Share of the host's rejected heat reaching the evaporator |
 | `unit_price_usd` | `double` | Unit price |
 | `uid` | `string` | Stable unique identifier |
-| `switchboard_id` | `uint32` | > 0: converted to a feems `OrganicRankineCycle` power source on this switchboard (main engine ORC); 0: integrated in its host, not converted |
+| `switchboard_id` | `uint32` | Switchboard the ORC feeds. Main engine ORC: required (> 0). Genset / fuel-cell ORC: the host's switchboard (0 or that id; another id raises `ValueError`) |
 | `name` | `string` | Component name |
 
-`FeemsResult.energy_input_waste_heat_recovery_total_mj = 17` carries the recovered electric energy.
+`FeemsResult.energy_input_waste_heat_recovery_total_mj = 17` carries the recovered electric energy,
+`FeemsResult.running_hours_orc_total_hr = 18` the hours with ORC output.
 
 ### Engine.EngineCycleType enum
 
@@ -251,18 +252,30 @@ for one switchboard.
 
 ---
 
-### convert_proto_orc_to_feems / collect_orcs_on_switchboards
+### ORC conversion
 
 ```python
-def convert_proto_orc_to_feems(orc: proto.OrganicRankineCycle) -> OrganicRankineCycle
-def collect_orcs_on_switchboards(system: proto.MachinerySystem) -> Dict[int, List[OrganicRankineCycle]]
+def convert_proto_orc_to_feems(orc: proto.OrganicRankineCycle, switchboard_id: int) -> OrganicRankineCycle
+def collect_main_engine_orcs(system: proto.MachinerySystem) -> Dict[Tuple[int, str], OrganicRankineCycle]
+def convert_proto_fuel_cell_orc_to_feems(system: proto.MachinerySystem) -> Optional[OrganicRankineCycle]
+def convert_orc_to_protobuf(orc: OrganicRankineCycle) -> proto.OrganicRankineCycle  # convert_to_protobuf
 ```
 
-`collect_orcs_on_switchboards` returns the ORCs of main engines with `switchboard_id > 0`, keyed by
-switchboard id. `convert_proto_propulsion_system_to_feems` uses it for mechanical and hybrid
-propulsion, so these ORCs appear as power sources in the electric system. ORCs with
-`switchboard_id == 0` or without rated power are not converted. `convert_switchboard_to_protobuf` skips ORC components
-(they are stored on their host engine).
+`convert_proto_propulsion_system_to_feems` turns every ORC with rated power > 0 into a feems
+`OrganicRankineCycle` power source (all propulsion types):
+
+- **Main engine** (`Engine.orc` / `MultiFuelEngine.orc` on a shaft line): on the switchboard given by
+  `switchboard_id`; 0 raises `ValueError`. `collect_main_engine_orcs` keys them by
+  (shaft line id, engine name); the main engine's `engine.orc` points at the component.
+- **Genset** (`Engine.orc` / `MultiFuelEngine.orc` of a genset): on the genset's switchboard;
+  `genset.aux_engine.orc` points at the component.
+- **Fuel cells** (`MachinerySystem.fuel_cell_orc`): on the fuel cells' switchboard; fuel cells on
+  more than one switchboard raise `ValueError`. Stored as `ElectricPowerSystem.fuel_cell_orc`.
+
+A genset / fuel-cell ORC whose `switchboard_id` is neither 0 nor its host's switchboard raises
+`ValueError`. feems → proto: `convert_switchboard_to_protobuf` skips ORC components; the engine
+converters write `engine.orc` back to `Engine.orc` / `MultiFuelEngine.orc`, and the system converters
+write `fuel_cell_orc` back to `MachinerySystem.fuel_cell_orc` (round trip keeps the ORC).
 
 ---
 

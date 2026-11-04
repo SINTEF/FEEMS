@@ -148,3 +148,27 @@ The time-series collector accepts `ORGANIC_RANKINE_CYCLE` as a power source (pow
 - ORC thermodynamics and host-curve lifting (client side).
 - Dispatch of the ORC setpoint in `RunFEEMSSim` PMS — the client provides the setpoint.
 - ORC on COGES / COGAS hosts.
+
+---
+
+## 9. Revision after review of PR #105 (2026-11-04)
+
+Supersedes the genset / fuel-cell parts of §1, §2.1 (`switchboard_id`), §4.1, §4.2, §6 and §8. The
+efficiency-curve lift of gensets and fuel cells is dropped: **every ORC is a feems component** and
+gets its own power setpoint from the PMS.
+
+| Topic | Before | Now |
+|---|---|---|
+| Genset / fuel-cell ORC | integrated in the host curve by the client, not converted | feems `OrganicRankineCycle` on the host's switchboard |
+| `switchboard_id` | > 0 separate source, 0 integrated | main engine: required (> 0, else `ValueError`); genset / fuel cells: host's switchboard (0 or that id, else `ValueError`); fuel cells on several switchboards: `ValueError` |
+| Round trip proto → feems → proto | ORC lost (engine had no link) | `Engine.orc` / `ElectricPowerSystem.fuel_cell_orc` point at the component; written back to `Engine.orc` / `MultiFuelEngine.orc` / `MachinerySystem.fuel_cell_orc` |
+| Setpoint above bus load | balancing source negative, or surplus lost | ORC setpoints on that bus curtailed by a common factor, warning logged |
+| ORC as balancing unit | possible (basic PMS dispatched it like a genset) | `InputError`; the basic RunFEEMSSim PMS leaves ORCs out of its load table and keeps them off |
+| Heat model | client only | `OrganicRankineCycle.get_power_output_from_waste_heat_kw` (rated efficiency, waste-heat fraction, relative efficiency curve carried on the component) |
+| Results | energy only | + `running_hours_orc_total_hr` (`FeemsResult` field 18), included in the detail row running hours |
+| Protobuf stubs | protoc 29.0 | regenerated with protoc 29.6 (matches the `protobuf>=5.29.6` pin) |
+
+The PMS of the caller decides the setpoint. In the KSOE Machinery Design Lab a lookup table per genset /
+fuel cell splits the net set power of host + ORC into the host set power and the expected ORC power
+(capacity = host rating + ORC output at host full load); the host is dispatched first, then the ORC
+from the host's actual output. Unit commitment and spinning reserve stay on the host ratings.

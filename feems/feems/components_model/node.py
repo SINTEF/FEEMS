@@ -495,7 +495,7 @@ def get_fuel_emission_energy_balance_for_component(
         )
 
         res.running_hours_genset_total_hr = running_hours
-    #: Electric energy recovered from waste heat (fuel-free)
+    # Electric energy recovered from waste heat (fuel-free)
     elif component.type == TypeComponent.ORGANIC_RANKINE_CYCLE:
         res.energy_input_waste_heat_recovery_total_mj = (
             integrate_data(
@@ -505,6 +505,7 @@ def get_fuel_emission_energy_balance_for_component(
             )
             / 1000
         )
+        res.running_hours_orc_total_hr = running_hours
     else:
         raise TypeError(
             f"Component type {component.type} not supported for energy balance calculation"

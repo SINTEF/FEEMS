@@ -34,6 +34,7 @@ message Efficiency {
 }
 
 // Waste-heat recovery bottoming cycle attached to its host (engine or fuel-cell group).
+// Converted to a feems OrganicRankineCycle power source on its switchboard; the PMS sets its power.
 message OrganicRankineCycle {
   double rated_power_kw = 1;                 // electric output rating
   double rated_efficiency = 2;               // thermal-to-electric efficiency at design heat input
@@ -41,8 +42,9 @@ message OrganicRankineCycle {
   double waste_heat_fraction = 4;            // share of host rejected heat reaching the evaporator
   double unit_price_usd = 5;
   string uid = 6;
-  // > 0: modelled as a separate electric power source on this switchboard (main engine ORC).
-  // 0: integrated in its host, not converted to a feems component (genset / fuel-cell ORC).
+  // Switchboard the ORC feeds. Main engine ORC: required (> 0). Genset ORC: the genset's
+  // switchboard; leave 0 or set it to that switchboard. Fuel-cell ORC (MachinerySystem.fuel_cell_orc):
+  // the fuel cells' switchboard; leave 0 or set it to that switchboard.
   uint32 switchboard_id = 7;
   string name = 8;
 }

@@ -93,6 +93,7 @@ message FeemsResult {
     double energy_consumption_propulsion_total_mj = 15;
     double energy_consumption_auxiliary_total_mj = 16;
     double energy_input_waste_heat_recovery_total_mj = 17;
+    double running_hours_orc_total_hr = 18;
 }
 
 message FeemsResultForMachinerySystem {

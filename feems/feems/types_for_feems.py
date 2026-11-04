@@ -64,6 +64,7 @@ class FEEMSResult:
     running_hours_fuel_cell_total_hr: float = 0.0
     running_hours_pti_pto_total_hr: float = 0.0
     running_hours_boiler_total_hr: float = 0.0
+    running_hours_orc_total_hr: float = 0.0
     steam_production_boiler_total_kg: float = 0.0
     total_emission_kg: Optional[DefaultDict[EmissionType, float]] = None
     detail_result: Optional[pd.DataFrame] = None
@@ -156,7 +157,8 @@ class FEEMSResult:
             self.energy_stored_total_mj,
             (self.running_hours_genset_total_hr or 0.0)
             + (self.running_hours_pti_pto_total_hr or 0.0)
-            + (self.running_hours_fuel_cell_total_hr or 0.0),
+            + (self.running_hours_fuel_cell_total_hr or 0.0)
+            + (self.running_hours_orc_total_hr or 0.0),
             self.co2_emission_total_kg,
             (self.total_emission_kg[EmissionType.NOX] if self.total_emission_kg else None),
         ]
