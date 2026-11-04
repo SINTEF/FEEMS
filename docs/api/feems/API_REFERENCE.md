@@ -464,6 +464,7 @@ multi_boiler = SteamBoiler(
 **Instance attributes:**
 - `steam_out_kg_per_h: Optional[np.ndarray]` — Steam output time series (kg/h). Set internally by `MachinerySystem.get_fuel_energy_consumption_running_time` from the `steam_demand_kg_per_h` argument passed to `MachineryCalculation`. Must be finite and >= 0 element-wise when set.
 - `fuel_type: TypeFuel` — Active fuel type. Updated automatically by `get_fuel_energy_consumption_running_time` when a matching `fuel_option` is passed (see **`fuel_option` behaviour** in the System Model section).
+- `fuel_consumer_type_fuel_eu_maritime: FuelConsumerClassFuelEUMaritime` — Property; always `FuelConsumerClassFuelEUMaritime.BOILER`. Used to select the `Boiler` rows of the FuelEU Maritime fuel table for GHG calculations.
 
 **Methods:**
 - `get_boiler_run_point(steam_demand_kg_per_h, fuel_specified_by=FuelSpecifiedBy.IMO) -> BoilerRunPoint` — `steam_demand_kg_per_h` must be finite and >= 0

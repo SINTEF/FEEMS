@@ -37,12 +37,14 @@ message PropulsionPowerInstance {
   double epoch_s = 1;
   double propulsion_power_kw = 2;
   double auxiliary_power_kw = 3;
+  double boiler_steam_demand_kg_per_h = 4;
 }
 
 message PropulsionPowerInstanceForMultiplePropulsors {
   double epoch_s = 1;
   repeated double propulsion_power_kw = 2;
   double auxiliary_power_kw = 3;
+  double boiler_steam_demand_kg_per_h = 4;
 }
 
 message OperationProfilePoint {
@@ -55,6 +57,7 @@ message TimeSeriesResult {
   repeated PropulsionPowerInstance propulsion_power_timeseries = 1;
   double auxiliary_power_kw = 2;
   repeated OperationProfilePoint operation_profile = 3;
+  double boiler_steam_demand_kg_per_h = 4;
 }
 
 message TimeSeriesResultForMultiplePropulsors {
@@ -62,4 +65,5 @@ message TimeSeriesResultForMultiplePropulsors {
   repeated string propulsor_names = 2;
   double auxiliary_power_kw = 3;
   repeated OperationProfilePoint operation_profile = 4;
+  double boiler_steam_demand_kg_per_h = 5;
 }

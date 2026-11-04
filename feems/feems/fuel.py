@@ -112,6 +112,7 @@ class FuelConsumerClassFuelEUMaritime(Enum):
     LNG_LBSI = 5
     FUEL_CELL = 6
     GAS_TURBINE = 7
+    BOILER = 8
 
 
 _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING = {
@@ -122,6 +123,7 @@ _FUEL_CONSUMER_CLASS_FUEL_EU_MARITIME_MAPPING = {
     FuelConsumerClassFuelEUMaritime.LNG_LBSI: "LBSI",
     FuelConsumerClassFuelEUMaritime.FUEL_CELL: "Fuel Cells",
     FuelConsumerClassFuelEUMaritime.GAS_TURBINE: "Gas Turbine",
+    FuelConsumerClassFuelEUMaritime.BOILER: "Boiler",
 }
 
 _FUEL_ALIAS_MAP: dict[tuple[str, FuelOrigin, TypeFuel], tuple[str, FuelOrigin, TypeFuel]] = {

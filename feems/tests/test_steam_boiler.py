@@ -627,6 +627,45 @@ class TestCalculateBoilerResult:
         res = sys._calculate_boiler_result(boiler, tis, im)
         assert res.running_hours_boiler_total_hr == pytest.approx(0.0)
 
+    def test_fuel_eu_maritime_ghg_uses_boiler_consumer_class(self):
+        """Regression: FuelEU Maritime GHG for the boiler uses the 'Boiler' table rows
+        (Cf_CH4 = 0, C_slip = 0, Cf_N2O = 0.00018 for HFO)."""
+        from feems.fuel import _GWP100_N2O, FuelConsumerClassFuelEUMaritime, FuelSpecifiedBy
+
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        assert boiler.fuel_consumer_type_fuel_eu_maritime == FuelConsumerClassFuelEUMaritime.BOILER
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = sys._calculate_boiler_result(boiler, tis, im, fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME)
+        fuel_kg = float(np.sum(res.fuel_consumption_boiler_total.total_fuel_consumption))
+        expected_ttw_kg = fuel_kg * (3.114 + 0.00018 * _GWP100_N2O)
+        assert res.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel == pytest.approx(expected_ttw_kg)
+        # WtT: 13.5 gCO2eq/MJ * 0.0405 MJ/g fuel
+        expected_wtt_kg = fuel_kg * 13.5 * 0.0405
+        assert res.co2_emission_total_kg.well_to_tank_kg_or_gco2eq_per_gfuel == pytest.approx(expected_wtt_kg)
+
+    def test_fuel_eu_maritime_ghg_lng_mode_uses_boiler_factor(self):
+        """Multi-fuel boiler switched to LNG under FuelEU Maritime uses the LNG 'Boiler' row
+        (Cf_N2O = 0.00011, no methane-slip term) — not an LNG engine row."""
+        from feems.components_model.utility import IntegrationMethod
+        from feems.fuel import _GWP100_N2O, FuelOrigin, FuelSpecifiedBy, TypeFuel
+        from feems.system_model import MachinerySystem
+
+        boiler = _make_multi_fuel_boiler()
+        boiler.set_fuel_in_use(TypeFuel.NATURAL_GAS, FuelOrigin.FOSSIL)
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = MachinerySystem()._calculate_boiler_result(
+            boiler, 3600.0, IntegrationMethod.sum_with_time, fuel_specified_by=FuelSpecifiedBy.FUEL_EU_MARITIME
+        )
+        fuel_kg = float(np.sum(res.fuel_consumption_boiler_total.total_fuel_consumption))
+        expected_ttw_kg = fuel_kg * (2.75 + 0.00011 * _GWP100_N2O)
+        assert res.co2_emission_total_kg.tank_to_wake_kg_or_gco2eq_per_gfuel == pytest.approx(expected_ttw_kg)
+
+    def test_detail_row_fuel_consumer_type_is_boiler(self):
+        sys, boiler, tis, im = _make_machinery_system_with_boiler()
+        boiler.steam_out_kg_per_h = np.array([10_000.0])
+        res = sys._calculate_boiler_result(boiler, tis, im)
+        assert res.detail_result["fuel consumer type"].iloc[0] == "BOILER"
+
     def test_no_boiler_on_system_gives_zero_boiler_hours(self):
         """System with no boiler set returns zero boiler running hours."""
         from feems.components_model.utility import IntegrationMethod

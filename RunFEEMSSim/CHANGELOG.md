@@ -5,6 +5,14 @@ All notable changes to the RunFeemsSim package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.6.0...RunFeemsSim-v0.7.0) (2026-06-02)
+
+
+### Features
+
+* carry boiler_steam_demand_kg_per_h through TimeSeriesResult ([c6ffcc5](https://github.com/SINTEF/FEEMS/commit/c6ffcc5b8c93f07ca86c00b6792f1bfa295680b4))
+* carry boiler_steam_demand_kg_per_h through TimeSeriesResult ([dab469b](https://github.com/SINTEF/FEEMS/commit/dab469baea6888df6a0929f75d7de6f13ba0c12f))
+
 ## [0.6.0](https://github.com/SINTEF/FEEMS/compare/RunFeemsSim-v0.5.0...RunFeemsSim-v0.6.0) (2026-05-11)
 
 

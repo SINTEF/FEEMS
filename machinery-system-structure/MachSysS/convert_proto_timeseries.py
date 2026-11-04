@@ -62,11 +62,20 @@ def convert_proto_timeseries_to_pd_dataframe(
     )
     if (np.array(auxiliary_power) == 0).all():
         auxiliary_power = [proto_timeseries.auxiliary_power_kw] * len(time)
+    steam_demand = list(
+        map(
+            lambda each: each.boiler_steam_demand_kg_per_h,
+            proto_timeseries.propulsion_power_timeseries,
+        )
+    )
+    if (np.array(steam_demand) == 0).all():
+        steam_demand = [proto_timeseries.boiler_steam_demand_kg_per_h] * len(time)
     df = pd.DataFrame(
         index=time,
         data=dict(
             propulsion_power_kw=propulsion_power,
             auxiliary_power_kw=auxiliary_power,
+            boiler_steam_demand_kg_per_h=steam_demand,
         ),
     )
     if len(proto_timeseries.operation_profile) > 0:
@@ -130,6 +139,15 @@ def convert_proto_timeseries_for_multiple_propulsors_to_pd_dataframe(
     if (np.array(auxiliary_power) == 0).all():
         auxiliary_power = [proto_timeseries.auxiliary_power_kw] * len(time)
     data["auxiliary_power_kw"] = auxiliary_power
+    steam_demand = list(
+        map(
+            lambda each: each.boiler_steam_demand_kg_per_h,
+            proto_timeseries.propulsion_power_timeseries,
+        )
+    )
+    if (np.array(steam_demand) == 0).all():
+        steam_demand = [proto_timeseries.boiler_steam_demand_kg_per_h] * len(time)
+    data["boiler_steam_demand_kg_per_h"] = steam_demand
     df = pd.DataFrame(
         index=time,
         data=data,
