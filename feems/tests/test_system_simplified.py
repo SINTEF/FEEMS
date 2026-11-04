@@ -395,6 +395,7 @@ class TestOrganicRankineCycleHeatModel(TestCase):
             rated_power=Power_kW(300),
             rated_efficiency=0.095,
             waste_heat_fraction=0.3,
+            relative_efficiency_curve=np.array([[0.0, 0.0], [0.15, 0.0], [0.5, 0.93], [1.0, 1.0]]),
         )
         design_heat_input_kw = 300 / (0.095 * 0.3)
         self.assertAlmostEqual(orc.design_heat_input_kw, design_heat_input_kw)
@@ -404,9 +405,18 @@ class TestOrganicRankineCycleHeatModel(TestCase):
             ),
             [0.0, 0.0, 300.0, 300.0],
         )
-        # half the design heat: rated efficiency x 0.93 (default part-load curve) x half the heat
+        # half the design heat: rated efficiency x 0.93 (part-load curve) x half the heat
         self.assertAlmostEqual(
             float(orc.get_power_output_from_waste_heat_kw(0.5 * design_heat_input_kw)), 0.93 * 150.0
+        )
+
+    def test_without_curve_runs_at_rated_efficiency(self):
+        orc = OrganicRankineCycle(
+            name="ORC", rated_power=Power_kW(300), rated_efficiency=0.095, waste_heat_fraction=0.3
+        )
+        waste_heat_kw = 0.1 * orc.design_heat_input_kw
+        self.assertAlmostEqual(
+            float(orc.get_power_output_from_waste_heat_kw(waste_heat_kw)), 0.095 * 0.3 * waste_heat_kw
         )
 
     def test_without_heat_parameters_gives_zero(self):

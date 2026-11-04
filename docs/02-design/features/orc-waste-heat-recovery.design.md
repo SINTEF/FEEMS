@@ -164,7 +164,7 @@ gets its own power setpoint from the PMS.
 | Round trip proto → feems → proto | ORC lost (engine had no link) | `Engine.orc` / `ElectricPowerSystem.fuel_cell_orc` point at the component; written back to `Engine.orc` / `MultiFuelEngine.orc` / `MachinerySystem.fuel_cell_orc` |
 | Setpoint above bus load | balancing source negative, or surplus lost | ORC setpoints on that bus curtailed by a common factor, warning logged |
 | ORC as balancing unit | possible (basic PMS dispatched it like a genset) | `InputError`; the basic RunFEEMSSim PMS leaves ORCs out of its load table and keeps them off |
-| Heat model | client only | `OrganicRankineCycle.get_power_output_from_waste_heat_kw` (rated efficiency, waste-heat fraction, relative efficiency curve carried on the component) |
+| Heat model | client only | `OrganicRankineCycle.get_power_output_from_waste_heat_kw` (rated efficiency, waste-heat fraction, relative efficiency curve carried on the component; no curve = rated efficiency at every heat input, the client supplies its part-load curve through the proto) |
 | Results | energy only | + `running_hours_orc_total_hr` (`FeemsResult` field 18), included in the detail row running hours |
 | Protobuf stubs | protoc 29.0 | regenerated with protoc 29.6 (matches the `protobuf>=5.29.6` pin) |
 

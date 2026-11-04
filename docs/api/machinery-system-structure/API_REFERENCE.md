@@ -245,7 +245,7 @@ def convert_proto_electric_system_to_feems(
 ```
 
 Top-level converter for diesel-electric systems. `additional_components_by_switchboard` adds
-components that are not switchboard subsystems in the proto (e.g. main engine ORCs) to the given
+components that are not switchboard subsystems in the proto (main engine and fuel-cell ORCs) to the given
 switchboards; an unknown switchboard id raises `ValueError`.
 `convert_proto_switchboard_to_feems(switchboard, additional_components=None)` takes the same list
 for one switchboard.

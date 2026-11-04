@@ -642,8 +642,9 @@ orc.get_power_output_from_waste_heat_kw([5000.0, 10000.0])  # kW electric
 - Automatically set to `power_type=TypePower.POWER_SOURCE`
 - `rated_efficiency`: thermal-to-electric efficiency at the design heat input
 - `waste_heat_fraction`: share of the host's rejected heat that reaches the evaporator
-- `relative_efficiency_curve`: Nx2 [heat input / design heat input, efficiency / rated efficiency];
-  `None` uses `DEFAULT_ORC_RELATIVE_EFFICIENCY_CURVE` (cut-in at 15-20 % heat input)
+- `relative_efficiency_curve`: Nx2 [heat input / design heat input, efficiency / rated efficiency]
+  (part-load shape, e.g. a cut-in); `None` = rated efficiency at every heat input. The client
+  (e.g. the KSOE Machinery Design Lab) writes its default curve into the proto.
 - `unit_price_usd`: carried for the protobuf round trip only
 
 **Methods:**

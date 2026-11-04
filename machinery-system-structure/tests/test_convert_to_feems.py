@@ -248,7 +248,7 @@ class TestConvertToFeems(unittest.TestCase):
 
 
 class TestConvertOrganicRankineCycle(unittest.TestCase):
-    """Main engine ORC (switchboard_id > 0) becomes a feems power source on that switchboard."""
+    """Main engine ORC becomes a feems power source on the switchboard its switchboard_id names."""
 
     def _system_with_main_engine_orc(self, switchboard_id=None):
         current_dir = os.path.dirname(__file__)

@@ -995,21 +995,6 @@ class ShorePowerConnectionSystem(ShorePowerConnection):
         self.converter = converter
 
 
-# Part-load shape of the ORC relative to its rated efficiency (cut-in at 15-20 % heat input).
-# x = evaporator heat input / design heat input, y = efficiency / rated efficiency.
-DEFAULT_ORC_RELATIVE_EFFICIENCY_CURVE = np.array(
-    [
-        [0.0, 0.0],
-        [0.15, 0.0],
-        [0.2, 0.75],
-        [0.3, 0.85],
-        [0.5, 0.93],
-        [0.75, 0.98],
-        [1.0, 1.0],
-    ]
-)
-
-
 class OrganicRankineCycle(ElectricComponent):
     """
     Organic Rankine cycle: fuel-free electric power source driven by the waste heat of a host
@@ -1028,7 +1013,8 @@ class OrganicRankineCycle(ElectricComponent):
     :param rated_efficiency: Thermal-to-electric efficiency at the design heat input
     :param waste_heat_fraction: Share of the host's rejected heat that reaches the evaporator
     :param relative_efficiency_curve: Nx2 [heat input / design heat input,
-        efficiency / rated efficiency]; None = default part-load shape
+        efficiency / rated efficiency] (part-load shape); None = rated efficiency at every
+        heat input
     :param unit_price_usd: Unit price, carried for the protobuf round trip only
     """
 
@@ -1072,15 +1058,14 @@ class OrganicRankineCycle(ElectricComponent):
         waste_heat_kw = np.asarray(waste_heat_kw, dtype=float)
         if self.rated_power <= 0 or self.rated_efficiency <= 0 or self.waste_heat_fraction <= 0:
             return np.zeros_like(waste_heat_kw)
-        relative_efficiency_curve = (
-            DEFAULT_ORC_RELATIVE_EFFICIENCY_CURVE
-            if self.relative_efficiency_curve is None
-            else self.relative_efficiency_curve
-        )
-        heat_input_ratio = np.clip(waste_heat_kw / self.design_heat_input_kw, 0.0, 1.0)
-        efficiency = self.rated_efficiency * np.interp(
-            heat_input_ratio, relative_efficiency_curve[:, 0], relative_efficiency_curve[:, 1]
-        )
+        efficiency = np.full_like(waste_heat_kw, self.rated_efficiency)
+        if self.relative_efficiency_curve is not None:
+            heat_input_ratio = np.clip(waste_heat_kw / self.design_heat_input_kw, 0.0, 1.0)
+            efficiency = self.rated_efficiency * np.interp(
+                heat_input_ratio,
+                self.relative_efficiency_curve[:, 0],
+                self.relative_efficiency_curve[:, 1],
+            )
         return np.minimum(
             efficiency * self.waste_heat_fraction * np.maximum(waste_heat_kw, 0.0),
             self.rated_power,
