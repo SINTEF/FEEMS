@@ -95,10 +95,10 @@ All 8 plan tasks completed. Analysis match rate: **16/16 = 100 %**. One defect f
 Review of PR #105 (kevinksyTRD, Copilot) and the main developers' feedback led to the changes in
 design §9: every ORC is a feems component (no host-curve lift), protobuf round trip keeps the ORC,
 curtailment above the bus load, `InputError` for an ORC as balancing unit (basic PMS keeps ORCs off),
-heat model on the component, `running_hours_orc_total_hr` (field 18), stubs regenerated with protoc 29.6.
+heat model on the component (no default curve), `running_hours_orc_total_hr` (field 18), stubs regenerated with protoc 29.6. Test results below are on the branch merged with `main`.
 
 | Suite | Result |
 |---|---|
-| `feems/tests` | 280 passed, 1 skipped |
+| `feems/tests` | 284 passed, 1 skipped |
 | `machinery-system-structure/tests` | 50 passed |
-| `RunFEEMSSim/tests` | 8 passed |
+| `RunFEEMSSim/tests` | 13 passed |
