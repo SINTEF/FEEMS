@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, Union
 
 import numpy as np
 import pandas as pd
@@ -38,6 +38,9 @@ from .utility import (
     get_emission_curve_from_points,
 )
 
+if TYPE_CHECKING:
+    from .component_electric import OrganicRankineCycle
+
 logger = get_logger(__name__)
 
 # IPCC 2006 Vol.2 Ch.2 Table 2.6 defaults for gas turbines (Brayton cycle).
@@ -63,6 +66,10 @@ class Engine(Component):
     """
     Engine class for basic information and fuel consumption interpolation
     """
+
+    #: ORC driven by this engine's waste heat (an ``OrganicRankineCycle`` on a switchboard), or None
+    orc: Optional["OrganicRankineCycle"] = None
+
     def __init__(
         self,
         *,

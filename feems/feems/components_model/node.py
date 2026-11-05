@@ -495,6 +495,17 @@ def get_fuel_emission_energy_balance_for_component(
         )
 
         res.running_hours_genset_total_hr = running_hours
+    # Electric energy recovered from waste heat (fuel-free)
+    elif component.type == TypeComponent.ORGANIC_RANKINE_CYCLE:
+        res.energy_input_waste_heat_recovery_total_mj = (
+            integrate_data(
+                data_to_integrate=component.power_output,
+                time_interval_s=time_interval_s,
+                integration_method=integration_method,
+            )
+            / 1000
+        )
+        res.running_hours_orc_total_hr = running_hours
     else:
         raise TypeError(
             f"Component type {component.type} not supported for energy balance calculation"
@@ -632,6 +643,13 @@ def _assign_operating_avg_metrics(
         res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(
             power, time_interval_s, mask
         )
+        return
+
+    # Organic Rankine cycle (fuel-free source) --------------------------------
+    if type_ == TypeComponent.ORGANIC_RANKINE_CYCLE:
+        power = np.atleast_1d(component.power_output)
+        mask = power != 0
+        res.operating_avg_power_kw = _time_weighted_avg_magnitude_kw(power, time_interval_s, mask)
         return
 
     # Shore power -----------------------------------------------------------

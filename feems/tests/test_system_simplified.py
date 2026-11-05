@@ -11,11 +11,17 @@ from feems.components_model import (
     Engine,
     Genset,
 )
-from feems.components_model.component_electric import FuelCell, FuelCellSystem
+from feems.components_model.component_electric import (
+    FuelCell,
+    FuelCellSystem,
+    OrganicRankineCycle,
+    ShorePowerConnection,
+)
 from feems.components_model.utility import (
     IntegrationMethod,
     integrate_multi_fuel_consumption,
 )
+from feems.exceptions import InputError
 from feems.runsimulation import (
     BatteryFuelCellDieselHybridSimulationInterface,
     run_simulation,
@@ -255,3 +261,211 @@ class TestElectricPowerSystem(TestCase):
     def sim_one_step_part_two(self, load_other: Union[float, np.ndarray], n: int) -> None:
         self.power_system.set_bus_tie_status_all(np.array([]))
         self.power_system.do_power_balance_calculation()
+
+
+class TestOrganicRankineCycle(TestCase):
+    """Organic Rankine cycle as a fuel-free power source with a fixed setpoint."""
+
+    number_of_points = 3
+
+    def _system(self, with_battery: bool = False, with_fixed_source: bool = False):
+        self.orc = OrganicRankineCycle(
+            name="ORC", rated_power=Power_kW(300), switchboard_id=SwbId(1), uid="orc"
+        )
+        # fuel-free symmetric source as load-balancing unit keeps the test free of engine data
+        self.balancing_source = ShorePowerConnection(
+            name="balancing source", rated_power=Power_kW(2000), switchboard_id=SwbId(1)
+        )
+        self.auxiliary_load = ElectricComponent(
+            type_=TypeComponent.OTHER_LOAD,
+            name="auxiliary load",
+            power_type=TypePower.POWER_CONSUMER,
+            rated_power=Power_kW(2000),
+            rated_speed=Speed_rpm(0),
+            eff_curve=np.array([1]),
+            switchboard_id=SwbId(1),
+        )
+        components = [self.orc, self.balancing_source, self.auxiliary_load]
+        if with_battery:
+            self.battery = Battery(
+                name="battery",
+                rated_capacity_kwh=1000.0,
+                charging_rate_c=1,
+                discharge_rate_c=1,
+                switchboard_id=SwbId(1),
+            )
+            components.append(self.battery)
+        if with_fixed_source:
+            # another fuel-free source at a fixed setpoint (set in the test)
+            self.fixed_source = ShorePowerConnection(
+                name="fixed source", rated_power=Power_kW(500), switchboard_id=SwbId(1)
+            )
+            components.append(self.fixed_source)
+        return ElectricPowerSystem(
+            name="orc test", power_plant_components=components, bus_tie_connections=[]
+        )
+
+    def _run_power_balance(self, system, auxiliary_load_kw, orc_setpoint_kw, balancing_source_on=True):
+        self.auxiliary_load.set_power_input_from_output(auxiliary_load_kw)
+        self.orc.status = orc_setpoint_kw != 0
+        self.orc.load_sharing_mode = orc_setpoint_kw / self.orc.rated_power
+        self.balancing_source.status = np.full(self.number_of_points, float(balancing_source_on))
+        self.balancing_source.load_sharing_mode = np.zeros(self.number_of_points)
+        system.set_bus_tie_status_all(np.array([]))
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+        system.do_power_balance_calculation()
+
+    def test_orc_is_power_source(self):
+        system = self._system()
+        self.assertIn(self.orc, system.power_sources)
+
+    def test_fixed_orc_setpoint_reduces_balancing_unit(self):
+        system = self._system()
+        auxiliary_load_kw = np.array([1000.0, 1000.0, 1000.0])
+        orc_setpoint_kw = np.array([0.0, 150.0, 300.0])
+        self._run_power_balance(system, auxiliary_load_kw, orc_setpoint_kw)
+        np.testing.assert_allclose(self.orc.power_output, orc_setpoint_kw)
+        np.testing.assert_allclose(self.balancing_source.power_output, auxiliary_load_kw - orc_setpoint_kw)
+
+    def test_orc_burns_no_fuel_and_reports_recovered_energy(self):
+        system = self._system()
+        self._run_power_balance(system, np.full(3, 1000.0), np.full(3, 150.0))
+        result = system.get_fuel_energy_consumption_running_time()
+        self.assertEqual(result.fuel_consumption_total_kg, 0)
+        # 150 kW over 2 s (3 points, 1 s apart) -> 0.3 MJ
+        self.assertAlmostEqual(result.energy_input_waste_heat_recovery_total_mj, 150 * 2 / 1000)
+        self.assertIn("ORC", result.detail_result.index)
+
+    def test_orc_covering_load_up_to_rounding_gives_no_nan(self):
+        # ORC exactly covers the load except for a rounding residual, no balancing power on,
+        # battery symmetric and off: previously inf load ratio -> NaN battery power
+        system = self._system(with_battery=True)
+        self.battery.status = np.zeros(self.number_of_points)
+        self.battery.load_sharing_mode = np.zeros(self.number_of_points)
+        self.battery.power_input = np.zeros(self.number_of_points)
+        auxiliary_load_kw = np.full(3, 0.1 + 0.2)  # 0.30000000000000004
+        orc_setpoint_kw = np.full(3, 0.3)
+        self._run_power_balance(system, auxiliary_load_kw, orc_setpoint_kw, balancing_source_on=False)
+        self.assertFalse(np.isnan(self.battery.power_input).any())
+        np.testing.assert_allclose(self.balancing_source.power_output, 0.0)
+
+    def test_real_load_without_balancing_power_unchanged(self):
+        # a real load with no balancing power is still not silently set to zero
+        system = self._system(with_battery=True)
+        self.battery.status = np.zeros(self.number_of_points)
+        self.battery.load_sharing_mode = np.zeros(self.number_of_points)
+        self.battery.power_input = np.zeros(self.number_of_points)
+        self._run_power_balance(system, np.full(3, 500.0), np.zeros(3), balancing_source_on=False)
+        self.assertFalse(np.isfinite(self.battery.power_input).all())
+
+    def test_setpoint_above_bus_load_is_curtailed_with_balancing_source(self):
+        # 300 kW setpoint on a 200 kW load: the balancing source must not go negative
+        system = self._system()
+        self._run_power_balance(system, np.full(3, 200.0), np.full(3, 300.0))
+        np.testing.assert_allclose(self.orc.power_output, 200.0)
+        np.testing.assert_allclose(self.balancing_source.power_output, 0.0, atol=1e-9)
+
+    def test_setpoint_above_bus_load_is_curtailed_without_balancing_source(self):
+        system = self._system()
+        self._run_power_balance(
+            system, np.full(3, 200.0), np.full(3, 300.0), balancing_source_on=False
+        )
+        np.testing.assert_allclose(self.orc.power_output, 200.0)
+        np.testing.assert_allclose(self.balancing_source.power_output, 0.0, atol=1e-9)
+
+    def test_fully_curtailed_orc_is_off_and_not_balancing(self):
+        # another fixed source (250 kW) already exceeds the 200 kW load: the ORC is curtailed
+        # to zero and must not be taken as a balancing source (previously ORC -6.5 kW)
+        system = self._system(with_fixed_source=True)
+        self.fixed_source.status = np.ones(3)
+        self.fixed_source.load_sharing_mode = np.full(3, 250.0 / 500.0)
+        self._run_power_balance(system, np.full(3, 200.0), np.full(3, 300.0))
+        np.testing.assert_allclose(self.orc.power_output, 0.0, atol=1e-9)
+        np.testing.assert_allclose(self.fixed_source.power_output, 250.0)
+        # the surplus of the other fixed source is left to the balancing source, as before
+        np.testing.assert_allclose(self.balancing_source.power_output, -50.0)
+
+    def test_curtailment_keeps_caller_setpoints(self):
+        system = self._system(with_fixed_source=True)
+        self.fixed_source.status = np.array([False, False, True])
+        self.fixed_source.load_sharing_mode = np.full(3, 250.0 / 500.0)
+        orc_setpoint_kw = np.array([150.0, 300.0, 300.0])  # not / partly / fully curtailed
+        self._run_power_balance(system, np.full(3, 200.0), orc_setpoint_kw)
+        np.testing.assert_allclose(self.orc.power_output, [150.0, 200.0, 0.0], atol=1e-9)
+        np.testing.assert_allclose(self.orc.load_sharing_mode, orc_setpoint_kw / 300.0)
+        np.testing.assert_array_equal(self.orc.status, [True, True, True])
+        # a second balance with a higher load is not limited by the earlier curtailment
+        self.fixed_source.status = np.zeros(3, dtype=bool)
+        self.auxiliary_load.set_power_input_from_output(np.full(3, 1000.0))
+        system.do_power_balance_calculation()
+        np.testing.assert_allclose(self.orc.power_output, orc_setpoint_kw)
+
+    def test_orc_as_balancing_unit_is_rejected(self):
+        system = self._system()
+        self.auxiliary_load.set_power_input_from_output(np.full(3, 200.0))
+        self.orc.status = np.ones(3)
+        self.orc.load_sharing_mode = np.zeros(3)
+        self.balancing_source.status = np.ones(3)
+        self.balancing_source.load_sharing_mode = np.zeros(3)
+        system.set_bus_tie_status_all(np.array([]))
+        system.set_time_interval(time_interval_s=1, integration_method=IntegrationMethod.simpson)
+        with self.assertRaisesRegex(InputError, "cannot balance the bus"):
+            system.do_power_balance_calculation()
+
+    def test_orc_running_hours(self):
+        system = self._system()
+        # ORC on at 2 of 3 points, 1 s apart -> 2 s
+        self._run_power_balance(system, np.full(3, 1000.0), np.array([0.0, 150.0, 150.0]))
+        result = system.get_fuel_energy_consumption_running_time()
+        self.assertAlmostEqual(result.running_hours_orc_total_hr, 2 / 3600)
+        self.assertAlmostEqual(result.detail_result.loc["ORC", "running hours [h]"], 2 / 3600)
+
+
+class TestOrganicRankineCycleHeatModel(TestCase):
+    def test_power_from_waste_heat(self):
+        orc = OrganicRankineCycle(
+            name="ORC",
+            rated_power=Power_kW(300),
+            rated_efficiency=0.095,
+            waste_heat_fraction=0.3,
+            relative_efficiency_curve=np.array([[0.0, 0.0], [0.15, 0.0], [0.5, 0.93], [1.0, 1.0]]),
+        )
+        design_heat_input_kw = 300 / (0.095 * 0.3)
+        self.assertAlmostEqual(orc.design_heat_input_kw, design_heat_input_kw)
+        np.testing.assert_allclose(
+            orc.get_power_output_from_waste_heat_kw(
+                [0.0, 0.1 * design_heat_input_kw, design_heat_input_kw, 2 * design_heat_input_kw]
+            ),
+            [0.0, 0.0, 300.0, 300.0],
+        )
+        # half the design heat: rated efficiency x 0.93 (part-load curve) x half the heat
+        self.assertAlmostEqual(
+            float(orc.get_power_output_from_waste_heat_kw(0.5 * design_heat_input_kw)), 0.93 * 150.0
+        )
+
+    def test_without_curve_runs_at_rated_efficiency(self):
+        orc = OrganicRankineCycle(
+            name="ORC", rated_power=Power_kW(300), rated_efficiency=0.095, waste_heat_fraction=0.3
+        )
+        waste_heat_kw = 0.1 * orc.design_heat_input_kw
+        self.assertAlmostEqual(
+            float(orc.get_power_output_from_waste_heat_kw(waste_heat_kw)), 0.095 * 0.3 * waste_heat_kw
+        )
+
+    def test_without_heat_parameters_gives_zero(self):
+        orc = OrganicRankineCycle(name="ORC", rated_power=Power_kW(300))
+        np.testing.assert_allclose(orc.get_power_output_from_waste_heat_kw([1000.0]), [0.0])
+
+    def test_curve_with_wrong_shape_is_rejected(self):
+        for curve in (np.array([0.0, 0.5, 1.0]), np.array([[1.0, 1.0]]), np.ones((3, 3))):
+            with self.assertRaisesRegex(ValueError, "Nx2"):
+                OrganicRankineCycle(
+                    name="ORC", rated_power=Power_kW(300), relative_efficiency_curve=curve
+                )
+
+    def test_curve_with_unsorted_heat_input_is_rejected(self):
+        for curve in ([[0.0, 0.0], [1.0, 1.0], [0.5, 0.9]], [[0.0, 0.0], [0.5, 0.9], [0.5, 1.0]]):
+            with self.assertRaisesRegex(ValueError, "strictly increasing"):
+                OrganicRankineCycle(
+                    name="ORC", rated_power=Power_kW(300), relative_efficiency_curve=np.array(curve)
+                )

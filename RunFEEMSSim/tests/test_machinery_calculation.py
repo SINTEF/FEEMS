@@ -465,6 +465,43 @@ def test_machinery_calculation_multifuel_coges():
 
 
 
+def test_machinery_calculation_keeps_orc_off():
+    """The basic PMS leaves an ORC out of its load table and keeps it off (fixed setpoint 0)."""
+    gymir_result = create_gymir_result()
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    system_proto = retrieve_machinery_system_from_file(os.path.join(package_dir, "system_proto.mss"))
+    genset = next(
+        subsystem
+        for switchboard in system_proto.electric_system.switchboards
+        for subsystem in switchboard.subsystems
+        if subsystem.HasField("engine")
+    )
+    genset.engine.orc.name = "ORC genset"
+    genset.engine.orc.uid = "genset_orc"
+    genset.engine.orc.rated_power_kw = 100.0
+    system_feems = convert_proto_propulsion_system_to_feems(system_proto)
+    machinery_calculation = MachineryCalculation(feems_system=system_feems)
+    number_of_dispatchable_sources = sum(
+        power_source.type != TypeComponent.ORGANIC_RANKINE_CYCLE
+        for power_source in system_feems.power_sources
+    )
+    _, on_patterns = machinery_calculation.pms._pms_load_table.sorted_load_table()
+    assert len(on_patterns[0]) == number_of_dispatchable_sources
+
+    res = machinery_calculation.calculate_machinery_system_output_from_gymir_result(
+        gymir_result=gymir_result
+    )
+
+    orcs = [
+        power_source
+        for power_source in machinery_calculation.electric_system.power_sources
+        if power_source.type == TypeComponent.ORGANIC_RANKINE_CYCLE
+    ]
+    assert len(orcs) == 1
+    np.testing.assert_allclose(orcs[0].power_output, 0.0)
+    assert res.fuel_consumption_total_kg > 0
+
+
 # --- Boiler steam demand carried through TimeSeriesResult ---------------------------------
 #
 # These tests cover boiler_steam_demand_kg_per_h on the TimeSeriesResult proto: the value is

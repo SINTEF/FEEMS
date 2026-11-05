@@ -7,6 +7,7 @@ This document covers the public API for the `machinery-system-structure` (MachSy
 - [Overview](#overview)
 - [Proto Schema — Key Messages](#proto-schema--key-messages)
   - [COGAS](#cogas-message)
+  - [OrganicRankineCycle](#organicrankinecycle-message)
   - [Engine.EngineCycleType](#engineenginecycletype-enum)
 - [Converters: Protobuf → FEEMS](#converters-protobuf--feems)
   - [convert_proto_cogas_to_feems](#convert_proto_cogas_to_feems)
@@ -15,6 +16,7 @@ This document covers the public API for the `machinery-system-structure` (MachSy
   - [convert_proto_multifuel_engine_to_feems](#convert_proto_multifuel_engine_to_feems)
   - [convert_proto_genset_to_feems](#convert_proto_genset_to_feems)
   - [convert_proto_electric_system_to_feems](#convert_proto_electric_system_to_feems)
+  - [ORC conversion](#orc-conversion)
   - [convert_proto_mechanical_system_to_feems](#convert_proto_mechanical_system_to_feems)
   - [convert_proto_propulsion_system_to_feems](#convert_proto_propulsion_system_to_feems)
 - [Converters: FEEMS → Protobuf](#converters-feems--protobuf)
@@ -128,6 +130,26 @@ the wire format homogeneous and lets old clients ignore the new IDs without spec
 See `docs/api/feems/API_REFERENCE.md#per-component-operating-averages` for the per-component
 semantics matrix.
 
+### OrganicRankineCycle message
+
+Waste-heat recovery bottoming cycle attached to its host:
+`Engine.orc = 16`, `MultiFuelEngine.orc = 12` (one per engine) and
+`MachinerySystem.fuel_cell_orc = 10` (one shared by all fuel cells).
+
+| Field | Type | Description |
+|---|---|---|
+| `rated_power_kw` | `double` | Electric output rating (kW) |
+| `rated_efficiency` | `double` | Thermal-to-electric efficiency at design heat input |
+| `relative_efficiency_curve` | `Curve1D` | x: heat input / design heat input, y: efficiency / rated efficiency |
+| `waste_heat_fraction` | `double` | Share of the host's rejected heat reaching the evaporator |
+| `unit_price_usd` | `double` | Unit price |
+| `uid` | `string` | Stable unique identifier |
+| `switchboard_id` | `uint32` | Switchboard the ORC feeds. Main engine ORC: required (> 0). Genset / fuel-cell ORC: the host's switchboard (0 or that id; another id raises `ValueError`) |
+| `name` | `string` | Component name |
+
+`FeemsResult.energy_input_waste_heat_recovery_total_mj = 17` carries the recovered electric energy,
+`FeemsResult.running_hours_orc_total_hr = 18` the hours with ORC output.
+
 ### Engine.EngineCycleType enum
 
 ```protobuf
@@ -220,11 +242,43 @@ Converts a genset subsystem proto to a FEEMS `Genset`.
 
 ```python
 def convert_proto_electric_system_to_feems(
-    system: proto.MachinerySystem,
+    system: proto.ElectricSystem,
+    additional_components_by_switchboard: Optional[Dict[int, List[Any]]] = None,
 ) -> ElectricPowerSystem
 ```
 
-Top-level converter for diesel-electric systems.
+Top-level converter for diesel-electric systems. `additional_components_by_switchboard` adds
+components that are not switchboard subsystems in the proto (main engine and fuel-cell ORCs) to the given
+switchboards; an unknown switchboard id raises `ValueError`.
+`convert_proto_switchboard_to_feems(switchboard, additional_components=None)` takes the same list
+for one switchboard.
+
+---
+
+### ORC conversion
+
+```python
+def convert_proto_orc_to_feems(orc: proto.OrganicRankineCycle, switchboard_id: int) -> OrganicRankineCycle
+def collect_main_engine_orcs(system: proto.MachinerySystem) -> Dict[Tuple[int, str], OrganicRankineCycle]
+def convert_proto_fuel_cell_orc_to_feems(system: proto.MachinerySystem) -> Optional[OrganicRankineCycle]
+def convert_orc_to_protobuf(orc: OrganicRankineCycle) -> proto.OrganicRankineCycle  # convert_to_protobuf
+```
+
+`convert_proto_propulsion_system_to_feems` turns every ORC with rated power > 0 into a feems
+`OrganicRankineCycle` power source (all propulsion types):
+
+- **Main engine** (`Engine.orc` / `MultiFuelEngine.orc` on a shaft line): on the switchboard given by
+  `switchboard_id`; 0 raises `ValueError`. `collect_main_engine_orcs` keys them by
+  (shaft line id, engine name); the main engine's `engine.orc` points at the component.
+- **Genset** (`Engine.orc` / `MultiFuelEngine.orc` of a genset): on the genset's switchboard;
+  `genset.aux_engine.orc` points at the component.
+- **Fuel cells** (`MachinerySystem.fuel_cell_orc`): on the fuel cells' switchboard; fuel cells on
+  more than one switchboard raise `ValueError`. Stored as `ElectricPowerSystem.fuel_cell_orc`.
+
+A genset / fuel-cell ORC whose `switchboard_id` is neither 0 nor its host's switchboard raises
+`ValueError`. feems → proto: `convert_switchboard_to_protobuf` skips ORC components; the engine
+converters write `engine.orc` back to `Engine.orc` / `MultiFuelEngine.orc`, and the system converters
+write `fuel_cell_orc` back to `MachinerySystem.fuel_cell_orc` (round trip keeps the ORC).
 
 ---
 

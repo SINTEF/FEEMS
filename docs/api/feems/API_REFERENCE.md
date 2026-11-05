@@ -612,6 +612,58 @@ shore_system = ShorePowerConnectionSystem(
 - `shore_power_connection: ShorePowerConnection`
 - `converter: ElectricComponent`
 
+#### `OrganicRankineCycle`
+
+Fuel-free electric power source driven by the waste heat of a host (main engine, genset engine or
+fuel cells). Its output depends on the heat of its host and is therefore not dispatched by the
+power balance: set it as a fixed setpoint (`load_sharing_mode = power / rated_power`,
+`status = 1`); the load-balancing units cover the rest.
+
+- An ORC with `status = 1` and `load_sharing_mode = 0` raises `InputError` in the power balance
+  (an ORC cannot balance the bus).
+- If the fixed sources exceed the load of a bus, the ORC setpoints on that bus are curtailed by
+  the same factor and a warning is logged; a fully curtailed ORC is off at that point. The
+  curtailment shows in `power_output` only: `status` and `load_sharing_mode` are restored to the
+  caller's values after the power balance.
+
+```python
+from feems.components_model.component_electric import OrganicRankineCycle
+
+orc = OrganicRankineCycle(
+    name="ORC main engine",
+    rated_power=Power_kW(300),
+    switchboard_id=SwbId(1),
+    rated_efficiency=0.095,
+    waste_heat_fraction=0.3,
+    uid="main_engine_orc",
+)
+orc.get_power_output_from_waste_heat_kw([5000.0, 10000.0])  # kW electric
+```
+
+**Attributes:**
+- Same as `ElectricComponent` with `type_=TypeComponent.ORGANIC_RANKINE_CYCLE`
+- Automatically set to `power_type=TypePower.POWER_SOURCE`
+- `rated_efficiency`: thermal-to-electric efficiency at the design heat input
+- `waste_heat_fraction`: share of the host's rejected heat that reaches the evaporator
+- `relative_efficiency_curve`: Nx2 [heat input / design heat input, efficiency / rated efficiency]
+  (part-load shape, e.g. a cut-in); `None` = rated efficiency at every heat input. The client
+  (e.g. the KSOE Machinery Design Lab) writes its default curve into the proto. The constructor
+  raises `ValueError` unless the curve is Nx2 (N >= 2) with strictly increasing heat input ratios.
+- `unit_price_usd`: carried for the protobuf round trip only
+
+**Methods:**
+- `design_heat_input_kw` (property): host waste heat at which the ORC reaches its rated power
+- `get_power_output_from_waste_heat_kw(waste_heat_kw)`: electric output for the host's rejected
+  heat, capped at the rated power; 0 if the heat parameters are not set
+
+**Host link:** `Engine.orc` (also `EngineDualFuel`, `EngineMultiFuel`; main engine and genset
+engine) and `ElectricPowerSystem.fuel_cell_orc` point at the ORC component of their host, or are
+`None`.
+
+**Results:** no fuel; the recovered electric energy is reported as
+`FEEMSResult.energy_input_waste_heat_recovery_total_mj`, the hours with output as
+`FEEMSResult.running_hours_orc_total_hr`, both also in its own `detail_result` row.
+
 ### Serial Systems
 
 Serial systems combine multiple components in series to represent subsystems like gensets (engine + generator) or propulsion drives (transformer + converter + motor). FEEMS uses a mathematical framework for calculating power flow and efficiency through series-connected components.
@@ -1364,6 +1416,7 @@ TypeComponent.SUPERCAPACITOR_SYSTEM
 TypeComponent.SHORE_POWER
 TypeComponent.COGAS
 TypeComponent.COGES
+TypeComponent.ORGANIC_RANKINE_CYCLE
 ```
 
 ### `TypePower`

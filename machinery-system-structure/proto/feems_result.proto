@@ -13,7 +13,7 @@ message FuelScalar {
     double lhv_mj_per_g = 5;
     double ghg_emission_factor_well_to_tank_gco2eq_per_mj = 6;
     double ghg_emission_factor_tank_to_wake = 7;
-    string name = 8;
+    string name = 8;  // Required when fuel_specified_by = USER
 }
 
 message FuelArray {
@@ -24,7 +24,7 @@ message FuelArray {
     double lhv_mj_per_g = 5;
     double ghg_emission_factor_well_to_tank_gco2eq_per_mj = 6;
     double ghg_emission_factor_tank_to_wake = 7;
-    string name = 8;
+    string name = 8;  // Required when fuel_specified_by = USER
 }
 
 message FuelConsumptionScalar {
@@ -92,6 +92,8 @@ message FeemsResult {
     double energy_input_electric_total_mj = 14;
     double energy_consumption_propulsion_total_mj = 15;
     double energy_consumption_auxiliary_total_mj = 16;
+    double energy_input_waste_heat_recovery_total_mj = 17;
+    double running_hours_orc_total_hr = 18;
 }
 
 message FeemsResultForMachinerySystem {

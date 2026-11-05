@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 # %% ../01_ConvertToProtobuf.ipynb 3
-from typing import List, Union, cast
+from typing import List, Optional, Union, cast
 
 import numpy as np
 from feems.components_model import (
@@ -43,6 +43,7 @@ from feems.components_model.component_electric import (
     ElectricMachine,
     FuelCellSystem,
     Genset,
+    OrganicRankineCycle,
     SerialSystemElectric,
     SuperCapacitor,
     SuperCapacitorSystem,
@@ -339,6 +340,8 @@ def convert_engine_component_to_protobuf(
                 fuel_origin=engine_feems.pilot_fuel_origin.value,
             )
         )
+    if engine_feems.orc is not None:
+        engine.orc.CopyFrom(convert_orc_to_protobuf(engine_feems.orc))
     return engine
 
 
@@ -381,7 +384,7 @@ def convert_multi_fuel_engine_to_protobuf(
                 )
             )
 
-    return proto.MultiFuelEngine(
+    engine = proto.MultiFuelEngine(
         name=engine_feems.name,
         rated_power_kw=engine_feems.rated_power,
         rated_speed_rpm=engine_feems.rated_speed,
@@ -389,6 +392,26 @@ def convert_multi_fuel_engine_to_protobuf(
         order_from_switchboard_or_shaftline=order_from_shaftline_or_switchboard,
         uid=engine_feems.uid,
     )
+    if engine_feems.orc is not None:
+        engine.orc.CopyFrom(convert_orc_to_protobuf(engine_feems.orc))
+    return engine
+
+
+def convert_orc_to_protobuf(orc: OrganicRankineCycle) -> proto.OrganicRankineCycle:
+    """Convert an ORC component of FEEMS to protobuf message (stored on its host)"""
+    orc_proto = proto.OrganicRankineCycle(
+        name=orc.name,
+        rated_power_kw=orc.rated_power,
+        rated_efficiency=orc.rated_efficiency,
+        waste_heat_fraction=orc.waste_heat_fraction,
+        unit_price_usd=orc.unit_price_usd,
+        uid=orc.uid,
+        switchboard_id=orc.switchboard_id,
+    )
+    if orc.relative_efficiency_curve is not None:
+        for x, y in orc.relative_efficiency_curve:
+            orc_proto.relative_efficiency_curve.points.add(x=float(x), y=float(y))
+    return orc_proto
 
 
 def convert_cogas_component_to_protobuf(
@@ -496,6 +519,9 @@ def convert_switchboard_to_protobuf(
     switchboard_proto.switchboard_id = switchboard_feems.id
 
     for component in switchboard_feems.components:
+        if component.type == TypeComponent.ORGANIC_RANKINE_CYCLE:
+            # written back on its host (Engine.orc / MachinerySystem.fuel_cell_orc)
+            continue
         subsystem = proto.Subsystem(
             power_type=component.power_type.value,
             component_type=component.type.value,
@@ -742,6 +768,14 @@ def convert_electric_system_to_protobuf(
     )
 
 
+def _fuel_cell_orc_to_protobuf(
+    electric_system: ElectricPowerSystem,
+) -> Optional[proto.OrganicRankineCycle]:
+    if electric_system.fuel_cell_orc is None:
+        return None
+    return convert_orc_to_protobuf(electric_system.fuel_cell_orc)
+
+
 def convert_electric_system_to_protobuf_machinery_system(
     electric_system: ElectricPowerSystem,
     maximum_allowed_genset_load_percentage: float = 80.0,
@@ -754,6 +788,7 @@ def convert_electric_system_to_protobuf_machinery_system(
         maximum_allowed_genset_load_percentage=maximum_allowed_genset_load_percentage,
         electric_system=convert_electric_system_to_protobuf(electric_system),
         steam_boiler=steam_boiler_to_proto(electric_system.boiler) if electric_system.boiler else None,
+        fuel_cell_orc=_fuel_cell_orc_to_protobuf(electric_system),
     )
 
 
@@ -780,6 +815,7 @@ def convert_mechanical_propulsion_system_with_electric_system_to_protobuf(
         mechanical_system=convert_mechanical_system_to_protobuf(system_feems.mechanical_system),
         electric_system=convert_electric_system_to_protobuf(system_feems.electric_system),
         steam_boiler=steam_boiler_to_proto(system_feems.boiler) if system_feems.boiler else None,
+        fuel_cell_orc=_fuel_cell_orc_to_protobuf(system_feems.electric_system),
     )
 
 
@@ -795,4 +831,5 @@ def convert_hybrid_propulsion_system_to_protobuf(
         mechanical_system=convert_mechanical_system_to_protobuf(system_feems.mechanical_system),
         electric_system=convert_electric_system_to_protobuf(system_feems.electric_system),
         steam_boiler=steam_boiler_to_proto(system_feems.boiler) if system_feems.boiler else None,
+        fuel_cell_orc=_fuel_cell_orc_to_protobuf(system_feems.electric_system),
     )

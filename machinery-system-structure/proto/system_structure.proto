@@ -33,6 +33,22 @@ message Efficiency {
   optional double value = 2;
 }
 
+// Waste-heat recovery bottoming cycle attached to its host (engine or fuel-cell group).
+// Converted to a feems OrganicRankineCycle power source on its switchboard; the PMS sets its power.
+message OrganicRankineCycle {
+  double rated_power_kw = 1;                 // electric output rating
+  double rated_efficiency = 2;               // thermal-to-electric efficiency at design heat input
+  Curve1D relative_efficiency_curve = 3;     // x: heat input / design heat input, y: efficiency / rated efficiency
+  double waste_heat_fraction = 4;            // share of host rejected heat reaching the evaporator
+  double unit_price_usd = 5;
+  string uid = 6;
+  // Switchboard the ORC feeds. Main engine ORC: required (> 0). Genset ORC: the genset's
+  // switchboard; leave 0 or set it to that switchboard. Fuel-cell ORC (MachinerySystem.fuel_cell_orc):
+  // the fuel cells' switchboard; leave 0 or set it to that switchboard.
+  uint32 switchboard_id = 7;
+  string name = 8;
+}
+
 message PowerCurve {
   string x_label = 1;
   string y_label = 2;
@@ -123,7 +139,7 @@ enum FuelSpecifiedBy {
 message Fuel {
   FuelType fuel_type = 1;
   FuelOrigin fuel_origin = 2;
-  string name = 3;
+  string name = 3;  // Required when fuel_specified_by = USER
 }
 
 message Engine {
@@ -155,6 +171,7 @@ message Engine {
   double start_delay_s = 13;
   double turn_off_power_kw = 14;
   string uid = 15;
+  OrganicRankineCycle orc = 16;
 }
 
 message COGAS {
@@ -375,6 +392,7 @@ message MachinerySystem {
   double maximum_allowed_fuel_cell_load_percentage = 7;
   double average_base_load_percentage = 8;
   SteamBoiler steam_boiler = 9;
+  OrganicRankineCycle fuel_cell_orc = 10;
 }
 
 message SteamBoiler {
@@ -416,5 +434,6 @@ message MultiFuelEngine {
   double start_delay_s = 9;
   double turn_off_power_kw = 10;
   string uid = 11;
+  OrganicRankineCycle orc = 12;
 }
 

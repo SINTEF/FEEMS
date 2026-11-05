@@ -82,6 +82,15 @@ def get_min_load_table_dict_from_proto_system(
     )
 
 
+def _dispatchable_power_sources(electric_system: ElectricPowerSystem) -> List:
+    """Power sources the basic PMS dispatches: all but ORCs, which run at a fixed setpoint."""
+    return [
+        component
+        for component in electric_system.power_sources
+        if component.type != TypeComponent.ORGANIC_RANKINE_CYCLE
+    ]
+
+
 def get_min_load_table_dict_from_feems_system(
     system: Union[
         ElectricPowerSystem,
@@ -93,7 +102,7 @@ def get_min_load_table_dict_from_feems_system(
 ) -> Load2OnPattern:
     """Return a minimum load table dict generated from a feems model"""
     electric_system = system if not hasattr(system, "electric_system") else system.electric_system
-    power_sources = [component for component in electric_system.power_sources]
+    power_sources = _dispatchable_power_sources(electric_system)
     if component_types is not None:
         power_sources = [
             component for component in power_sources if component.type in component_types
@@ -161,7 +170,8 @@ class PmsLoadTableSimulationInterface(SimulationInterface):
         off_vector = np.zeros(n_datapoints)
         np.ones(n_datapoints)
         equal_load_sharing_vector = np.zeros(n_datapoints)
-        number_power_sources = len(electric_power_system.power_sources)
+        power_sources = _dispatchable_power_sources(electric_power_system)
+        number_power_sources = len(power_sources)
         on_pattern_per_datapoint = np.array(self._pms_load_table.on_pattern(total_power_kw))
         assert on_pattern_per_datapoint.shape == (n_datapoints, self._n_power_sources)
         if self._n_bus_ties > 0:
@@ -169,9 +179,14 @@ class PmsLoadTableSimulationInterface(SimulationInterface):
         assert self._n_power_sources == number_power_sources, (
             f"The electric_power_system.power_sources count is different from {self._n_power_sources}"
         )
-        for i, source in enumerate(electric_power_system.power_sources):
+        for i, source in enumerate(power_sources):
             source.status = on_pattern_per_datapoint[:, i].astype(bool)
             source.load_sharing_mode = equal_load_sharing_vector
+        # an ORC is not dispatchable; it stays off unless the caller sets a fixed setpoint
+        for orc in electric_power_system.power_sources:
+            if orc.type == TypeComponent.ORGANIC_RANKINE_CYCLE:
+                orc.status = off_vector.astype(bool)
+                orc.load_sharing_mode = equal_load_sharing_vector
         for component in chain(electric_power_system.energy_storage):
             component.status = off_vector.astype(bool)
             component.load_sharing_mode = equal_load_sharing_vector

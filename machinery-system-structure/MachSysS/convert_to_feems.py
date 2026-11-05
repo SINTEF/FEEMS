@@ -34,7 +34,7 @@ __all__ = [
 
 # %% ../00_ConvertToFeems.ipynb 3
 from functools import reduce
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from feems.components_model import (
@@ -54,6 +54,7 @@ from feems.components_model.component_electric import (
     FuelCell,
     FuelCellSystem,
     Genset,
+    OrganicRankineCycle,
     SerialSystemElectric,
     SuperCapacitor,
     SuperCapacitorSystem,
@@ -698,7 +699,138 @@ def convert_generic_electric_subsystem_to_feems(
             )
 
 
-def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switchboard:
+def convert_proto_orc_to_feems(
+    orc: proto.OrganicRankineCycle, switchboard_id: int
+) -> OrganicRankineCycle:
+    return OrganicRankineCycle(
+        name=orc.name,
+        rated_power=orc.rated_power_kw,
+        switchboard_id=switchboard_id,
+        rated_efficiency=orc.rated_efficiency,
+        waste_heat_fraction=orc.waste_heat_fraction,
+        relative_efficiency_curve=(
+            convert_proto_curve1d_to_np_array(orc.relative_efficiency_curve)
+            if len(orc.relative_efficiency_curve.points) > 1
+            else None
+        ),
+        unit_price_usd=orc.unit_price_usd,
+        uid=orc.uid,
+    )
+
+
+def _engine_of_subsystem(
+    subsystem: proto.Subsystem,
+) -> Optional[Union[proto.Engine, proto.MultiFuelEngine]]:
+    if subsystem.HasField("engine"):
+        return subsystem.engine
+    if subsystem.HasField("multi_fuel_engine"):
+        return subsystem.multi_fuel_engine
+    return None
+
+
+def _has_orc(holder, field_name: str = "orc") -> bool:
+    return holder.HasField(field_name) and getattr(holder, field_name).rated_power_kw > 0
+
+
+def _host_switchboard_id(orc: proto.OrganicRankineCycle, host_switchboard_id: int, host: str) -> int:
+    """Switchboard of a genset / fuel-cell ORC: its host's. A different nonzero value is an error."""
+    if orc.switchboard_id not in (0, host_switchboard_id):
+        raise ValueError(
+            f"ORC {orc.name} of {host} has switchboard_id {orc.switchboard_id}, but its host is "
+            f"on switchboard {host_switchboard_id}. A genset / fuel-cell ORC feeds its host's "
+            "switchboard."
+        )
+    return host_switchboard_id
+
+
+def collect_main_engine_orcs(
+    system: proto.MachinerySystem,
+) -> Dict[Tuple[int, str], OrganicRankineCycle]:
+    """Main engine ORCs as feems components, keyed by (shaft line id, engine name).
+
+    A main engine ORC feeds the switchboard given by its ``switchboard_id``, which is required.
+    ORCs without rated power are skipped. The engine name is the key because feems replaces a
+    short uid with a generated one.
+    """
+    orcs_by_host: Dict[Tuple[int, str], OrganicRankineCycle] = {}
+    for shaft_line in system.mechanical_system.shaft_lines:
+        for subsystem in shaft_line.subsystems:
+            engine = _engine_of_subsystem(subsystem)
+            if engine is None or not _has_orc(engine):
+                continue
+            if engine.orc.switchboard_id == 0:
+                raise ValueError(
+                    f"ORC {engine.orc.name} of main engine {engine.name} has switchboard_id 0. "
+                    "A main engine ORC needs the id of the switchboard it feeds."
+                )
+            key = (shaft_line.shaft_line_id, engine.name)
+            if key in orcs_by_host:
+                raise ValueError(
+                    f"Two main engines named {engine.name} on shaft line "
+                    f"{shaft_line.shaft_line_id} carry an ORC; engine names must be unique per "
+                    "shaft line."
+                )
+            orcs_by_host[key] = convert_proto_orc_to_feems(
+                engine.orc, switchboard_id=engine.orc.switchboard_id
+            )
+    return orcs_by_host
+
+
+def convert_proto_fuel_cell_orc_to_feems(
+    system: proto.MachinerySystem,
+) -> Optional[OrganicRankineCycle]:
+    """The ORC shared by the fuel cells, on the fuel cells' switchboard, or None."""
+    if not _has_orc(system, "fuel_cell_orc"):
+        return None
+    fuel_cell_switchboard_ids = {
+        switchboard.switchboard_id
+        for switchboard in system.electric_system.switchboards
+        for subsystem in switchboard.subsystems
+        if subsystem.component_type == proto.Subsystem.ComponentType.FUEL_CELL_SYSTEM
+    }
+    if len(fuel_cell_switchboard_ids) != 1:
+        raise ValueError(
+            f"The fuel-cell ORC {system.fuel_cell_orc.name} needs all fuel cells on one "
+            f"switchboard; found fuel cells on switchboards {sorted(fuel_cell_switchboard_ids)}."
+        )
+    switchboard_id = _host_switchboard_id(
+        system.fuel_cell_orc, fuel_cell_switchboard_ids.pop(), host="the fuel cells"
+    )
+    return convert_proto_orc_to_feems(system.fuel_cell_orc, switchboard_id=switchboard_id)
+
+
+def _orcs_by_switchboard(
+    main_engine_orcs: Dict[Tuple[int, str], OrganicRankineCycle],
+    fuel_cell_orc: Optional[OrganicRankineCycle],
+) -> Dict[int, List[OrganicRankineCycle]]:
+    orcs_by_switchboard: Dict[int, List[OrganicRankineCycle]] = {}
+    for orc in [*main_engine_orcs.values(), *([fuel_cell_orc] if fuel_cell_orc else [])]:
+        orcs_by_switchboard.setdefault(orc.switchboard_id, []).append(orc)
+    return orcs_by_switchboard
+
+
+def _attach_main_engine_orcs(
+    mechanical_system: MechanicalPropulsionSystem,
+    main_engine_orcs: Dict[Tuple[int, str], OrganicRankineCycle],
+) -> None:
+    """Point each main engine at its ORC (``engine.orc``) for the protobuf round trip."""
+    attached = set()
+    for main_engine in mechanical_system.main_engines:
+        key = (main_engine.shaft_line_id, main_engine.engine.name)
+        if key in main_engine_orcs:
+            main_engine.engine.orc = main_engine_orcs[key]
+            attached.add(key)
+    if attached != set(main_engine_orcs):
+        raise ValueError(
+            "Could not attach main engine ORCs "
+            f"{sorted(set(main_engine_orcs) - attached)} to their engines."
+        )
+
+
+def convert_proto_switchboard_to_feems(
+    switchboard: proto.Switchboard,
+    additional_components: Optional[List[Any]] = None,
+) -> Switchboard:
     components = []
     switchboard_id = switchboard.switchboard_id
     for subsystem in switchboard.subsystems:
@@ -709,9 +841,18 @@ def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switch
                 )
             )
         elif subsystem.component_type == proto.Subsystem.ComponentType.GENSET:
-            components.append(
-                convert_proto_genset_to_feems(subsystem=subsystem, switchboard_id=switchboard_id)
-            )
+            genset = convert_proto_genset_to_feems(subsystem=subsystem, switchboard_id=switchboard_id)
+            components.append(genset)
+            engine = _engine_of_subsystem(subsystem)
+            if engine is not None and _has_orc(engine):
+                orc = convert_proto_orc_to_feems(
+                    engine.orc,
+                    switchboard_id=_host_switchboard_id(
+                        engine.orc, switchboard_id, host=f"genset {subsystem.name}"
+                    ),
+                )
+                genset.aux_engine.orc = orc
+                components.append(orc)
         elif subsystem.component_type == proto.Subsystem.ComponentType.COGES:
             components.append(
                 convert_proto_coges_to_feems(subsystem=subsystem, switchboard_id=switchboard_id)
@@ -747,6 +888,8 @@ def convert_proto_switchboard_to_feems(switchboard: proto.Switchboard) -> Switch
                     subsystem=subsystem, switchboard_id=switchboard_id
                 )
             )
+
+    components.extend(additional_components or [])
 
     return Switchboard(
         name=f"SWBD {switchboard.switchboard_id}",
@@ -920,9 +1063,22 @@ def convert_feems_shaftlines_to_feems_mechanical_propulsion_system(
 
 def convert_proto_electric_system_to_feems(
     system: proto.ElectricSystem,
+    additional_components_by_switchboard: Optional[Dict[int, List[Any]]] = None,
 ) -> ElectricPowerSystem:
+    additional_components_by_switchboard = additional_components_by_switchboard or {}
+    unknown_switchboard_ids = set(additional_components_by_switchboard) - {
+        proto_switchboard.switchboard_id for proto_switchboard in system.switchboards
+    }
+    if unknown_switchboard_ids:
+        raise ValueError(
+            f"Components refer to switchboard ids {sorted(unknown_switchboard_ids)} "
+            "that do not exist in the electric system."
+        )
     switchboards = [
-        convert_proto_switchboard_to_feems(proto_switchboard)
+        convert_proto_switchboard_to_feems(
+            proto_switchboard,
+            additional_components=additional_components_by_switchboard.get(proto_switchboard.switchboard_id),
+        )
         for proto_switchboard in system.switchboards
     ]
     return convert_feems_switchboards_to_feems_electric_power_system(switchboards)
@@ -969,28 +1125,41 @@ def convert_proto_propulsion_system_to_feems(
     None,
 ]:
     boiler = proto_to_steam_boiler(system.steam_boiler) if system.HasField("steam_boiler") else None
+    if system.propulsion_type not in [
+        proto.MachinerySystem.PropulsionType.MECHANICAL,
+        proto.MachinerySystem.PropulsionType.ELECTRIC,
+        proto.MachinerySystem.PropulsionType.HYBRID,
+    ]:
+        return None
+    main_engine_orcs = collect_main_engine_orcs(system)
+    if main_engine_orcs and system.propulsion_type == proto.MachinerySystem.PropulsionType.ELECTRIC:
+        raise ValueError("An electric propulsion system has no main engine for an ORC.")
+    fuel_cell_orc = convert_proto_fuel_cell_orc_to_feems(system)
+    electric_system = convert_proto_electric_system_to_feems(
+        system.electric_system,
+        additional_components_by_switchboard=_orcs_by_switchboard(main_engine_orcs, fuel_cell_orc),
+    )
+    electric_system.fuel_cell_orc = fuel_cell_orc
     if system.propulsion_type == proto.MachinerySystem.PropulsionType.MECHANICAL:
+        mechanical_system = convert_proto_mechanical_system_to_feems(system.mechanical_system)
+        _attach_main_engine_orcs(mechanical_system, main_engine_orcs)
         feems_system = MechanicalPropulsionSystemWithElectricPowerSystem(
             name=system.name,
-            electric_system=convert_proto_electric_system_to_feems(system.electric_system),
-            mechanical_system=convert_proto_mechanical_system_to_feems(system.mechanical_system),
+            electric_system=electric_system,
+            mechanical_system=mechanical_system,
         )
-        feems_system.boiler = boiler
-        return feems_system
-    if system.propulsion_type == proto.MachinerySystem.PropulsionType.ELECTRIC:
-        feems_system = convert_proto_electric_system_to_feems(system.electric_system)
-        feems_system.boiler = boiler
-        return feems_system
-    if system.propulsion_type == proto.MachinerySystem.PropulsionType.HYBRID:
-        electric_system = convert_proto_electric_system_to_feems(system.electric_system)
+    elif system.propulsion_type == proto.MachinerySystem.PropulsionType.ELECTRIC:
+        feems_system = electric_system
+    else:
         pti_ptos = electric_system.pti_pto if len(electric_system.pti_pto) > 0 else None
+        mechanical_system = convert_proto_mechanical_system_to_feems(
+            system=system.mechanical_system, pti_ptos=pti_ptos
+        )
+        _attach_main_engine_orcs(mechanical_system, main_engine_orcs)
         feems_system = HybridPropulsionSystem(
             name=system.name,
             electric_system=electric_system,
-            mechanical_system=convert_proto_mechanical_system_to_feems(
-                system=system.mechanical_system, pti_ptos=pti_ptos
-            ),
+            mechanical_system=mechanical_system,
         )
-        feems_system.boiler = boiler
-        return feems_system
-    return None
+    feems_system.boiler = boiler
+    return feems_system

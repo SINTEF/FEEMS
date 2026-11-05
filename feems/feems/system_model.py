@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import reduce
 from operator import itemgetter
-from typing import Dict, List, NamedTuple, NewType, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, NewType, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ from .components_model.component_electric import (
     FuelCellSystem,
     Genset,
     MechanicalComponent,
+    OrganicRankineCycle,
     PowerSystemComponent,
     SerialSystemElectric,
     ShorePowerConnection,
@@ -424,6 +425,9 @@ class MachinerySystem:
 
 
 class ElectricPowerSystem(MachinerySystem):
+    #: ORC shared by the fuel cells (``MachinerySystem.fuel_cell_orc`` in the proto), or None
+    fuel_cell_orc: Optional[OrganicRankineCycle] = None
+
     def __init__(
         self,
         name: str,
@@ -459,6 +463,7 @@ class ElectricPowerSystem(MachinerySystem):
                         COGES,
                         ShorePowerConnection,
                         ShorePowerConnectionSystem,
+                        OrganicRankineCycle,
                     ),
                 ):
                     self.power_sources.append(component)
@@ -468,7 +473,7 @@ class ElectricPowerSystem(MachinerySystem):
                     raise TypeError(
                         "The component was specified to be power source but is "
                         "not an instance of ElectricMachine, Genset, FuelCellSystem, "
-                        "COGES, ShorePowerConnection, ShorePowerConnectionSystem"
+                        "COGES, ShorePowerConnection, ShorePowerConnectionSystem, OrganicRankineCycle"
                     )
             elif component.type == TypeComponent.PROPULSION_DRIVE:
                 if isinstance(component, (ElectricComponent, SerialSystemElectric)):
@@ -1022,12 +1027,120 @@ class ElectricPowerSystem(MachinerySystem):
                         logger.error(msg)
                         raise InputError(msg)
 
+        for component in self.power_sources:
+            if component.type != TypeComponent.ORGANIC_RANKINE_CYCLE:
+                continue
+            is_balancing = (np.atleast_1d(component.status) == 1) & (
+                np.atleast_1d(component.load_sharing_mode) == 0
+            )
+            if is_balancing.any():
+                msg = (
+                    f"ORC {component.name} is on with load_sharing_mode = 0 at "
+                    f"{int(is_balancing.sum())} points. An ORC runs at a fixed setpoint "
+                    "(load_sharing_mode = power / rated_power) and cannot balance the bus."
+                )
+                logger.error(msg)
+                raise InputError(msg)
+
+    def _bus_id_of_switchboard_per_point(self, number_points: int) -> Dict[SwbId, np.ndarray]:
+        """Bus id of each switchboard per point, from the bus-tie configuration segments."""
+        bus_id_of_switchboard = {
+            switchboard_id: np.zeros(number_points, dtype=int)
+            for switchboard_id in self.switchboards
+        }
+        for index, switchboard2bus in enumerate(self.switchboard2bus):
+            index_start = self.bus_configuration_change_index[index]
+            index_end = (
+                self.bus_configuration_change_index[index + 1]
+                if index + 1 < self.no_bus_configuration_change
+                else number_points
+            )
+            for switchboard_id, bus_id in switchboard2bus.items():
+                bus_id_of_switchboard[switchboard_id][index_start:index_end] = bus_id
+        return bus_id_of_switchboard
+
+    def _curtail_orc_surplus(self) -> List[Tuple[OrganicRankineCycle, Any, Any]]:
+        """Curtail ORC setpoints where the fixed sources exceed the bus load.
+
+        An ORC cannot push power into a bus that has no use for it (it bypasses or throttles
+        the evaporator instead). Where the load left for the symmetric sources of a bus is
+        negative, the ORC setpoints on that bus are reduced by the same factor until it is
+        zero, or until the ORCs are off. A fully curtailed ORC is switched off at that point,
+        so it is not taken as a balancing source. A surplus of other fixed sources is left as
+        is.
+
+        :return: (ORC, status, load_sharing_mode) as set by the caller, for every curtailed
+            ORC, so the caller's setpoints can be restored after the power balance
+        """
+        orcs = [
+            component
+            for component in self.power_sources
+            if component.type == TypeComponent.ORGANIC_RANKINE_CYCLE
+        ]
+        caller_setpoints = []
+        if not orcs:
+            return caller_setpoints
+        sum_load_by_bus = self.get_sum_load_kw_sources_symmetric_buses()
+        number_points = max(np.atleast_1d(sum_load).size for sum_load in sum_load_by_bus.values())
+        bus_id_of_switchboard = self._bus_id_of_switchboard_per_point(number_points)
+        orc_power_by_bus = {bus_id: np.zeros(number_points) for bus_id in sum_load_by_bus}
+        for orc in orcs:
+            orc_power_kw = orc.rated_power * np.broadcast_to(
+                np.atleast_1d(orc.load_sharing_mode) * np.atleast_1d(orc.status), number_points
+            )
+            for bus_id, orc_power_bus_kw in orc_power_by_bus.items():
+                is_on_bus = bus_id_of_switchboard[orc.switchboard_id] == bus_id
+                orc_power_bus_kw[is_on_bus] += orc_power_kw[is_on_bus]
+        scale_by_bus = {}
+        for bus_id, sum_load in sum_load_by_bus.items():
+            surplus_kw = np.maximum(-np.broadcast_to(sum_load, number_points).astype(float), 0.0)
+            orc_power_kw = orc_power_by_bus[bus_id]
+            scale = np.ones(number_points)
+            has_orc_power = orc_power_kw > 0
+            scale[has_orc_power] = np.clip(
+                1.0 - surplus_kw[has_orc_power] / orc_power_kw[has_orc_power], 0.0, 1.0
+            )
+            if (scale < 1.0).any():
+                logger.warning(
+                    f"ORC output above the load of bus {bus_id} at {int((scale < 1.0).sum())} "
+                    "points; ORC curtailed."
+                )
+            scale_by_bus[bus_id] = scale
+        for orc in orcs:
+            scale = np.ones(number_points)
+            for bus_id, scale_bus in scale_by_bus.items():
+                is_on_bus = bus_id_of_switchboard[orc.switchboard_id] == bus_id
+                scale[is_on_bus] = scale_bus[is_on_bus]
+            if (scale < 1.0).any():
+                caller_setpoints.append((orc, orc.status, orc.load_sharing_mode))
+                orc.load_sharing_mode = (
+                    np.broadcast_to(np.atleast_1d(orc.load_sharing_mode), number_points) * scale
+                )
+                status = np.broadcast_to(np.atleast_1d(orc.status), number_points).astype(bool)
+                status[scale == 0] = False
+                orc.status = status
+        return caller_setpoints
+
     def do_power_balance_calculation(self) -> None:
         """
         Calculate the power output of the gensets and power sources (PTI/PTO or energy
         storage device at symmetric load sharing mode) based on the power balance.
+
+        ORC setpoints above the bus load are curtailed for this calculation only: the
+        curtailment shows in the ORC power output, and the caller's status and load sharing
+        mode are restored afterwards.
         """
         self.validate_inputs_before_power_balance_calculation()
+        caller_orc_setpoints = self._curtail_orc_surplus()
+        try:
+            self._do_power_balance_for_buses()
+        finally:
+            for orc, status, load_sharing_mode in caller_orc_setpoints:
+                orc.status = status
+                orc.load_sharing_mode = load_sharing_mode
+
+    def _do_power_balance_for_buses(self) -> None:
+        """Set the power output of the sources from the bus loads (symmetric sharing)."""
 
         sum_load_kw_sources_symmetric_buses = self.get_sum_load_kw_sources_symmetric_buses()
         sum_power_avail_power_sources_symmetric_buses = (
@@ -1041,7 +1154,10 @@ class ElectricPowerSystem(MachinerySystem):
         for bus_id, sum_load in sum_load_kw_sources_symmetric_buses.items():
             sum_power_avail = sum_power_avail_power_sources_symmetric_buses[bus_id]
             no_points = sum_load.size
-            index_non_zero: np.ndarray = sum_load != 0
+            # a rounding residual (e.g. fixed sources exactly covering the load) with no
+            # balancing power available is zero load, not an infinite load ratio
+            is_rounding_residual_without_balancing_power = (sum_power_avail == 0) & (np.abs(sum_load) < 1e-6)
+            index_non_zero: np.ndarray = (sum_load != 0) & ~is_rounding_residual_without_balancing_power
             load_buses[bus_id] = np.zeros(shape=sum_load.shape)
             if index_non_zero.any():
                 load_buses[bus_id][index_non_zero] = (
