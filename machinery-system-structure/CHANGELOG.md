@@ -5,6 +5,13 @@ All notable changes to the MachSysS (Machinery System Structure) package will be
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.14.0...MachSysS-v0.15.0) (2026-11-05)
+
+
+### Features
+
+* organic Rankine cycle (ORC) waste-heat recovery component ([#104](https://github.com/SINTEF/FEEMS/issues/104)) ([ea23451](https://github.com/SINTEF/FEEMS/commit/ea2345148846b78828e797d8e9cf88bfa6a1361e))
+
 ## [0.14.0](https://github.com/SINTEF/FEEMS/compare/MachSysS-v0.13.0...MachSysS-v0.14.0) (2026-06-02)
 
 
