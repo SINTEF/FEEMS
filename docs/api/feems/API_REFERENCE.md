@@ -622,7 +622,9 @@ power balance: set it as a fixed setpoint (`load_sharing_mode = power / rated_po
 - An ORC with `status = 1` and `load_sharing_mode = 0` raises `InputError` in the power balance
   (an ORC cannot balance the bus).
 - If the fixed sources exceed the load of a bus, the ORC setpoints on that bus are curtailed by
-  the same factor and a warning is logged.
+  the same factor and a warning is logged; a fully curtailed ORC is off at that point. The
+  curtailment shows in `power_output` only: `status` and `load_sharing_mode` are restored to the
+  caller's values after the power balance.
 
 ```python
 from feems.components_model.component_electric import OrganicRankineCycle
@@ -645,7 +647,8 @@ orc.get_power_output_from_waste_heat_kw([5000.0, 10000.0])  # kW electric
 - `waste_heat_fraction`: share of the host's rejected heat that reaches the evaporator
 - `relative_efficiency_curve`: Nx2 [heat input / design heat input, efficiency / rated efficiency]
   (part-load shape, e.g. a cut-in); `None` = rated efficiency at every heat input. The client
-  (e.g. the KSOE Machinery Design Lab) writes its default curve into the proto.
+  (e.g. the KSOE Machinery Design Lab) writes its default curve into the proto. The constructor
+  raises `ValueError` unless the curve is Nx2 (N >= 2) with strictly increasing heat input ratios.
 - `unit_price_usd`: carried for the protobuf round trip only
 
 **Methods:**

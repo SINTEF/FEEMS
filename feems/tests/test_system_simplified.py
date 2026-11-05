@@ -268,7 +268,7 @@ class TestOrganicRankineCycle(TestCase):
 
     number_of_points = 3
 
-    def _system(self, with_battery: bool = False):
+    def _system(self, with_battery: bool = False, with_fixed_source: bool = False):
         self.orc = OrganicRankineCycle(
             name="ORC", rated_power=Power_kW(300), switchboard_id=SwbId(1), uid="orc"
         )
@@ -295,6 +295,12 @@ class TestOrganicRankineCycle(TestCase):
                 switchboard_id=SwbId(1),
             )
             components.append(self.battery)
+        if with_fixed_source:
+            # another fuel-free source at a fixed setpoint (set in the test)
+            self.fixed_source = ShorePowerConnection(
+                name="fixed source", rated_power=Power_kW(500), switchboard_id=SwbId(1)
+            )
+            components.append(self.fixed_source)
         return ElectricPowerSystem(
             name="orc test", power_plant_components=components, bus_tie_connections=[]
         )
@@ -367,6 +373,33 @@ class TestOrganicRankineCycle(TestCase):
         np.testing.assert_allclose(self.orc.power_output, 200.0)
         np.testing.assert_allclose(self.balancing_source.power_output, 0.0, atol=1e-9)
 
+    def test_fully_curtailed_orc_is_off_and_not_balancing(self):
+        # another fixed source (250 kW) already exceeds the 200 kW load: the ORC is curtailed
+        # to zero and must not be taken as a balancing source (previously ORC -6.5 kW)
+        system = self._system(with_fixed_source=True)
+        self.fixed_source.status = np.ones(3)
+        self.fixed_source.load_sharing_mode = np.full(3, 250.0 / 500.0)
+        self._run_power_balance(system, np.full(3, 200.0), np.full(3, 300.0))
+        np.testing.assert_allclose(self.orc.power_output, 0.0, atol=1e-9)
+        np.testing.assert_allclose(self.fixed_source.power_output, 250.0)
+        # the surplus of the other fixed source is left to the balancing source, as before
+        np.testing.assert_allclose(self.balancing_source.power_output, -50.0)
+
+    def test_curtailment_keeps_caller_setpoints(self):
+        system = self._system(with_fixed_source=True)
+        self.fixed_source.status = np.array([False, False, True])
+        self.fixed_source.load_sharing_mode = np.full(3, 250.0 / 500.0)
+        orc_setpoint_kw = np.array([150.0, 300.0, 300.0])  # not / partly / fully curtailed
+        self._run_power_balance(system, np.full(3, 200.0), orc_setpoint_kw)
+        np.testing.assert_allclose(self.orc.power_output, [150.0, 200.0, 0.0], atol=1e-9)
+        np.testing.assert_allclose(self.orc.load_sharing_mode, orc_setpoint_kw / 300.0)
+        np.testing.assert_array_equal(self.orc.status, [True, True, True])
+        # a second balance with a higher load is not limited by the earlier curtailment
+        self.fixed_source.status = np.zeros(3, dtype=bool)
+        self.auxiliary_load.set_power_input_from_output(np.full(3, 1000.0))
+        system.do_power_balance_calculation()
+        np.testing.assert_allclose(self.orc.power_output, orc_setpoint_kw)
+
     def test_orc_as_balancing_unit_is_rejected(self):
         system = self._system()
         self.auxiliary_load.set_power_input_from_output(np.full(3, 200.0))
@@ -422,3 +455,17 @@ class TestOrganicRankineCycleHeatModel(TestCase):
     def test_without_heat_parameters_gives_zero(self):
         orc = OrganicRankineCycle(name="ORC", rated_power=Power_kW(300))
         np.testing.assert_allclose(orc.get_power_output_from_waste_heat_kw([1000.0]), [0.0])
+
+    def test_curve_with_wrong_shape_is_rejected(self):
+        for curve in (np.array([0.0, 0.5, 1.0]), np.array([[1.0, 1.0]]), np.ones((3, 3))):
+            with self.assertRaisesRegex(ValueError, "Nx2"):
+                OrganicRankineCycle(
+                    name="ORC", rated_power=Power_kW(300), relative_efficiency_curve=curve
+                )
+
+    def test_curve_with_unsorted_heat_input_is_rejected(self):
+        for curve in ([[0.0, 0.0], [1.0, 1.0], [0.5, 0.9]], [[0.0, 0.0], [0.5, 0.9], [0.5, 1.0]]):
+            with self.assertRaisesRegex(ValueError, "strictly increasing"):
+                OrganicRankineCycle(
+                    name="ORC", rated_power=Power_kW(300), relative_efficiency_curve=np.array(curve)
+                )

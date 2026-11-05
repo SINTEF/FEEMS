@@ -8,6 +8,8 @@
 
 ## 1. Context
 
+> **Superseded by §9** (review of PR #105): every ORC is a feems component; the genset / fuel-cell curve lift and the `switchboard_id == 0` sentinel below no longer apply.
+
 An ORC turns low-temperature waste heat (exhaust, jacket water) into electricity without burning fuel. Its output depends on the heat its host rejects, which depends on the host load. That is the key difference from every other feems power source: an ORC cannot follow the electric demand.
 
 feems therefore does not model the thermodynamics. The proto carries the ORC data so that a client can compute:
@@ -20,6 +22,8 @@ feems only needs a component that injects a given power into a switchboard and a
 ## 2. Proto (`machinery-system-structure/proto/system_structure.proto`)
 
 ### 2.1 Message
+
+> **Superseded by §9** (review of PR #105): every ORC is a feems component; the genset / fuel-cell curve lift and the `switchboard_id == 0` sentinel below no longer apply.
 
 ```proto
 message OrganicRankineCycle {
@@ -94,6 +98,8 @@ Only the case "no balancing power **and** |load| < 1e-6 kW" changes. A real load
 
 ### 4.1 proto → feems (`convert_to_feems.py`)
 
+> **Superseded by §9** (review of PR #105): every ORC is a feems component; the genset / fuel-cell curve lift and the `switchboard_id == 0` sentinel below no longer apply.
+
 ```
 convert_proto_propulsion_system_to_feems
   └─ MECHANICAL / HYBRID:
@@ -115,6 +121,8 @@ ELECTRIC propulsion has no main engines on shaft lines, so no ORC sources are co
 
 ### 4.2 feems → proto (`convert_to_protobuf.py`)
 
+> **Superseded by §9** (review of PR #105): every ORC is a feems component; the genset / fuel-cell curve lift and the `switchboard_id == 0` sentinel below no longer apply.
+
 `convert_switchboard_to_protobuf` skips components of type `ORGANIC_RANKINE_CYCLE`: the ORC is stored on its host engine, and writing it as a switchboard subsystem would duplicate it on the next proto → feems conversion.
 
 ### 4.3 Result conversion (`convert_feems_result_to_proto.py`)
@@ -128,6 +136,8 @@ The time-series collector accepts `ORGANIC_RANKINE_CYCLE` as a power source (pow
 - Power balance: behaviour changes only for |load| < 1e-6 kW with zero balancing power, which previously produced inf/NaN.
 
 ## 6. Edge cases
+
+> **Superseded by §9** (review of PR #105): every ORC is a feems component; the genset / fuel-cell curve lift and the `switchboard_id == 0` sentinel below no longer apply.
 
 | Case | Behaviour |
 |------|-----------|
@@ -144,6 +154,8 @@ The time-series collector accepts `ORGANIC_RANKINE_CYCLE` as a power source (pow
 - `machinery-system-structure/tests/test_convert_to_feems.py::TestConvertOrganicRankineCycle` — main engine ORC becomes a source, integrated ORC not converted, zero-rated ORC not converted, unknown switchboard raises, conversion back to proto skips the ORC.
 
 ## 8. Out of scope
+
+> **Superseded by §9** (review of PR #105): every ORC is a feems component; the genset / fuel-cell curve lift and the `switchboard_id == 0` sentinel below no longer apply.
 
 - ORC thermodynamics and host-curve lifting (client side).
 - Dispatch of the ORC setpoint in `RunFEEMSSim` PMS — the client provides the setpoint.
@@ -162,7 +174,8 @@ gets its own power setpoint from the PMS.
 | Genset / fuel-cell ORC | integrated in the host curve by the client, not converted | feems `OrganicRankineCycle` on the host's switchboard |
 | `switchboard_id` | > 0 separate source, 0 integrated | main engine: required (> 0, else `ValueError`); genset / fuel cells: host's switchboard (0 or that id, else `ValueError`); fuel cells on several switchboards: `ValueError` |
 | Round trip proto → feems → proto | ORC lost (engine had no link) | `Engine.orc` / `ElectricPowerSystem.fuel_cell_orc` point at the component; written back to `Engine.orc` / `MultiFuelEngine.orc` / `MachinerySystem.fuel_cell_orc` |
-| Setpoint above bus load | balancing source negative, or surplus lost | ORC setpoints on that bus curtailed by a common factor, warning logged |
+| Setpoint above bus load | balancing source negative, or surplus lost | ORC setpoints on that bus curtailed by a common factor, warning logged; a fully curtailed ORC is off at that point (never a balancing source); the curtailment applies to the calculation only, so the caller's `status` / `load_sharing_mode` are unchanged afterwards and only `power_output` shows it |
+| Efficiency curve | not checked | constructor raises `ValueError` unless N×2 (N ≥ 2) with strictly increasing heat input ratios |
 | ORC as balancing unit | possible (basic PMS dispatched it like a genset) | `InputError`; the basic RunFEEMSSim PMS leaves ORCs out of its load table and keeps them off |
 | Heat model | client only | `OrganicRankineCycle.get_power_output_from_waste_heat_kw` (rated efficiency, waste-heat fraction, relative efficiency curve carried on the component; no curve = rated efficiency at every heat input, the client supplies its part-load curve through the proto) |
 | Results | energy only | + `running_hours_orc_total_hr` (`FeemsResult` field 18), included in the detail row running hours |

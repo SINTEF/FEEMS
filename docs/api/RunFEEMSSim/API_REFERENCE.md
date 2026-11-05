@@ -259,6 +259,8 @@ PmsLoadTableSimulationInterface(
 | `n_bus_ties` | `int` | Number of bus-tie connections in the electric system. |
 | `pms_load_table` | `PmsLoadTable` | Load table that maps load levels to genset patterns. |
 
+Organic Rankine cycles (`OrganicRankineCycle`) are not dispatchable: this PMS leaves them out of the load table and keeps them off at every timestep. To run an ORC at a setpoint (e.g. from its host's waste heat), pass your own `pms` to `MachineryCalculation`.
+
 ### `get_min_load_table_dict_from_feems_system`
 
 ```python

@@ -1037,6 +1037,22 @@ class OrganicRankineCycle(ElectricComponent):
             switchboard_id=switchboard_id,
             uid=uid,
         )
+        if relative_efficiency_curve is not None:
+            relative_efficiency_curve = np.asarray(relative_efficiency_curve, dtype=float)
+            if (
+                relative_efficiency_curve.ndim != 2
+                or relative_efficiency_curve.shape[0] < 2
+                or relative_efficiency_curve.shape[1] != 2
+            ):
+                raise ValueError(
+                    f"ORC '{name}': relative_efficiency_curve must be an Nx2 array with N >= 2, "
+                    f"got shape {relative_efficiency_curve.shape}."
+                )
+            if not np.all(np.diff(relative_efficiency_curve[:, 0]) > 0):
+                raise ValueError(
+                    f"ORC '{name}': the heat input ratios (first column) of "
+                    "relative_efficiency_curve must be strictly increasing."
+                )
         self.rated_efficiency = rated_efficiency
         self.waste_heat_fraction = waste_heat_fraction
         self.relative_efficiency_curve = relative_efficiency_curve

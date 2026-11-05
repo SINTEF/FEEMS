@@ -99,6 +99,20 @@ heat model on the component (no default curve), `running_hours_orc_total_hr` (fi
 
 | Suite | Result |
 |---|---|
-| `feems/tests` | 284 passed, 1 skipped |
+| `feems/tests` | 288 passed, 1 skipped |
 | `machinery-system-structure/tests` | 50 passed |
 | `RunFEEMSSim/tests` | 13 passed |
+
+### Second review round (2026-11-05)
+
+- A fully curtailed ORC is switched off at that point, so it is never taken as a balancing source
+  (previously −6.5 kW with another fixed source above the load).
+- The curtailment applies to the power balance only: the caller's `status` / `load_sharing_mode`
+  are restored afterwards, and only `power_output` shows it. This matches the rest of the power
+  balance, which never changes caller inputs.
+- `relative_efficiency_curve` is validated in the constructor (N×2, N ≥ 2, strictly increasing heat
+  input ratios).
+- Design §1–§8: "superseded by §9" notes; RunFEEMSSim API reference states that the basic PMS keeps
+  ORCs off.
+
+The table above includes the four new tests. KSOE `mdl_process_lib` against this branch: 503 passed.
